@@ -1,0 +1,556 @@
+import 'dart:io';
+
+import 'package:path/path.dart' as path;
+import 'package:sqflite/sqflite.dart' as mobile;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart' as ffi;
+
+import 'auth_service.dart';
+
+class DatabaseService {
+  DatabaseService._();
+
+  static final DatabaseService instance = DatabaseService._();
+  static const currentVersion = 3;
+  static const demoCenterId = 'center_demo';
+
+  mobile.Database? _database;
+
+  Future<mobile.Database> get database async {
+    if (_database != null) return _database!;
+    final factory = _databaseFactory();
+    final dbPath = await factory.getDatabasesPath();
+    _database = await factory.openDatabase(
+      path.join(dbPath, 'sanad_mvp.db'),
+      options: mobile.OpenDatabaseOptions(
+        version: currentVersion,
+        onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
+        onCreate: (db, version) async {
+          await _createSchema(db);
+          await _seed(db);
+        },
+        onUpgrade: _upgrade,
+        onOpen: _seed,
+      ),
+    );
+    return _database!;
+  }
+
+  dynamic _databaseFactory() {
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      ffi.sqfliteFfiInit();
+      return ffi.databaseFactoryFfi;
+    }
+    return mobile.databaseFactory;
+  }
+
+  Future<String> databaseFilePath() async {
+    final factory = _databaseFactory();
+    final dbPath = await factory.getDatabasesPath();
+    return path.join(dbPath, 'sanad_mvp.db');
+  }
+
+  Future<void> exportBackup(String targetPath) async {
+    await database;
+    final source = File(await databaseFilePath());
+    await source.copy(targetPath);
+  }
+
+  Future<void> importBackup(String sourcePath) async {
+    await _database?.close();
+    _database = null;
+    await File(sourcePath).copy(await databaseFilePath());
+    await database;
+  }
+
+  Future<void> _createSchema(mobile.Database db) async {
+    await db.execute('''
+      CREATE TABLE centers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        logo_path TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL DEFAULT '',
+        manager_name TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        student_id TEXT,
+        force_password_change INTEGER NOT NULL DEFAULT 0,
+        is_demo INTEGER NOT NULL DEFAULT 0,
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE students (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        age INTEGER NOT NULL,
+        status TEXT NOT NULL,
+        diagnosis TEXT NOT NULL,
+        parent_name TEXT NOT NULL,
+        parent_phone TEXT NOT NULL,
+        portal_email TEXT NOT NULL,
+        portal_password TEXT NOT NULL,
+        photo_path TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        deleted_at TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE parents (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sessions (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        plan_id TEXT NOT NULL DEFAULT '',
+        started_at TEXT NOT NULL,
+        duration_seconds INTEGER NOT NULL,
+        card_title TEXT NOT NULL,
+        quick_result TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        summary TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE evaluations (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        letter TEXT NOT NULL,
+        position TEXT NOT NULL,
+        error_type TEXT NOT NULL,
+        score TEXT NOT NULL,
+        severity INTEGER NOT NULL DEFAULT 1,
+        recommendation TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE training_plans (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        goal TEXT NOT NULL,
+        target_date TEXT NOT NULL,
+        progress INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE exercises (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        instructions TEXT NOT NULL,
+        due_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        audio_path TEXT NOT NULL,
+        parent_note TEXT NOT NULL DEFAULT '',
+        stars INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE rewards (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        xp INTEGER NOT NULL,
+        level INTEGER NOT NULL,
+        badges TEXT NOT NULL,
+        daily_streak INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE reports (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        improvement_rate INTEGER NOT NULL,
+        specialist_signature TEXT NOT NULL,
+        manager_signature TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE sign_resources (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        title TEXT NOT NULL,
+        category TEXT NOT NULL,
+        media_type TEXT NOT NULL,
+        media_path TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT '',
+        FOREIGN KEY(center_id) REFERENCES centers(id)
+      )
+    ''');
+  }
+
+  Future<void> _upgrade(mobile.Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _ensureTable(db, 'sign_resources', '''
+        CREATE TABLE sign_resources (
+          id TEXT PRIMARY KEY,
+          center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+          title TEXT NOT NULL,
+          category TEXT NOT NULL,
+          media_type TEXT NOT NULL,
+          media_path TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 3) {
+      await _migrateToVersion3(db);
+    }
+    await _seed(db);
+  }
+
+  Future<void> _migrateToVersion3(mobile.Database db) async {
+    final now = DateTime.now().toIso8601String();
+    await _ensureTable(db, 'centers', '''
+      CREATE TABLE centers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        logo_path TEXT NOT NULL DEFAULT '',
+        address TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL DEFAULT '',
+        manager_name TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.insert('centers', _demoCenter(now), conflictAlgorithm: mobile.ConflictAlgorithm.ignore);
+    await _ensureMigrationTables(db);
+    await _addColumns(db, {
+      'users': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'password_hash': "TEXT NOT NULL DEFAULT ''",
+        'force_password_change': 'INTEGER NOT NULL DEFAULT 0',
+        'is_demo': 'INTEGER NOT NULL DEFAULT 0',
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'students': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'deleted_at': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'parents': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'sessions': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'summary': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'evaluations': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'severity': 'INTEGER NOT NULL DEFAULT 1',
+        'recommendation': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'training_plans': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'exercises': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'parent_note': "TEXT NOT NULL DEFAULT ''",
+        'stars': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'rewards': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'reports': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'manager_signature': "TEXT NOT NULL DEFAULT ''",
+        'file_path': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'sign_resources': {
+        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+    });
+    final users = await db.query('users');
+    for (final user in users) {
+      final existingHash = (user['password_hash'] ?? '') as String;
+      final legacyPassword = (user['password'] ?? '') as String;
+      if (existingHash.isEmpty && legacyPassword.isNotEmpty) {
+        await db.update(
+          'users',
+          {'password_hash': AuthService.hashPassword(legacyPassword), 'password': '', 'updated_at': now},
+          where: 'id = ?',
+          whereArgs: [user['id']],
+        );
+      }
+    }
+    await db.update(
+      'students',
+      {'portal_password': 'لا تحفظ كلمة المرور في قاعدة البيانات', 'updated_at': now},
+      where: 'portal_password != ?',
+      whereArgs: [''],
+    );
+  }
+
+  Future<void> _ensureMigrationTables(mobile.Database db) async {
+    await _ensureTable(db, 'parents', '''
+      CREATE TABLE parents (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        student_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await _ensureTable(db, 'evaluations', '''
+      CREATE TABLE evaluations (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        student_id TEXT NOT NULL,
+        letter TEXT NOT NULL,
+        position TEXT NOT NULL,
+        error_type TEXT NOT NULL,
+        score TEXT NOT NULL,
+        severity INTEGER NOT NULL DEFAULT 1,
+        recommendation TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'exercises', '''
+      CREATE TABLE exercises (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        student_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        instructions TEXT NOT NULL,
+        due_date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        audio_path TEXT NOT NULL,
+        parent_note TEXT NOT NULL DEFAULT '',
+        stars INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await _ensureTable(db, 'rewards', '''
+      CREATE TABLE rewards (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        student_id TEXT NOT NULL,
+        xp INTEGER NOT NULL,
+        level INTEGER NOT NULL,
+        badges TEXT NOT NULL,
+        daily_streak INTEGER NOT NULL,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await _ensureTable(db, 'reports', '''
+      CREATE TABLE reports (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        student_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        improvement_rate INTEGER NOT NULL,
+        specialist_signature TEXT NOT NULL,
+        manager_signature TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+  }
+
+  Future<void> _ensureTable(mobile.Database db, String table, String createSql) async {
+    final rows = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table]);
+    if (rows.isEmpty) await db.execute(createSql);
+  }
+
+  Future<void> _addColumns(mobile.Database db, Map<String, Map<String, String>> columnsByTable) async {
+    for (final entry in columnsByTable.entries) {
+      final existing = await db.rawQuery('PRAGMA table_info(${entry.key})');
+      final names = existing.map((row) => row['name']).toSet();
+      for (final column in entry.value.entries) {
+        if (!names.contains(column.key)) {
+          await db.execute('ALTER TABLE ${entry.key} ADD COLUMN ${column.key} ${column.value}');
+        }
+      }
+    }
+  }
+
+  Future<void> _seed(mobile.Database db) async {
+    final now = DateTime.now().toIso8601String();
+    await db.insert('centers', _demoCenter(now), conflictAlgorithm: mobile.ConflictAlgorithm.ignore);
+    await _seedUser(db, id: 'owner_root', email: 'owner@sanad.local', name: 'Sanad Owner', role: 'sanadOwner', centerId: demoCenterId, now: now);
+    await _seedUser(db, id: 'admin_root', email: 'admin@sanad.local', name: 'Sanad Admin', role: 'admin', centerId: demoCenterId, now: now);
+    await _seedUser(db, id: 'specialist_root', email: 'specialist@sanad.local', name: 'Sanad Specialist', role: 'specialist', centerId: demoCenterId, now: now);
+  }
+
+  Map<String, Object?> _demoCenter(String now) => {
+        'id': demoCenterId,
+        'name': 'مركز سند التجريبي',
+        'logo_path': '',
+        'address': 'الرياض',
+        'phone': '',
+        'manager_name': 'مدير المركز',
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      };
+
+  Future<void> _seedUser(
+    mobile.Database db, {
+    required String id,
+    required String email,
+    required String name,
+    required String role,
+    required String centerId,
+    required String now,
+  }) {
+    return db.insert(
+      'users',
+      {
+        'id': id,
+        'center_id': centerId,
+        'email': email,
+        'password_hash': AuthService.hashPassword('123456', salt: id),
+        'name': name,
+        'role': role,
+        'student_id': null,
+        'force_password_change': 1,
+        'is_demo': 1,
+        'is_active': 1,
+        'created_at': now,
+        'updated_at': now,
+      },
+      conflictAlgorithm: mobile.ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<List<Map<String, Object?>>> all(String table, {String? orderBy}) async {
+    final db = await database;
+    return db.query(table, orderBy: orderBy);
+  }
+
+  Future<List<Map<String, Object?>>> where(
+    String table, {
+    required String where,
+    required List<Object?> whereArgs,
+    String? orderBy,
+  }) async {
+    final db = await database;
+    return db.query(table, where: where, whereArgs: whereArgs, orderBy: orderBy);
+  }
+
+  Future<Map<String, Object?>?> first(
+    String table, {
+    required String where,
+    required List<Object?> whereArgs,
+  }) async {
+    final rows = await this.where(table, where: where, whereArgs: whereArgs);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<void> upsert(String table, Map<String, Object?> data) async {
+    final db = await database;
+    final now = DateTime.now().toIso8601String();
+    final normalized = Map<String, Object?>.from(data);
+    normalized['updated_at'] = now;
+    normalized['created_at'] = (normalized['created_at'] as String?)?.isNotEmpty == true ? normalized['created_at'] : now;
+    await db.insert(table, normalized, conflictAlgorithm: mobile.ConflictAlgorithm.replace);
+  }
+
+  Future<void> updateWhere(String table, Map<String, Object?> data, String where, List<Object?> whereArgs) async {
+    final db = await database;
+    final normalized = Map<String, Object?>.from(data)..['updated_at'] = DateTime.now().toIso8601String();
+    await db.update(table, normalized, where: where, whereArgs: whereArgs);
+  }
+
+  Future<void> delete(String table, String id) async {
+    final db = await database;
+    await db.delete(table, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteWhere(String table, String where, List<Object?> whereArgs) async {
+    final db = await database;
+    await db.delete(table, where: where, whereArgs: whereArgs);
+  }
+}
