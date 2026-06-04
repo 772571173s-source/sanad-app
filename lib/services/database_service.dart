@@ -10,8 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 3;
-  static const demoCenterId = 'center_demo';
+  static const currentVersion = 4;
 
   mobile.Database? _database;
 
@@ -26,10 +25,8 @@ class DatabaseService {
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
         onCreate: (db, version) async {
           await _createSchema(db);
-          await _seed(db);
         },
         onUpgrade: _upgrade,
-        onOpen: _seed,
       ),
     );
     return _database!;
@@ -79,7 +76,7 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE users (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         email TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -89,8 +86,7 @@ class DatabaseService {
         is_demo INTEGER NOT NULL DEFAULT 0,
         is_active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY(center_id) REFERENCES centers(id)
+        updated_at TEXT NOT NULL
       )
     ''');
     await db.execute('''
@@ -101,6 +97,7 @@ class DatabaseService {
         age INTEGER NOT NULL,
         status TEXT NOT NULL,
         diagnosis TEXT NOT NULL,
+        program_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
         parent_name TEXT NOT NULL,
         parent_phone TEXT NOT NULL,
         portal_email TEXT NOT NULL,
@@ -133,6 +130,13 @@ class DatabaseService {
         center_id TEXT NOT NULL,
         student_id TEXT NOT NULL,
         plan_id TEXT NOT NULL DEFAULT '',
+        session_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
+        target_letter TEXT NOT NULL DEFAULT '',
+        letter_position TEXT NOT NULL DEFAULT '',
+        error_type TEXT NOT NULL DEFAULT '',
+        practice_items TEXT NOT NULL DEFAULT '',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        success_rate INTEGER NOT NULL DEFAULT 0,
         started_at TEXT NOT NULL,
         duration_seconds INTEGER NOT NULL,
         card_title TEXT NOT NULL,
@@ -229,7 +233,7 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE sign_resources (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         title TEXT NOT NULL,
         category TEXT NOT NULL,
         media_type TEXT NOT NULL,
@@ -247,7 +251,7 @@ class DatabaseService {
       await _ensureTable(db, 'sign_resources', '''
         CREATE TABLE sign_resources (
           id TEXT PRIMARY KEY,
-          center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+          center_id TEXT NOT NULL DEFAULT '',
           title TEXT NOT NULL,
           category TEXT NOT NULL,
           media_type TEXT NOT NULL,
@@ -261,7 +265,9 @@ class DatabaseService {
     if (oldVersion < 3) {
       await _migrateToVersion3(db);
     }
-    await _seed(db);
+    if (oldVersion < 4) {
+      await _removeDemoData(db);
+    }
   }
 
   Future<void> _migrateToVersion3(mobile.Database db) async {
@@ -279,11 +285,10 @@ class DatabaseService {
         updated_at TEXT NOT NULL
       )
     ''');
-    await db.insert('centers', _demoCenter(now), conflictAlgorithm: mobile.ConflictAlgorithm.ignore);
     await _ensureMigrationTables(db);
     await _addColumns(db, {
       'users': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'password_hash': "TEXT NOT NULL DEFAULT ''",
         'force_password_change': 'INTEGER NOT NULL DEFAULT 0',
         'is_demo': 'INTEGER NOT NULL DEFAULT 0',
@@ -292,54 +297,62 @@ class DatabaseService {
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'students': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'program_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
         'deleted_at': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'parents': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'sessions': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'session_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
+        'target_letter': "TEXT NOT NULL DEFAULT ''",
+        'letter_position': "TEXT NOT NULL DEFAULT ''",
+        'error_type': "TEXT NOT NULL DEFAULT ''",
+        'practice_items': "TEXT NOT NULL DEFAULT ''",
+        'attempts': 'INTEGER NOT NULL DEFAULT 0',
+        'success_rate': 'INTEGER NOT NULL DEFAULT 0',
         'summary': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'evaluations': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'severity': 'INTEGER NOT NULL DEFAULT 1',
         'recommendation': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'training_plans': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'exercises': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'parent_note': "TEXT NOT NULL DEFAULT ''",
         'stars': 'INTEGER NOT NULL DEFAULT 0',
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'rewards': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'reports': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'manager_signature': "TEXT NOT NULL DEFAULT ''",
         'file_path': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
       'sign_resources': {
-        'center_id': "TEXT NOT NULL DEFAULT '$demoCenterId'",
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
@@ -359,17 +372,22 @@ class DatabaseService {
     }
     await db.update(
       'students',
-      {'portal_password': 'لا تحفظ كلمة المرور في قاعدة البيانات', 'updated_at': now},
+      {'portal_password': '', 'updated_at': now},
       where: 'portal_password != ?',
       whereArgs: [''],
     );
+  }
+
+  Future<void> _removeDemoData(mobile.Database db) async {
+    await db.delete('users', where: 'is_demo = 1');
+    await db.delete('centers', where: 'name LIKE ?', whereArgs: ['%تجريبي%']);
   }
 
   Future<void> _ensureMigrationTables(mobile.Database db) async {
     await _ensureTable(db, 'parents', '''
       CREATE TABLE parents (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         name TEXT NOT NULL,
         phone TEXT NOT NULL,
@@ -381,7 +399,7 @@ class DatabaseService {
     await _ensureTable(db, 'evaluations', '''
       CREATE TABLE evaluations (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         letter TEXT NOT NULL,
         position TEXT NOT NULL,
@@ -397,7 +415,7 @@ class DatabaseService {
     await _ensureTable(db, 'exercises', '''
       CREATE TABLE exercises (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         title TEXT NOT NULL,
         instructions TEXT NOT NULL,
@@ -413,7 +431,7 @@ class DatabaseService {
     await _ensureTable(db, 'rewards', '''
       CREATE TABLE rewards (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         xp INTEGER NOT NULL,
         level INTEGER NOT NULL,
@@ -426,7 +444,7 @@ class DatabaseService {
     await _ensureTable(db, 'reports', '''
       CREATE TABLE reports (
         id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL DEFAULT '$demoCenterId',
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         type TEXT NOT NULL,
         created_at TEXT NOT NULL,
@@ -456,53 +474,10 @@ class DatabaseService {
     }
   }
 
-  Future<void> _seed(mobile.Database db) async {
-    final now = DateTime.now().toIso8601String();
-    await db.insert('centers', _demoCenter(now), conflictAlgorithm: mobile.ConflictAlgorithm.ignore);
-    await _seedUser(db, id: 'owner_root', email: 'owner@sanad.local', name: 'Sanad Owner', role: 'sanadOwner', centerId: demoCenterId, now: now);
-    await _seedUser(db, id: 'admin_root', email: 'admin@sanad.local', name: 'Sanad Admin', role: 'admin', centerId: demoCenterId, now: now);
-    await _seedUser(db, id: 'specialist_root', email: 'specialist@sanad.local', name: 'Sanad Specialist', role: 'specialist', centerId: demoCenterId, now: now);
-  }
-
-  Map<String, Object?> _demoCenter(String now) => {
-        'id': demoCenterId,
-        'name': 'مركز سند التجريبي',
-        'logo_path': '',
-        'address': 'الرياض',
-        'phone': '',
-        'manager_name': 'مدير المركز',
-        'is_active': 1,
-        'created_at': now,
-        'updated_at': now,
-      };
-
-  Future<void> _seedUser(
-    mobile.Database db, {
-    required String id,
-    required String email,
-    required String name,
-    required String role,
-    required String centerId,
-    required String now,
-  }) {
-    return db.insert(
-      'users',
-      {
-        'id': id,
-        'center_id': centerId,
-        'email': email,
-        'password_hash': AuthService.hashPassword('123456', salt: id),
-        'name': name,
-        'role': role,
-        'student_id': null,
-        'force_password_change': 1,
-        'is_demo': 1,
-        'is_active': 1,
-        'created_at': now,
-        'updated_at': now,
-      },
-      conflictAlgorithm: mobile.ConflictAlgorithm.ignore,
-    );
+  Future<int> count(String table) async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) AS total FROM $table');
+    return (result.first['total'] as int?) ?? 0;
   }
 
   Future<List<Map<String, Object?>>> all(String table, {String? orderBy}) async {

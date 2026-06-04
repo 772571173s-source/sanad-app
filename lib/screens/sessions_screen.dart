@@ -18,17 +18,25 @@ class SessionsScreen extends StatefulWidget {
 class _SessionsScreenState extends State<SessionsScreen> {
   Timer? timer;
   int seconds = 0;
+  int attempts = 0;
+  int successRate = 0;
+  String sessionType = 'نطق وتخاطب';
+  String targetLetter = '';
+  String letterPosition = 'أول الكلمة';
+  String errorType = 'حذف';
   String cardTitle = 'بطاقة نطق الحرف';
   String result = 'صحيح';
   String planId = '';
   final notes = TextEditingController();
   final summary = TextEditingController();
+  final practiceItems = TextEditingController();
 
   @override
   void dispose() {
     timer?.cancel();
     notes.dispose();
     summary.dispose();
+    practiceItems.dispose();
     super.dispose();
   }
 
@@ -55,6 +63,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       children: [
                         SizedBox(width: 260, child: TextField(decoration: const InputDecoration(labelText: 'بطاقة التدريب'), onChanged: (value) => cardTitle = value)),
                         SizedBox(
+                          width: 220,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: sessionType,
+                            decoration: const InputDecoration(labelText: 'نوع الجلسة'),
+                            items: const ['نطق وتخاطب', 'لغة إشارة', 'مهارات تعليمية', 'مهارات سلوكية', 'أخرى'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+                            onChanged: (value) => setState(() => sessionType = value ?? sessionType),
+                          ),
+                        ),
+                        SizedBox(
                           width: 260,
                           child: DropdownButtonFormField<String>(
                             initialValue: planId.isEmpty ? null : planId,
@@ -72,6 +89,28 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           selected: {result},
                           onSelectionChanged: (value) => setState(() => result = value.first),
                         ),
+                      ],
+                    ),
+                    if (sessionType == 'نطق وتخاطب') ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          SizedBox(width: 120, child: TextField(decoration: const InputDecoration(labelText: 'الحرف'), onChanged: (value) => targetLetter = value)),
+                          SizedBox(width: 180, child: DropdownButtonFormField<String>(initialValue: letterPosition, decoration: const InputDecoration(labelText: 'موضع الحرف'), items: const ['أول الكلمة', 'وسط الكلمة', 'آخر الكلمة'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) => setState(() => letterPosition = value ?? letterPosition))),
+                          SizedBox(width: 180, child: DropdownButtonFormField<String>(initialValue: errorType, decoration: const InputDecoration(labelText: 'نوع الخطأ'), items: const ['حذف', 'إبدال', 'تشويه', 'إضافة'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) => setState(() => errorType = value ?? errorType))),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(controller: practiceItems, maxLines: 2, decoration: const InputDecoration(labelText: 'الكلمات / الجمل / الإشارات المستهدفة')),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      children: [
+                        SizedBox(width: 180, child: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'عدد التمارين'), onChanged: (value) => attempts = int.tryParse(value) ?? 0)),
+                        SizedBox(width: 180, child: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'نسبة النجاح %'), onChanged: (value) => successRate = int.tryParse(value) ?? 0)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -125,11 +164,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (seconds == 0 || cardTitle.trim().isEmpty) throw StateError('ابدأ المؤقت واكتب بطاقة التدريب قبل الحفظ.');
       await app.saveSession(
         TherapySession(
-          id: 'session_${DateTime.now().millisecondsSinceEpoch}',
-          centerId: student.centerId,
-          studentId: student.id,
-          planId: planId,
-          startedAt: DateTime.now().toIso8601String(),
+        id: 'session_${DateTime.now().millisecondsSinceEpoch}',
+        centerId: student.centerId,
+        studentId: student.id,
+        planId: planId,
+        sessionType: sessionType,
+        targetLetter: targetLetter,
+        letterPosition: letterPosition,
+        errorType: sessionType == 'نطق وتخاطب' ? errorType : '',
+        practiceItems: practiceItems.text.trim(),
+        attempts: attempts,
+        successRate: successRate.clamp(0, 100).toInt(),
+        startedAt: DateTime.now().toIso8601String(),
           durationSeconds: seconds,
           cardTitle: cardTitle,
           quickResult: result,
@@ -141,6 +187,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
         seconds = 0;
         notes.clear();
         summary.clear();
+        practiceItems.clear();
+        attempts = 0;
+        successRate = 0;
       });
     });
   }

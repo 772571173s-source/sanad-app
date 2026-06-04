@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 import 'repositories/sanad_repository.dart';
 import 'screens/app_shell.dart';
+import 'screens/first_setup_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/database_service.dart';
 import 'services/pdf_service.dart';
@@ -25,7 +26,7 @@ class SanadApp extends StatelessWidget {
           final seed = const Color(0xFF19706C);
           return MaterialApp(
             debugShowCheckedModeBanner: false,
-            title: 'Sanad MVP',
+            title: 'Sanad',
             themeMode: app.darkMode ? ThemeMode.dark : ThemeMode.light,
             theme: ThemeData(
               useMaterial3: true,
@@ -40,10 +41,39 @@ class SanadApp extends StatelessWidget {
               inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
               cardTheme: const CardThemeData(margin: EdgeInsets.zero),
             ),
-            home: app.user == null ? const LoginScreen() : const AppShell(),
+            home: _HomeGate(app: app),
           );
         },
       ),
     );
+  }
+}
+
+class _HomeGate extends StatefulWidget {
+  const _HomeGate({required this.app});
+
+  final AppProvider app;
+
+  @override
+  State<_HomeGate> createState() => _HomeGateState();
+}
+
+class _HomeGateState extends State<_HomeGate> {
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.app.initialized) {
+      Future.microtask(widget.app.initialize);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = widget.app;
+    if (!app.initialized) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (app.setupRequired) return const FirstSetupScreen();
+    return app.user == null ? const LoginScreen() : const AppShell();
   }
 }

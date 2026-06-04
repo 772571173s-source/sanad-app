@@ -7,6 +7,24 @@ class SanadRepository {
 
   final DatabaseService _db;
 
+  Future<bool> hasUsers() async => await _db.count('users') > 0;
+
+  Future<void> createSystemOwner({required String name, required String email, required String password}) async {
+    if (await hasUsers()) throw StateError('تم إعداد النظام مسبقًا.');
+    await saveUser(
+      AppUser(
+        id: 'owner_${DateTime.now().millisecondsSinceEpoch}',
+        email: email,
+        passwordHash: AuthService.hashPassword(password),
+        name: name,
+        role: UserRole.sanadOwner,
+        centerId: '',
+        forcePasswordChange: false,
+        isDemo: false,
+      ),
+    );
+  }
+
   Future<AppUser?> login(String email, String password) async {
     final row = await _db.first('users', where: 'email = ? AND is_active = 1', whereArgs: [email]);
     if (row == null) return null;
@@ -65,7 +83,7 @@ class SanadRepository {
         parentName: student.parentName,
         parentPhone: student.parentPhone,
         portalEmail: student.portalEmail,
-        portalPassword: student.portalPassword.isEmpty ? '' : 'لا تحفظ كلمة المرور في قاعدة البيانات',
+        portalPassword: '',
         photoPath: student.photoPath,
         notes: student.notes,
         deletedAt: student.deletedAt,
@@ -84,20 +102,34 @@ class SanadRepository {
         email: student.portalEmail,
       ).toMap(),
     );
-    await _db.upsert(
-      'users',
-      AppUser(
-        id: 'user_${student.id}',
-        centerId: student.centerId,
-        email: student.portalEmail,
-        passwordHash: AuthService.hashPassword(student.portalPassword),
-        name: student.parentName.isEmpty ? 'Parent ${student.name}' : student.parentName,
-        role: UserRole.parent,
-        studentId: student.id,
-        forcePasswordChange: true,
-        isDemo: false,
-      ).toMap(),
-    );
+    final existingParentUser = await _db.first('users', where: 'student_id = ?', whereArgs: [student.id]);
+    if (existingParentUser == null || student.portalPassword.isNotEmpty) {
+      await _db.upsert(
+        'users',
+        AppUser(
+          id: 'user_${student.id}',
+          centerId: student.centerId,
+          email: student.portalEmail,
+          passwordHash: AuthService.hashPassword(student.portalPassword),
+          name: student.parentName.isEmpty ? 'Parent ${student.name}' : student.parentName,
+          role: UserRole.parent,
+          studentId: student.id,
+          forcePasswordChange: true,
+          isDemo: false,
+        ).toMap(),
+      );
+    } else {
+      await _db.updateWhere(
+        'users',
+        {
+          'center_id': student.centerId,
+          'email': student.portalEmail,
+          'name': student.parentName.isEmpty ? 'Parent ${student.name}' : student.parentName,
+        },
+        'student_id = ?',
+        [student.id],
+      );
+    }
     if (await reward(student.id) == null) {
       await _db.upsert('rewards', Reward(id: 'reward_${student.id}', centerId: student.centerId, studentId: student.id, xp: 0, level: 1, badges: '', dailyStreak: 0).toMap());
     }

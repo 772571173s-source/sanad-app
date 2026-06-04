@@ -78,19 +78,19 @@ class _AppShellState extends State<AppShell> {
   List<_NavItem> _items(AppProvider app) {
     final base = <_NavItem>[
       const _NavItem('لوحة التحكم', Icons.dashboard_outlined, DashboardScreen()),
-      if (!app.isParent) const _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
-      if (!app.isParent) const _NavItem('ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
-      if (!app.isParent) const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
-      if (!app.isParent) const _NavItem('تقييم الحروف', Icons.record_voice_over_outlined, EvaluationsScreen()),
-      if (!app.isParent) const _NavItem('الخطط الدراسية', Icons.route_outlined, PlansScreen()),
-      if (!app.isParent) const _NavItem('لغة الإشارة', Icons.sign_language_outlined, SignLibraryScreen()),
+      if (app.canManageStudents) const _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
+      if (app.canManageStudents || app.isParent) const _NavItem('ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
+      if (app.canWriteClinical) const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
+      if (app.canWriteClinical) const _NavItem('تقييم الحروف', Icons.record_voice_over_outlined, EvaluationsScreen()),
+      if (app.canWriteClinical) const _NavItem('الخطط الدراسية', Icons.route_outlined, PlansScreen()),
+      if (app.canWriteClinical && app.signLanguageEnabledForSelectedStudent) const _NavItem('لغة الإشارة', Icons.sign_language_outlined, SignLibraryScreen()),
       const _NavItem('واجهة الأهل', Icons.family_restroom_outlined, ExercisesParentScreen()),
       const _NavItem('المكافآت', Icons.emoji_events_outlined, RewardsScreen()),
-      if (!app.isParent) const _NavItem('التقارير PDF', Icons.picture_as_pdf_outlined, ReportsScreen()),
+      if (app.canViewReports) const _NavItem('التقارير PDF', Icons.picture_as_pdf_outlined, ReportsScreen()),
       if (app.canManageCenters) const _NavItem('إدارة المراكز', Icons.business_outlined, CentersScreen()),
       if (app.canManageStaff) const _NavItem('الموظفون والمدراء', Icons.manage_accounts_outlined, StaffScreen()),
-      if (!app.isParent) const _NavItem('إعدادات المركز', Icons.settings_outlined, CenterSettingsScreen()),
-      if (app.isOwner || app.isAdmin) const _NavItem('Backup', Icons.backup_outlined, BackupScreen()),
+      if (app.isCenterManager) const _NavItem('إعدادات المركز', Icons.settings_outlined, CenterSettingsScreen()),
+      if (app.isOwner || app.isCenterManager) const _NavItem('Backup', Icons.backup_outlined, BackupScreen()),
       const _NavItem('تغيير كلمة المرور', Icons.lock_reset, PasswordScreen()),
     ];
     return base;
@@ -136,7 +136,7 @@ class _Sidebar extends StatelessWidget {
             children: [
               ListTile(
                 leading: CircleAvatar(backgroundColor: Theme.of(context).colorScheme.primary, child: const Text('س')),
-                title: const Text('Sanad MVP', style: TextStyle(fontWeight: FontWeight.w900)),
+                title: const Text('Sanad', style: TextStyle(fontWeight: FontWeight.w900)),
                 subtitle: Text(context.watch<AppProvider>().currentCenter?.name ?? 'إدارة التخاطب والتأهيل'),
               ),
               const SizedBox(height: 12),

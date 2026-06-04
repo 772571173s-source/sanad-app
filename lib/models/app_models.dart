@@ -1,20 +1,24 @@
-enum UserRole { sanadOwner, admin, specialist, parent }
+﻿enum UserRole { sanadOwner, centerManager, specialist, dataEntry, parent }
 
 extension UserRoleX on UserRole {
   String get label {
     switch (this) {
-      case UserRole.admin:
-        return 'مدير مركز';
       case UserRole.sanadOwner:
         return 'مالك النظام';
+      case UserRole.centerManager:
+        return 'مدير مركز';
       case UserRole.specialist:
         return 'أخصائي';
+      case UserRole.dataEntry:
+        return 'مدخل بيانات';
       case UserRole.parent:
         return 'ولي أمر';
     }
   }
 
   static UserRole fromDb(String value) {
+    if (value == 'systemOwner') return UserRole.sanadOwner;
+    if (value == 'admin') return UserRole.centerManager;
     return UserRole.values.firstWhere((role) => role.name == value, orElse: () => UserRole.parent);
   }
 }
@@ -26,7 +30,7 @@ class AppUser {
     required this.passwordHash,
     required this.name,
     required this.role,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     this.studentId,
     this.forcePasswordChange = false,
     this.isDemo = false,
@@ -54,7 +58,7 @@ class AppUser {
         passwordHash: (row['password_hash'] ?? row['password'] ?? '') as String,
         name: row['name'] as String,
         role: UserRoleX.fromDb(row['role'] as String),
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String?,
         forcePasswordChange: ((row['force_password_change'] ?? 0) as int) == 1,
         isDemo: ((row['is_demo'] ?? 0) as int) == 1,
@@ -130,11 +134,12 @@ class SanadCenter {
 class Student {
   const Student({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.name,
     required this.age,
     required this.status,
     required this.diagnosis,
+    this.programType = 'نطق وتخاطب',
     required this.parentName,
     required this.parentPhone,
     required this.portalEmail,
@@ -152,6 +157,7 @@ class Student {
   final int age;
   final String status;
   final String diagnosis;
+  final String programType;
   final String parentName;
   final String parentPhone;
   final String portalEmail;
@@ -164,11 +170,12 @@ class Student {
 
   static Student fromMap(Map<String, Object?> row) => Student(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         name: row['name'] as String,
         age: row['age'] as int,
         status: row['status'] as String,
         diagnosis: row['diagnosis'] as String,
+        programType: (row['program_type'] ?? 'نطق وتخاطب') as String,
         parentName: row['parent_name'] as String,
         parentPhone: row['parent_phone'] as String,
         portalEmail: row['portal_email'] as String,
@@ -187,6 +194,7 @@ class Student {
         'age': age,
         'status': status,
         'diagnosis': diagnosis,
+        'program_type': programType,
         'parent_name': parentName,
         'parent_phone': parentPhone,
         'portal_email': portalEmail,
@@ -202,7 +210,7 @@ class Student {
 class ParentProfile {
   const ParentProfile({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.name,
     required this.phone,
@@ -218,7 +226,7 @@ class ParentProfile {
 
   static ParentProfile fromMap(Map<String, Object?> row) => ParentProfile(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         name: row['name'] as String,
         phone: row['phone'] as String,
@@ -238,9 +246,16 @@ class ParentProfile {
 class TherapySession {
   const TherapySession({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     this.planId = '',
+    this.sessionType = 'نطق وتخاطب',
+    this.targetLetter = '',
+    this.letterPosition = '',
+    this.errorType = '',
+    this.practiceItems = '',
+    this.attempts = 0,
+    this.successRate = 0,
     required this.startedAt,
     required this.durationSeconds,
     required this.cardTitle,
@@ -255,6 +270,13 @@ class TherapySession {
   final String centerId;
   final String studentId;
   final String planId;
+  final String sessionType;
+  final String targetLetter;
+  final String letterPosition;
+  final String errorType;
+  final String practiceItems;
+  final int attempts;
+  final int successRate;
   final String startedAt;
   final int durationSeconds;
   final String cardTitle;
@@ -266,9 +288,16 @@ class TherapySession {
 
   static TherapySession fromMap(Map<String, Object?> row) => TherapySession(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         planId: (row['plan_id'] ?? '') as String,
+        sessionType: (row['session_type'] ?? 'نطق وتخاطب') as String,
+        targetLetter: (row['target_letter'] ?? '') as String,
+        letterPosition: (row['letter_position'] ?? '') as String,
+        errorType: (row['error_type'] ?? '') as String,
+        practiceItems: (row['practice_items'] ?? '') as String,
+        attempts: (row['attempts'] ?? 0) as int,
+        successRate: (row['success_rate'] ?? 0) as int,
         startedAt: row['started_at'] as String,
         durationSeconds: row['duration_seconds'] as int,
         cardTitle: row['card_title'] as String,
@@ -284,6 +313,13 @@ class TherapySession {
         'center_id': centerId,
         'student_id': studentId,
         'plan_id': planId,
+        'session_type': sessionType,
+        'target_letter': targetLetter,
+        'letter_position': letterPosition,
+        'error_type': errorType,
+        'practice_items': practiceItems,
+        'attempts': attempts,
+        'success_rate': successRate,
         'started_at': startedAt,
         'duration_seconds': durationSeconds,
         'card_title': cardTitle,
@@ -298,7 +334,7 @@ class TherapySession {
 class Evaluation {
   const Evaluation({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.letter,
     required this.position,
@@ -326,7 +362,7 @@ class Evaluation {
 
   static Evaluation fromMap(Map<String, Object?> row) => Evaluation(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         letter: row['letter'] as String,
         position: row['position'] as String,
@@ -358,7 +394,7 @@ class Evaluation {
 class TrainingPlan {
   const TrainingPlan({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.goal,
     required this.targetDate,
@@ -378,7 +414,7 @@ class TrainingPlan {
 
   static TrainingPlan fromMap(Map<String, Object?> row) => TrainingPlan(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         goal: row['goal'] as String,
         targetDate: row['target_date'] as String,
@@ -402,7 +438,7 @@ class TrainingPlan {
 class Exercise {
   const Exercise({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.title,
     required this.instructions,
@@ -430,7 +466,7 @@ class Exercise {
 
   static Exercise fromMap(Map<String, Object?> row) => Exercise(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         title: row['title'] as String,
         instructions: row['instructions'] as String,
@@ -462,7 +498,7 @@ class Exercise {
 class Reward {
   const Reward({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.xp,
     required this.level,
@@ -480,7 +516,7 @@ class Reward {
 
   static Reward fromMap(Map<String, Object?> row) => Reward(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         xp: row['xp'] as int,
         level: row['level'] as int,
@@ -502,7 +538,7 @@ class Reward {
 class ReportRecord {
   const ReportRecord({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.studentId,
     required this.type,
     required this.createdAt,
@@ -526,7 +562,7 @@ class ReportRecord {
 
   static ReportRecord fromMap(Map<String, Object?> row) => ReportRecord(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         type: row['type'] as String,
         createdAt: row['created_at'] as String,
@@ -554,7 +590,7 @@ class ReportRecord {
 class SignResource {
   const SignResource({
     required this.id,
-    this.centerId = 'center_demo',
+    this.centerId = '',
     required this.title,
     required this.category,
     required this.mediaType,
@@ -572,7 +608,7 @@ class SignResource {
 
   static SignResource fromMap(Map<String, Object?> row) => SignResource(
         id: row['id'] as String,
-        centerId: (row['center_id'] ?? 'center_demo') as String,
+        centerId: (row['center_id'] ?? '') as String,
         title: row['title'] as String,
         category: row['category'] as String,
         mediaType: row['media_type'] as String,

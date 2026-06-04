@@ -86,7 +86,7 @@ class PdfService {
           pw.SizedBox(height: 16),
           pw.Text('الجلسات', style: pw.TextStyle(font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
           if (sessions.isEmpty) pw.Text('لا توجد جلسات مسجلة.', style: pw.TextStyle(font: font)),
-          ...sessions.take(12).map((session) => pw.Bullet(text: '${session.startedAt} - ${session.cardTitle} - ${session.quickResult}', style: pw.TextStyle(font: font))),
+          ...sessions.take(12).map((session) => pw.Bullet(text: '${session.startedAt} - ${session.sessionType} - ${session.cardTitle} - ${session.quickResult} - نجاح ${session.successRate}% - ${session.practiceItems}', style: pw.TextStyle(font: font))),
           pw.SizedBox(height: 16),
           pw.Text('تقييم نطق الحروف', style: pw.TextStyle(font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
           if (evaluations.isEmpty) pw.Text('لا توجد تقييمات مسجلة.', style: pw.TextStyle(font: font)),

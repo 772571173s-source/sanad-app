@@ -11,8 +11,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final email = TextEditingController(text: 'owner@sanad.local');
-  final password = TextEditingController(text: '123456');
+  final email = TextEditingController();
+  final password = TextEditingController();
   String? error;
 
   @override
@@ -48,7 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           Text('سند', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
                           SizedBox(height: 10),
-                          Text('MVP لإدارة التخاطب والتأهيل: طلاب، جلسات، تقييمات، واجبات، مكافآت، وتقارير.', style: TextStyle(color: Color(0xFFD8ECE8), height: 1.7)),
+                          Text('نظام إدارة التخاطب والتأهيل للمراكز: مراكز، موظفون، طلاب، جلسات، واجبات، وتقارير.', style: TextStyle(color: Color(0xFFD8ECE8), height: 1.7)),
                         ],
                       ),
                     );
@@ -74,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             label: Text(app.loading ? 'جاري الدخول...' : 'دخول'),
                           ),
                           const SizedBox(height: 8),
-                          const Text('حسابات تجريبية فقط:\nمالك النظام: owner@sanad.local / 123456\nمدير مركز: admin@sanad.local / 123456\nأخصائي: specialist@sanad.local / 123456'),
+                          const Text('استخدم الحساب الذي أنشأته في أول تشغيل أو الحساب الذي أنشأه مدير المركز.'),
                         ],
                       ),
                     );

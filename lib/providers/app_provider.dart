@@ -25,17 +25,42 @@ class AppProvider extends ChangeNotifier {
   Reward? reward;
   bool loading = false;
   bool darkMode = false;
+  bool initialized = false;
+  bool setupRequired = false;
 
   bool get isOwner => user?.role == UserRole.sanadOwner;
-  bool get isAdmin => user?.role == UserRole.admin;
+  bool get isCenterManager => user?.role == UserRole.centerManager;
   bool get isSpecialist => user?.role == UserRole.specialist;
+  bool get isDataEntry => user?.role == UserRole.dataEntry;
   bool get isParent => user?.role == UserRole.parent;
   bool get canManageCenters => isOwner;
-  bool get canManageStaff => isOwner || isAdmin;
-  bool get canManageStudents => isOwner || isAdmin || isSpecialist;
-  bool get canWriteClinical => isAdmin || isSpecialist;
+  bool get canManageStaff => isOwner || isCenterManager;
+  bool get canManageStudents => isCenterManager || isSpecialist || isDataEntry;
+  bool get canDeleteStudents => isCenterManager || isSpecialist;
+  bool get canWriteClinical => isSpecialist;
   bool get canWriteParentArea => isParent || canWriteClinical;
-  String get activeCenterId => currentCenter?.id ?? user?.centerId ?? 'center_demo';
+  bool get canViewReports => isCenterManager || isSpecialist;
+  String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
+  bool get signLanguageEnabledForSelectedStudent {
+    final student = selectedStudent;
+    if (student == null) return true;
+    return student.programType.contains('سمع') || student.programType.contains('إشارة');
+  }
+
+  Future<void> initialize() async {
+    setupRequired = !await _repository.hasUsers();
+    initialized = true;
+    notifyListeners();
+  }
+
+  Future<void> createSystemOwner({required String name, required String email, required String password, required String confirmPassword}) async {
+    if (name.trim().isEmpty || email.trim().isEmpty || password.isEmpty) throw StateError('أكمل بيانات مالك النظام.');
+    if (password.length < 8) throw StateError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
+    if (password != confirmPassword) throw StateError('كلمتا المرور غير متطابقتين.');
+    await _repository.createSystemOwner(name: name.trim(), email: email.trim(), password: password);
+    setupRequired = false;
+    notifyListeners();
+  }
 
   Future<bool> login(String email, String password) async {
     loading = true;
@@ -92,11 +117,24 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> loadHome() async {
     final current = _requireUser();
-    centers = await _repository.centers();
-    currentCenter = isOwner ? (currentCenter ?? centers.firstWhere((center) => center.id == current.centerId, orElse: () => centers.first)) : centers.firstWhere((center) => center.id == current.centerId);
+    final allCenters = await _repository.centers();
+    centers = isOwner ? allCenters : allCenters.where((center) => center.id == current.centerId).toList();
+    if (isOwner) {
+      final selectedCenter = currentCenter;
+      currentCenter = selectedCenter == null || centers.any((center) => center.id == selectedCenter.id) ? selectedCenter : null;
+    } else if (current.centerId.isNotEmpty) {
+      final matches = centers.where((center) => center.id == current.centerId).toList();
+      currentCenter = matches.isEmpty ? null : matches.first;
+    } else {
+      currentCenter = null;
+    }
     staff = canManageStaff ? await _repository.users(centerId: isOwner ? null : activeCenterId) : [];
-    signResources = await _repository.signResources(activeCenterId);
-    students = current.role == UserRole.parent && current.studentId != null ? await _repository.studentsForParent(current.studentId!) : await _repository.students(activeCenterId);
+    signResources = activeCenterId.isEmpty ? [] : await _repository.signResources(activeCenterId);
+    students = current.role == UserRole.parent && current.studentId != null
+        ? await _repository.studentsForParent(current.studentId!)
+        : activeCenterId.isEmpty
+            ? []
+            : await _repository.students(activeCenterId);
     final currentSelection = selectedStudent;
     selectedStudent = currentSelection != null && students.any((student) => student.id == currentSelection.id) ? currentSelection : (students.isEmpty ? null : students.first);
     await selectStudent(selectedStudent);
@@ -131,7 +169,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveCenter(SanadCenter center) async {
-    _ensure(canManageCenters || (isAdmin && center.id == activeCenterId), 'ليست لديك صلاحية تعديل هذا المركز.');
+    _ensure(canManageCenters || (isCenterManager && center.id == activeCenterId), 'ليست لديك صلاحية تعديل هذا المركز.');
     await _repository.saveCenter(center);
     await loadHome();
   }
@@ -140,6 +178,8 @@ class AppProvider extends ChangeNotifier {
     _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
     if (!isOwner && account.centerId != activeCenterId) throw StateError('لا يمكن إنشاء موظف خارج مركزك.');
     if (!isOwner && account.role == UserRole.sanadOwner) throw StateError('مالك النظام لا ينشئه إلا مالك النظام.');
+    if (isOwner && account.role != UserRole.centerManager) throw StateError('مالك النظام ينشئ مدير مركز فقط.');
+    if (isCenterManager && account.role != UserRole.specialist && account.role != UserRole.dataEntry) throw StateError('مدير المركز ينشئ أخصائي أو مدخل بيانات فقط.');
     await _repository.saveUser(account);
     await loadHome();
   }
@@ -153,6 +193,7 @@ class AppProvider extends ChangeNotifier {
       age: student.age,
       status: student.status,
       diagnosis: student.diagnosis,
+      programType: student.programType,
       parentName: student.parentName,
       parentPhone: student.parentPhone,
       portalEmail: student.portalEmail,
@@ -172,7 +213,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> deleteStudent(String id) async {
-    _ensure(canManageStudents, 'لا تملك صلاحية حذف الطلاب.');
+    _ensure(canDeleteStudents, 'لا تملك صلاحية حذف الطلاب.');
     await _repository.softDeleteStudent(id);
     selectedStudent = null;
     await loadHome();
@@ -225,12 +266,12 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> exportBackup(String targetPath) async {
-    _ensure(isOwner || isAdmin, 'النسخ الاحتياطي للمالك أو مدير المركز.');
+    _ensure(isOwner || isCenterManager, 'النسخ الاحتياطي للمالك أو مدير المركز.');
     await _repository.exportBackup(targetPath);
   }
 
   Future<void> importBackup(String sourcePath) async {
-    _ensure(isOwner || isAdmin, 'استيراد النسخ الاحتياطي للمالك أو مدير المركز.');
+    _ensure(isOwner || isCenterManager, 'استيراد النسخ الاحتياطي للمالك أو مدير المركز.');
     await _repository.importBackup(sourcePath);
     await loadHome();
   }
@@ -256,7 +297,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> printCredentials(Student student) => _pdfService.printStudentCredentials(student);
 
   Future<void> printReport(String type, String specialistSignature, String managerSignature) async {
-    _ensure(canWriteClinical, 'التقارير الرسمية يصدرها المركز فقط.');
+    _ensure(canViewReports, 'التقارير الرسمية يصدرها المركز فقط.');
     final student = selectedStudent;
     if (student == null) return;
     final report = ReportRecord(
@@ -313,7 +354,7 @@ class AppProvider extends ChangeNotifier {
     final current = _requireUser();
     if (current.role == UserRole.sanadOwner) return;
     if (current.role == UserRole.parent && current.studentId == student.id) return;
-    if ((current.role == UserRole.admin || current.role == UserRole.specialist) && current.centerId == student.centerId) return;
+    if ((current.role == UserRole.centerManager || current.role == UserRole.specialist || current.role == UserRole.dataEntry) && current.centerId == student.centerId) return;
     throw StateError('لا تملك صلاحية الوصول لهذا الطالب.');
   }
 }

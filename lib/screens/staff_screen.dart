@@ -35,8 +35,8 @@ class StaffScreen extends StatelessWidget {
     final app = context.read<AppProvider>();
     final name = TextEditingController();
     final email = TextEditingController();
-    final password = TextEditingController(text: '123456');
-    UserRole role = app.isOwner ? UserRole.admin : UserRole.specialist;
+    final password = TextEditingController();
+    UserRole role = app.isOwner ? UserRole.centerManager : UserRole.specialist;
     final centers = _uniqueCenters(app.centers);
     String? selectedCenterId = app.currentCenter?.id ?? (centers.isEmpty ? null : centers.first.id);
     await showDialog<void>(
@@ -56,7 +56,7 @@ class StaffScreen extends StatelessWidget {
               DropdownButtonFormField<UserRole>(
                 initialValue: role,
                 decoration: const InputDecoration(labelText: 'الدور'),
-                items: [if (app.isOwner) UserRole.admin, UserRole.specialist].map((item) => DropdownMenuItem(value: item, child: Text(item.label))).toList(),
+                items: (app.isOwner ? [UserRole.centerManager] : [UserRole.specialist, UserRole.dataEntry]).map((item) => DropdownMenuItem(value: item, child: Text(item.label))).toList(),
                 onChanged: (value) => setDialogState(() => role = value ?? role),
               ),
               if (app.isOwner) ...[
@@ -82,7 +82,7 @@ class StaffScreen extends StatelessWidget {
             FilledButton(
               onPressed: () => runWithFeedback(context, () async {
                 final centerId = app.isOwner ? selectedCenterId : app.activeCenterId;
-                if (name.text.trim().isEmpty || email.text.trim().isEmpty || centerId == null || centerId.isEmpty) throw StateError('أكمل بيانات الحساب واختر المركز.');
+                if (name.text.trim().isEmpty || email.text.trim().isEmpty || password.text.length < 8 || centerId == null || centerId.isEmpty) throw StateError('أكمل بيانات الحساب واختر المركز، وكلمة المرور 8 أحرف على الأقل.');
                 await app.saveStaffUser(AppUser(id: 'user_${DateTime.now().millisecondsSinceEpoch}', centerId: centerId, email: email.text.trim(), passwordHash: AuthService.hashPassword(password.text), name: name.text.trim(), role: role, forcePasswordChange: true));
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               }),

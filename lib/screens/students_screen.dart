@@ -70,8 +70,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       children: [
                         FilledButton.tonalIcon(onPressed: () => app.selectStudent(student), icon: const Icon(Icons.check), label: const Text('اختيار')),
                         FilledButton.tonalIcon(onPressed: () => _showStudentForm(context, student: student), icon: const Icon(Icons.edit), label: const Text('تعديل')),
-                        FilledButton.tonalIcon(onPressed: () => app.printCredentials(student), icon: const Icon(Icons.print), label: const Text('ورقة الدخول')),
-                        IconButton(onPressed: () => app.deleteStudent(student.id), icon: const Icon(Icons.delete_outline)),
+                        if (!app.isDataEntry) FilledButton.tonalIcon(onPressed: () => app.printCredentials(student), icon: const Icon(Icons.print), label: const Text('ورقة الدخول')),
+                        if (app.canDeleteStudents) IconButton(onPressed: () => app.deleteStudent(student.id), icon: const Icon(Icons.delete_outline)),
                       ],
                     ),
                   ],
@@ -92,6 +92,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
     final parentPhone = TextEditingController(text: student?.parentPhone ?? '');
     final notes = TextEditingController(text: student?.notes ?? '');
     String status = student?.status ?? 'نشط';
+    String programType = student?.programType ?? 'نطق وتخاطب';
     String photoPath = student?.photoPath ?? '';
     await showDialog<void>(
       context: context,
@@ -111,6 +112,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                         SizedBox(width: 280, child: TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم الطالب'))),
                         SizedBox(width: 120, child: TextField(controller: age, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'العمر'))),
                         SizedBox(width: 180, child: DropdownButtonFormField<String>(initialValue: status, items: const ['نشط', 'متابعة', 'متوقف'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) => setDialogState(() => status = value ?? status))),
+                        SizedBox(width: 220, child: DropdownButtonFormField<String>(initialValue: programType, decoration: const InputDecoration(labelText: 'نوع البرنامج'), items: const ['نطق وتخاطب', 'ضعف سمع / إعاقة سمعية', 'لغة إشارة', 'مهارات تعليمية', 'مهارات سلوكية', 'أخرى'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(), onChanged: (value) => setDialogState(() => programType = value ?? programType))),
                         SizedBox(width: 280, child: TextField(controller: diagnosis, decoration: const InputDecoration(labelText: 'التشخيص'))),
                         SizedBox(width: 280, child: TextField(controller: parentName, decoration: const InputDecoration(labelText: 'اسم ولي الأمر'))),
                         SizedBox(width: 280, child: TextField(controller: parentPhone, decoration: const InputDecoration(labelText: 'رقم ولي الأمر'))),
@@ -154,6 +156,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                       age: int.tryParse(age.text.trim()) ?? 0,
                       status: status,
                       diagnosis: diagnosis.text.trim(),
+                      programType: programType,
                       parentName: parentName.text.trim(),
                       parentPhone: parentPhone.text.trim(),
                       portalEmail: portalEmail,

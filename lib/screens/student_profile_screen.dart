@@ -20,6 +20,7 @@ class StudentProfileScreen extends StatelessWidget {
           Wrap(spacing: 16, runSpacing: 12, children: [
             _field('العمر', '${student.age}'),
             _field('الحالة', student.status),
+            _field('نوع البرنامج', student.programType),
             _field('التشخيص', student.diagnosis),
             _field('ولي الأمر', student.parentName),
             _field('هاتف ولي الأمر', student.parentPhone),
