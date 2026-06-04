@@ -40,7 +40,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
         ? <ProgramSection>[]
         : app.programSections
             .where((section) => section.programId == program.id)
-            .toList();
+            .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final sectionSkills = sectionId == null
         ? <ProgramSkill>[]
         : app.programSkills
@@ -73,6 +74,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   app.students.where((item) => item.id == value).toList();
               await app.selectStudent(matches.isEmpty ? null : matches.first);
               setState(() {
+                programId = null;
+                sectionId = null;
+                skillId = null;
                 activityResults.clear();
               });
             },
@@ -103,10 +107,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
           const SizedBox(height: 12),
           _StepCard(
             number: 3,
-            title: 'اختيار المرحلة',
+            title: 'اختيار القسم/المرحلة',
             child: DropdownButtonFormField<String>(
               initialValue: sectionId,
-              decoration: const InputDecoration(labelText: 'المرحلة'),
+              decoration: const InputDecoration(labelText: 'القسم'),
               items: sections
                   .map((item) => DropdownMenuItem(
                       value: item.id,
@@ -158,6 +162,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
                         Padding(
                           padding: const EdgeInsets.only(top: 6),
                           child: Text(activity.instructions),
+                        ),
+                      if (activity.homework.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text('الواجب المقترح: ${activity.homework}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700)),
                         ),
                       const SizedBox(height: 10),
                       SegmentedButton<String>(
@@ -285,15 +296,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   Future<void> _sendHomework(AppProvider app, ProgramActivity activity) {
     final student = app.selectedStudent;
+    final program = _program(app);
     if (student == null) return Future.value();
     return runWithFeedback(context, () async {
       await app.saveExercise(Exercise(
         id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
         centerId: student.centerId,
         studentId: student.id,
-        title: activity.title,
+        title: '${program?.name ?? 'برنامج علاجي'} - ${activity.title}',
         instructions: activity.homework,
-        dueDate: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        dueDate: DateTime.now()
+            .add(const Duration(days: 1))
+            .toIso8601String()
+            .split('T')
+            .first,
         status: 'مرسل',
       ));
     }, success: 'تم إرسال الواجب لولي الأمر.');
@@ -310,7 +326,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             .toList();
     return runWithFeedback(context, () async {
       if (student == null || program == null || skill == null) {
-        throw StateError('اختر الطالب والبرنامج والمرحلة والمهارة أولًا.');
+        throw StateError('اختر الطالب والبرنامج والقسم والمهارة أولًا.');
       }
       if (activityResults.length < activities.length) {
         throw StateError('قيّم كل الأنشطة قبل حفظ الجلسة.');

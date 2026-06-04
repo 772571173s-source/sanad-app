@@ -56,6 +56,14 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
               },
             ),
           ),
+        if (student != null)
+          AppCard(
+            child: ListTile(
+              leading: const Icon(Icons.child_care_outlined),
+              title: Text(student.name),
+              subtitle: Text('الواجبات الحالية: ${app.exercises.length}'),
+            ),
+          ),
         if (!app.isParent)
           AppCard(
             child: student == null
@@ -93,6 +101,12 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
         else
           ResponsiveGrid(
             children: app.exercises.map((exercise) {
+              final parts = exercise.title.split(' - ');
+              final programName =
+                  parts.length > 1 ? parts.first : 'برنامج علاجي';
+              final activityName = parts.length > 1
+                  ? parts.sublist(1).join(' - ')
+                  : exercise.title;
               return AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,11 +114,12 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.home_work_outlined),
-                      title: Text(exercise.title),
-                      subtitle: Text(
-                          '${exercise.instructions}\nتاريخ التسليم: ${exercise.dueDate}'),
+                      title: Text(programName),
+                      subtitle: Text('النشاط: $activityName'),
                       trailing: Chip(label: Text(exercise.status)),
                     ),
+                    Text('التعليمات: ${exercise.instructions}'),
+                    Text('تاريخ التسليم: ${exercise.dueDate}'),
                     if (exercise.audioPath.isNotEmpty)
                       Directionality(
                         textDirection: TextDirection.ltr,
@@ -138,7 +153,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                         FilledButton.tonalIcon(
                           onPressed: () => _uploadAudio(app, exercise),
                           icon: const Icon(Icons.mic),
-                          label: const Text('رفع/تسجيل صوت لاحقًا'),
+                          label: const Text('رفع صوت/فيديو لاحقًا'),
                         ),
                         if (!app.isParent)
                           FilledButton.tonalIcon(
@@ -182,7 +197,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
   }
 
   Future<void> _uploadAudio(AppProvider app, Exercise exercise) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.audio);
+    final result = await FilePicker.platform.pickFiles(type: FileType.media);
     final path = result?.files.single.path;
     if (path == null) return;
     if (!mounted) return;
@@ -194,7 +209,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
         audioPath: path,
         stars: exercise.stars + 1,
       )),
-      success: 'تم رفع التسجيل.',
+      success: 'تم رفع الملف.',
     );
   }
 

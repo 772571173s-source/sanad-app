@@ -24,7 +24,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         ? <ProgramSection>[]
         : app.programSections
             .where((section) => section.programId == selectedProgram.id)
-            .toList();
+            .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final skills = selectedProgram == null
         ? <ProgramSkill>[]
         : app.programSkills
@@ -62,7 +63,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             icon: Icons.extension_outlined,
             title: 'لا توجد برامج علاجية',
             message:
-                'أنشئ العلاج النطقي والتكامل الحسي، ثم أضف المراحل والمهارات والأنشطة.',
+                'أنشئ العلاج النطقي والتكامل الحسي، ثم جرّب المحتوى داخل الجلسات.',
           )
         else ...[
           AppCard(
@@ -95,6 +96,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 if (app.canManagePrograms)
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: [
                       FilledButton.tonalIcon(
                         onPressed: selectedProgram == null
@@ -130,8 +132,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           const SizedBox(height: 12),
           ResponsiveGrid(
             children: sections.map((section) {
-              final sectionSkills =
-                  skills.where((skill) => skill.sectionId == section.id);
+              final sectionSkills = skills
+                  .where((skill) => skill.sectionId == section.id)
+                  .toList()
+                ..sort((a, b) => a.title.compareTo(b.title));
               return AppCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,9 +163,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               title: Text(activity.title),
                               subtitle: Text(activity.instructions),
                               trailing: Text(
-                                  activity.evaluationType == 'sensory'
-                                      ? 'تكامل حسي'
-                                      : 'نطقي'),
+                                activity.evaluationType == 'sensory'
+                                    ? 'تكامل حسي'
+                                    : 'نطقي',
+                              ),
                             );
                           }).toList(),
                         );
@@ -474,121 +479,641 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         name: 'العلاج النطقي',
         type: 'العلاج النطقي',
         description:
-            'الحروف، الكلمات، الجمل، أعضاء النطق، التمييز السمعي، التنفس، اللغة التعبيرية والاستقبالية.',
+            'الحروف العربية، أعضاء النطق، التمييز السمعي، الكلمات والجمل، مع واجبات منزلية مقترحة.',
       );
       final sensory = TherapyProgram(
         id: 'program_sensory_$now',
         centerId: app.activeCenterId,
         name: 'التكامل الحسي',
         type: 'التكامل الحسي',
-        description:
-            'أنشطة سمعية وبصرية ولمسية وتوازن وحركة وإدراك وتكامل حركي.',
+        description: 'أنشطة سمعية وبصرية ولمسية وتوازن وحركة وتكامل بصري حركي.',
       );
       await app.saveProgram(speech);
       await app.saveProgram(sensory);
-
-      await _seedProgramTree(
-        app: app,
-        program: speech,
-        evaluationType: 'speech',
-        areas: const [
-          ['letters', 'الحروف', 'إنتاج الحرف', 'بطاقات حروف وكلمات قصيرة'],
-          ['words', 'الكلمات', 'إنتاج كلمات', 'تدريب كلمات وظيفية'],
-          ['sentences', 'الجمل', 'إنتاج جملة', 'جمل من كلمتين أو ثلاث'],
-          [
-            'organs',
-            'أعضاء النطق',
-            'تهيئة أعضاء النطق',
-            'تمارين شفاه ولسان وفك'
-          ],
-          [
-            'auditory',
-            'التمييز السمعي',
-            'تمييز الصوت',
-            'استماع واختيار الصوت الصحيح'
-          ],
-          ['breathing', 'التنفس', 'تنظيم النفس', 'شهيق وزفير مضبوط قبل النطق'],
-          [
-            'expressive',
-            'اللغة التعبيرية',
-            'تسمية ووصف',
-            'تسمية صورة أو وصف فعل'
-          ],
-          [
-            'receptive',
-            'اللغة الاستقبالية',
-            'اتباع التعليمات',
-            'تنفيذ أمر بسيط أو مركب'
-          ],
-        ],
-      );
-      await _seedProgramTree(
-        app: app,
-        program: sensory,
-        evaluationType: 'sensory',
-        areas: const [
-          [
-            'auditory',
-            'الأنشطة السمعية',
-            'تحمل المثير السمعي',
-            'تمييز أصوات بيئية'
-          ],
-          ['visual', 'الأنشطة البصرية', 'تتبع بصري', 'متابعة هدف بصري متحرك'],
-          ['tactile', 'الأنشطة اللمسية', 'تقبل اللمس', 'استكشاف خامات مختلفة'],
-          ['balance', 'التوازن', 'توازن ثابت ومتحرك', 'مسار توازن بسيط'],
-          ['movement', 'الحركة', 'تنظيم الحركة', 'نشاط حركة موجه'],
-          [
-            'perception',
-            'الإدراك',
-            'مطابقة وتصنيف',
-            'تصنيف حسب اللون أو الشكل'
-          ],
-          ['motor', 'التكامل الحركي', 'تناسق حركي', 'نشاط يد وعين'],
-        ],
-      );
-    }, success: 'تم إنشاء البرامج الأساسية.');
+      await _seedSpeechProgram(app, speech, now);
+      await _seedSensoryProgram(app, sensory, now);
+    }, success: 'تم إنشاء البرامج الأساسية بمحتوى علاجي قابل للتجربة.');
   }
 
-  Future<void> _seedProgramTree({
-    required AppProvider app,
-    required TherapyProgram program,
-    required String evaluationType,
-    required List<List<String>> areas,
+  Future<void> _seedSpeechProgram(
+      AppProvider app, TherapyProgram program, int stamp) async {
+    final lettersSection = await _createSection(
+      app,
+      program,
+      id: 'speech_letters_$stamp',
+      title: 'الحروف',
+      sortOrder: 1,
+    );
+    for (final letter in _arabicLetterContent) {
+      final skill = await _createSkill(
+        app,
+        program,
+        lettersSection,
+        id: 'speech_letter_${letter.id}_$stamp',
+        title: 'حرف ${letter.letter}',
+        description:
+            'تدريب حرف ${letter.letter} في أول ووسط وآخر الكلمة ثم داخل جملة قصيرة.',
+      );
+      await _createActivity(app, program, skill,
+          id: 'speech_${letter.id}_initial_$stamp',
+          title: 'حرف ${letter.letter} - أول الكلمة',
+          instructions: 'درّب الكلمات: ${letter.initial.join('، ')}.',
+          homework:
+              'كرر 5 كلمات تبدأ بحرف ${letter.letter} بصوت واضح مع ولي الأمر.',
+          evaluationType: 'speech');
+      await _createActivity(app, program, skill,
+          id: 'speech_${letter.id}_middle_$stamp',
+          title: 'حرف ${letter.letter} - وسط الكلمة',
+          instructions: 'درّب الكلمات: ${letter.middle.join('، ')}.',
+          homework:
+              'اختر 3 كلمات فيها حرف ${letter.letter} وسط الكلمة وكررها ببطء.',
+          evaluationType: 'speech');
+      await _createActivity(app, program, skill,
+          id: 'speech_${letter.id}_final_$stamp',
+          title: 'حرف ${letter.letter} - آخر الكلمة',
+          instructions: 'درّب الكلمات: ${letter.finalWords.join('، ')}.',
+          homework:
+              'كرر كلمات تنتهي بحرف ${letter.letter} مع الانتباه لنهاية الصوت.',
+          evaluationType: 'speech');
+      await _createActivity(app, program, skill,
+          id: 'speech_${letter.id}_sentence_$stamp',
+          title: 'حرف ${letter.letter} - جملة قصيرة',
+          instructions: letter.sentence,
+          homework: letter.homework,
+          evaluationType: 'speech');
+    }
+
+    final organs = await _createSection(app, program,
+        id: 'speech_organs_$stamp', title: 'أعضاء النطق', sortOrder: 2);
+    await _seedSimpleSpeechSection(app, program, organs, stamp, [
+      const _ContentSkill('تمارين الشفاه', [
+        _ContentActivity(
+            'ضم الشفاه وفتحها',
+            'اطلب من الطفل ضم الشفاه ثم فتحها 10 مرات أمام المرآة.',
+            'كرر تمرين ضم وفتح الشفاه مرتين يوميًا.'),
+        _ContentActivity(
+            'ابتسامة ثم ضم',
+            'انتقل بين الابتسامة وضم الشفاه ببطء مع العد.',
+            'نفذ 10 محاولات ابتسامة ثم ضم مع ولي الأمر.'),
+      ]),
+      const _ContentSkill('تمارين اللسان', [
+        _ContentActivity(
+            'رفع اللسان',
+            'يرفع الطفل اللسان خلف الأسنان العلوية ثم يعود للوضع الطبيعي.',
+            'كرر رفع اللسان 10 مرات أمام المرآة.'),
+        _ContentActivity(
+            'تحريك اللسان يمينًا ويسارًا',
+            'حرك اللسان باتجاه زاويتي الفم مع ثبات الفك قدر الإمكان.',
+            'نفذ 10 حركات يمين ويسار ببطء.'),
+      ]),
+      const _ContentSkill('تمارين الفك', [
+        _ContentActivity(
+            'فتح وإغلاق الفك',
+            'فتح الفم وإغلاقه ببطء مع مراقبة التحكم.',
+            'كرر التمرين 10 مرات بدون استعجال.'),
+      ]),
+      const _ContentSkill('النفخ والشفط والتنفس', [
+        _ContentActivity(
+            'نفخ الريشة',
+            'ينفخ الطفل ريشة أو منديلًا خفيفًا لمسافة قصيرة.',
+            'انفخ منديلًا خفيفًا 5 مرات.'),
+        _ContentActivity(
+            'الشفط بالشفاطة',
+            'استخدم شفاطة لشرب كمية بسيطة أو نقل ورقة خفيفة.',
+            'تدريب شفط قصير تحت إشراف ولي الأمر.'),
+        _ContentActivity(
+            'شهيق وزفير منظم',
+            'خذ شهيقًا من الأنف ثم زفيرًا من الفم قبل النطق.',
+            'كرر شهيق وزفير 5 مرات قبل التدريب المنزلي.'),
+      ]),
+    ]);
+
+    final auditory = await _createSection(app, program,
+        id: 'speech_auditory_$stamp', title: 'التمييز السمعي', sortOrder: 3);
+    await _seedSimpleSpeechSection(app, program, auditory, stamp, [
+      const _ContentSkill('تمييز صوت الحرف', [
+        _ContentActivity(
+            'اسمع حرف الهدف',
+            'اعرض كلمات فيها صوت الهدف وأخرى لا تحتويه، والطفل يرفع يده عند سماعه.',
+            'استمع إلى 6 كلمات وحدد هل يوجد صوت الهدف أم لا.'),
+      ]),
+      const _ContentSkill('تمييز كلمتين متشابهتين', [
+        _ContentActivity(
+            'اختيار الكلمة الصحيحة',
+            'قل كلمتين متقاربتين صوتيًا واطلب من الطفل الإشارة للصورة الصحيحة.',
+            'كرر 5 أزواج كلمات متشابهة مع ولي الأمر.'),
+      ]),
+      const _ContentSkill('اختيار الصوت الصحيح', [
+        _ContentActivity(
+            'أي صوت سمعت؟',
+            'يشير الطفل إلى الحرف أو الصورة التي تمثل الصوت المسموع.',
+            'اختر الصوت الصحيح من بين خيارين في 5 محاولات.'),
+      ]),
+    ]);
+
+    final words = await _createSection(app, program,
+        id: 'speech_words_sentences_$stamp',
+        title: 'الكلمات والجمل',
+        sortOrder: 4);
+    await _seedSimpleSpeechSection(app, program, words, stamp, [
+      const _ContentSkill('كلمات بسيطة', [
+        _ContentActivity(
+            'تسمية صور بسيطة',
+            'سمّ صورًا يومية مثل باب، ماء، كرة، قلم.',
+            'سمّ 5 أشياء في المنزل بصوت واضح.'),
+      ]),
+      const _ContentSkill('جمل من كلمتين', [
+        _ContentActivity(
+            'بناء جملة قصيرة',
+            'استخدم نمطًا مثل: أريد ماء، هذه كرة، باب مفتوح.',
+            'كوّن 5 جمل من كلمتين مع ولي الأمر.'),
+      ]),
+      const _ContentSkill('جمل من ثلاث كلمات', [
+        _ContentActivity(
+            'توسيع الجملة',
+            'وسّع الجملة إلى ثلاث كلمات مثل: أريد ماء بارد.',
+            'قل 3 جمل من ثلاث كلمات عن صور أو أشياء في المنزل.'),
+      ]),
+    ]);
+  }
+
+  Future<void> _seedSensoryProgram(
+      AppProvider app, TherapyProgram program, int stamp) async {
+    final sections = [
+      const _ContentSection('sensory_auditory', 'أنشطة سمعية', 1, [
+        _ContentSkill('تمييز الأصوات', [
+          _ContentActivity(
+              'تمييز صوت الحيوان',
+              'استمع إلى صوت حيوان واختر الصورة المناسبة.',
+              'استمع إلى 3 أصوات حيوانات واختر اسم الحيوان.'),
+          _ContentActivity(
+              'تحديد مصدر الصوت',
+              'حدد هل الصوت من اليمين أو اليسار أو الأمام.',
+              'حدد مصدر صوت بسيط داخل الغرفة 5 مرات.'),
+          _ContentActivity(
+              'اتباع صوت معين',
+              'تحرك أو أشر عند سماع الصوت المتفق عليه فقط.',
+              'نفذ لعبة صوت الهدف لمدة 3 دقائق.'),
+        ]),
+      ]),
+      const _ContentSection('sensory_visual', 'أنشطة بصرية', 2, [
+        _ContentSkill('انتباه بصري', [
+          _ContentActivity(
+              'تتبع جسم متحرك',
+              'تتبع كرة أو ضوء متحرك بالعين دون تحريك الرأس قدر الإمكان.',
+              'تتبع جسمًا متحركًا ببطء لمدة دقيقة.'),
+          _ContentActivity('مطابقة ألوان', 'طابق بطاقات أو مكعبات حسب اللون.',
+              'طابق 5 ألوان في المنزل.'),
+          _ContentActivity(
+              'فرز أشكال',
+              'افرز دائرة ومربع ومثلث في مجموعات واضحة.',
+              'افرز 6 أشكال أو ألعاب حسب الشكل.'),
+        ]),
+      ]),
+      const _ContentSection('sensory_tactile', 'أنشطة لمسية', 3, [
+        _ContentSkill('استكشاف اللمس', [
+          _ContentActivity(
+              'لمس خامات مختلفة',
+              'المس قطنًا وإسفنجًا وورقًا وخامة خشنة مع وصف الإحساس.',
+              'المس 3 خامات وقل: ناعم أو خشن.'),
+          _ContentActivity(
+              'تمييز ناعم وخشن',
+              'صنف خامات ناعمة وخشنة في مجموعتين.',
+              'صنف 4 أشياء من المنزل حسب الملمس.'),
+          _ContentActivity(
+              'الصندوق الحسي',
+              'ابحث عن شيء داخل صندوق يحتوي خامات آمنة ومختلفة.',
+              'ابحث عن لعبتين داخل كيس أو صندوق حسي.'),
+        ]),
+      ]),
+      const _ContentSection('sensory_balance', 'التوازن والحركة', 4, [
+        _ContentSkill('توازن وحركة كبيرة', [
+          _ContentActivity('المشي على خط', 'امش على خط مستقيم مع النظر للأمام.',
+              'امش على خط مرسوم على الأرض 3 مرات.'),
+          _ContentActivity(
+              'الوقوف على قدم واحدة',
+              'قف على قدم واحدة لثوان قصيرة مع دعم عند الحاجة.',
+              'حاول الوقوف على قدم واحدة 3 مرات لكل قدم.'),
+          _ContentActivity('القفز', 'اقفز في مكان محدد مع الحفاظ على الأمان.',
+              'اقفز 5 قفزات داخل دائرة مرسومة.'),
+          _ContentActivity(
+              'رمي والتقاط كرة',
+              'ارم الكرة والتقطها من مسافة مناسبة.',
+              'ارم والتقط كرة خفيفة 10 مرات.'),
+        ]),
+      ]),
+      const _ContentSection('sensory_visual_motor', 'التكامل البصري الحركي', 5, [
+        _ContentSkill('عين ويد', [
+          _ContentActivity('تتبع خط', 'تتبع خطًا مستقيمًا أو متعرجًا بالقلم.',
+              'تتبع خطًا قصيرًا على ورقة.'),
+          _ContentActivity('نسخ شكل', 'انسخ دائرة أو مربعًا حسب قدرة الطفل.',
+              'انسخ شكلين بسيطين.'),
+          _ContentActivity(
+              'إدخال خرز في خيط',
+              'أدخل خرزًا كبيرًا في خيط آمن مع متابعة اليد والعين.',
+              'أدخل 5 خرزات كبيرة في خيط.'),
+          _ContentActivity(
+              'قص ولصق بسيط',
+              'قص خطًا قصيرًا ثم ألصق الشكل في مكانه.',
+              'قص شريطًا قصيرًا بمساعدة ولي الأمر.'),
+        ]),
+      ]),
+    ];
+
+    for (final sectionContent in sections) {
+      final section = await _createSection(app, program,
+          id: '${sectionContent.id}_$stamp',
+          title: sectionContent.title,
+          sortOrder: sectionContent.sortOrder);
+      await _seedSimpleSensorySection(
+          app, program, section, stamp, sectionContent.skills);
+    }
+  }
+
+  Future<ProgramSection> _createSection(
+    AppProvider app,
+    TherapyProgram program, {
+    required String id,
+    required String title,
+    required int sortOrder,
   }) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    for (var index = 0; index < areas.length; index++) {
-      final area = areas[index];
-      final sectionId = 'section_${program.id}_${area[0]}_$now';
-      final skillId = 'skill_${program.id}_${area[0]}_$now';
-      await app.saveProgramSection(ProgramSection(
-        id: sectionId,
-        centerId: app.activeCenterId,
-        programId: program.id,
-        title: area[1],
-        sortOrder: index + 1,
-      ));
-      await app.saveProgramSkill(ProgramSkill(
-        id: skillId,
-        centerId: app.activeCenterId,
-        programId: program.id,
-        sectionId: sectionId,
-        title: area[2],
-        description: area[3],
-      ));
-      await app.saveProgramActivity(ProgramActivity(
-        id: 'activity_${program.id}_${area[0]}_$now',
-        centerId: app.activeCenterId,
-        programId: program.id,
-        skillId: skillId,
-        title: area[3],
-        instructions: evaluationType == 'sensory'
-            ? 'نفذ النشاط تدريجيًا ثم قيّم الأداء.'
-            : 'اعرض النشاط ثم قيّم الاستجابة.',
-        homework: evaluationType == 'sensory'
-            ? 'نشاط منزلي قصير بإشراف ولي الأمر.'
-            : 'تكرار التدريب في المنزل لمدة 5 دقائق.',
-        evaluationType: evaluationType,
-      ));
+    final section = ProgramSection(
+      id: 'section_${program.id}_$id',
+      centerId: app.activeCenterId,
+      programId: program.id,
+      title: title,
+      sortOrder: sortOrder,
+    );
+    await app.saveProgramSection(section);
+    return section;
+  }
+
+  Future<ProgramSkill> _createSkill(
+    AppProvider app,
+    TherapyProgram program,
+    ProgramSection section, {
+    required String id,
+    required String title,
+    required String description,
+  }) async {
+    final skill = ProgramSkill(
+      id: 'skill_${program.id}_$id',
+      centerId: app.activeCenterId,
+      programId: program.id,
+      sectionId: section.id,
+      title: title,
+      description: description,
+    );
+    await app.saveProgramSkill(skill);
+    return skill;
+  }
+
+  Future<void> _createActivity(
+    AppProvider app,
+    TherapyProgram program,
+    ProgramSkill skill, {
+    required String id,
+    required String title,
+    required String instructions,
+    required String homework,
+    required String evaluationType,
+  }) {
+    return app.saveProgramActivity(ProgramActivity(
+      id: 'activity_${program.id}_$id',
+      centerId: app.activeCenterId,
+      programId: program.id,
+      skillId: skill.id,
+      title: title,
+      instructions: instructions,
+      homework: homework,
+      evaluationType: evaluationType,
+    ));
+  }
+
+  Future<void> _seedSimpleSpeechSection(
+    AppProvider app,
+    TherapyProgram program,
+    ProgramSection section,
+    int stamp,
+    List<_ContentSkill> skills,
+  ) async {
+    for (final contentSkill in skills) {
+      final skill = await _createSkill(
+        app,
+        program,
+        section,
+        id: '${section.id}_${contentSkill.title.hashCode}_$stamp',
+        title: contentSkill.title,
+        description: 'نشاط نطقي عملي قابل للتقييم السريع.',
+      );
+      for (var index = 0; index < contentSkill.activities.length; index++) {
+        final activity = contentSkill.activities[index];
+        await _createActivity(app, program, skill,
+            id: '${skill.id}_$index',
+            title: activity.title,
+            instructions: activity.instructions,
+            homework: activity.homework,
+            evaluationType: 'speech');
+      }
+    }
+  }
+
+  Future<void> _seedSimpleSensorySection(
+    AppProvider app,
+    TherapyProgram program,
+    ProgramSection section,
+    int stamp,
+    List<_ContentSkill> skills,
+  ) async {
+    for (final contentSkill in skills) {
+      final skill = await _createSkill(
+        app,
+        program,
+        section,
+        id: '${section.id}_${contentSkill.title.hashCode}_$stamp',
+        title: contentSkill.title,
+        description: 'نشاط تكامل حسي بتدرج وملاحظة أداء واضحة.',
+      );
+      for (var index = 0; index < contentSkill.activities.length; index++) {
+        final activity = contentSkill.activities[index];
+        await _createActivity(app, program, skill,
+            id: '${skill.id}_$index',
+            title: activity.title,
+            instructions: activity.instructions,
+            homework: activity.homework,
+            evaluationType: 'sensory');
+      }
     }
   }
 }
+
+class _LetterContent {
+  const _LetterContent({
+    required this.id,
+    required this.letter,
+    required this.initial,
+    required this.middle,
+    required this.finalWords,
+    required this.sentence,
+    required this.homework,
+  });
+
+  final String id;
+  final String letter;
+  final List<String> initial;
+  final List<String> middle;
+  final List<String> finalWords;
+  final String sentence;
+  final String homework;
+}
+
+class _ContentSection {
+  const _ContentSection(this.id, this.title, this.sortOrder, this.skills);
+
+  final String id;
+  final String title;
+  final int sortOrder;
+  final List<_ContentSkill> skills;
+}
+
+class _ContentSkill {
+  const _ContentSkill(this.title, this.activities);
+
+  final String title;
+  final List<_ContentActivity> activities;
+}
+
+class _ContentActivity {
+  const _ContentActivity(this.title, this.instructions, this.homework);
+
+  final String title;
+  final String instructions;
+  final String homework;
+}
+
+const _arabicLetterContent = [
+  _LetterContent(
+      id: 'alef',
+      letter: 'أ',
+      initial: ['أسد', 'أرنب', 'أذن'],
+      middle: ['فأس', 'رأس', 'سأل'],
+      finalWords: ['ملأ', 'بدأ', 'قرأ'],
+      sentence: 'أحمد رأى أسدًا.',
+      homework: 'كرر كلمات حرف أ 5 مرات مع ولي الأمر.'),
+  _LetterContent(
+      id: 'baa',
+      letter: 'ب',
+      initial: ['باب', 'بطة', 'برتقال'],
+      middle: ['كبير', 'حبل', 'جبن'],
+      finalWords: ['كتاب', 'كوب', 'ثوب'],
+      sentence: 'باسم فتح الباب.',
+      homework: 'كرر 5 كلمات فيها حرف ب بصوت واضح.'),
+  _LetterContent(
+      id: 'taa',
+      letter: 'ت',
+      initial: ['تمر', 'تاج', 'تفاح'],
+      middle: ['كتاب', 'ستار', 'مفتاح'],
+      finalWords: ['بيت', 'زيت', 'حوت'],
+      sentence: 'تامر أكل تفاحة.',
+      homework: 'درّب حرف ت في كلمات قصيرة.'),
+  _LetterContent(
+      id: 'thaa',
+      letter: 'ث',
+      initial: ['ثعلب', 'ثوب', 'ثلج'],
+      middle: ['مثال', 'كثير', 'أثاث'],
+      finalWords: ['مثلث', 'ليث', 'بحث'],
+      sentence: 'ثامر لبس ثوبًا.',
+      homework: 'كرر كلمات حرف ث ببطء مع الانتباه لموضع اللسان.'),
+  _LetterContent(
+      id: 'jeem',
+      letter: 'ج',
+      initial: ['جمل', 'جزر', 'جرس'],
+      middle: ['عجلة', 'دجاجة', 'رجل'],
+      finalWords: ['درج', 'ثلج', 'برج'],
+      sentence: 'جنى سمعت الجرس.',
+      homework: 'كرر 5 كلمات لحرف ج مع ولي الأمر.'),
+  _LetterContent(
+      id: 'haa',
+      letter: 'ح',
+      initial: ['حوت', 'حليب', 'حصان'],
+      middle: ['بحر', 'نحلة', 'رحلة'],
+      finalWords: ['تفاح', 'مفتاح', 'مصباح'],
+      sentence: 'حسام شرب الحليب.',
+      homework: 'كرر حرف ح مع نفس هادئ وواضح.'),
+  _LetterContent(
+      id: 'khaa',
+      letter: 'خ',
+      initial: ['خبز', 'خروف', 'خيار'],
+      middle: ['أخضر', 'نخلة', 'بخار'],
+      finalWords: ['مطبخ', 'خوخ', 'صاروخ'],
+      sentence: 'خالد أكل خبزًا.',
+      homework: 'درّب حرف خ في أول ووسط وآخر الكلمة.'),
+  _LetterContent(
+      id: 'dal',
+      letter: 'د',
+      initial: ['دار', 'دب', 'دجاج'],
+      middle: ['مدرسة', 'حديقة', 'هدية'],
+      finalWords: ['يد', 'ولد', 'برد'],
+      sentence: 'دانا دخلت الدار.',
+      homework: 'كرر كلمات حرف د أمام المرآة.'),
+  _LetterContent(
+      id: 'thal',
+      letter: 'ذ',
+      initial: ['ذرة', 'ذئب', 'ذهب'],
+      middle: ['أذان', 'مذياع', 'حذاء'],
+      finalWords: ['لذيذ', 'نافذ', 'تلميذ'],
+      sentence: 'ذهب ذياب إلى البيت.',
+      homework: 'كرر كلمات حرف ذ ببطء ووضوح.'),
+  _LetterContent(
+      id: 'raa',
+      letter: 'ر',
+      initial: ['رمان', 'رأس', 'ريشة'],
+      middle: ['كرسي', 'وردة', 'قرد'],
+      finalWords: ['نار', 'قمر', 'بحر'],
+      sentence: 'رائد رسم وردة.',
+      homework: 'كرر كلمات حرف ر دون استعجال.'),
+  _LetterContent(
+      id: 'zay',
+      letter: 'ز',
+      initial: ['زهرة', 'زيت', 'زر'],
+      middle: ['جزرة', 'ميزان', 'غزال'],
+      finalWords: ['موز', 'كنز', 'خبز'],
+      sentence: 'زينب قطفت زهرة.',
+      homework: 'كرر كلمات حرف ز 5 مرات.'),
+  _LetterContent(
+      id: 'seen',
+      letter: 'س',
+      initial: ['سمكة', 'سيارة', 'ساعة'],
+      middle: ['عسل', 'بسمة', 'مدرسة'],
+      finalWords: ['جرس', 'شمس', 'كأس'],
+      sentence: 'سامي رأى سمكة.',
+      homework: 'كرر 5 كلمات بصوت واضح مع ولي الأمر.'),
+  _LetterContent(
+      id: 'sheen',
+      letter: 'ش',
+      initial: ['شمس', 'شجرة', 'شاي'],
+      middle: ['عشب', 'مشط', 'بشرة'],
+      finalWords: ['عش', 'ريش', 'فراش'],
+      sentence: 'شادي رأى الشمس.',
+      homework: 'كرر كلمات حرف ش مع إطالة خفيفة للصوت.'),
+  _LetterContent(
+      id: 'sad',
+      letter: 'ص',
+      initial: ['صقر', 'صحن', 'صوت'],
+      middle: ['عصفور', 'مصباح', 'قصة'],
+      finalWords: ['قميص', 'لص', 'نص'],
+      sentence: 'صالح سمع صوتًا.',
+      homework: 'كرر حرف ص في كلمات قصيرة.'),
+  _LetterContent(
+      id: 'dad',
+      letter: 'ض',
+      initial: ['ضفدع', 'ضرس', 'ضوء'],
+      middle: ['أخضر', 'مضرب', 'فضاء'],
+      finalWords: ['بيض', 'أرض', 'حوض'],
+      sentence: 'ضاري رأى ضفدعًا.',
+      homework: 'درّب حرف ض في ثلاث كلمات.'),
+  _LetterContent(
+      id: 'taa_emphatic',
+      letter: 'ط',
+      initial: ['طائر', 'طاولة', 'طماطم'],
+      middle: ['مطر', 'قطار', 'بطاطا'],
+      finalWords: ['خيط', 'شاطئ', 'محيط'],
+      sentence: 'طار الطائر عاليًا.',
+      homework: 'كرر كلمات حرف ط مع فتح الفم جيدًا.'),
+  _LetterContent(
+      id: 'zaa_emphatic',
+      letter: 'ظ',
+      initial: ['ظرف', 'ظبي', 'ظل'],
+      middle: ['نظارة', 'عظيم', 'حظيرة'],
+      finalWords: ['حفظ', 'وعظ', 'لفظ'],
+      sentence: 'ظل الظبي تحت الشجرة.',
+      homework: 'كرر كلمات حرف ظ ببطء.'),
+  _LetterContent(
+      id: 'ain',
+      letter: 'ع',
+      initial: ['عين', 'عنب', 'عصفور'],
+      middle: ['ملعب', 'سعيد', 'ساعة'],
+      finalWords: ['شموع', 'ذراع', 'شارع'],
+      sentence: 'علي أكل عنبًا.',
+      homework: 'كرر حرف ع مع تنفس هادئ.'),
+  _LetterContent(
+      id: 'ghain',
+      letter: 'غ',
+      initial: ['غزال', 'غيمة', 'غرفة'],
+      middle: ['مغسلة', 'صغير', 'بغداد'],
+      finalWords: ['صمغ', 'فراغ', 'دماغ'],
+      sentence: 'غادة دخلت الغرفة.',
+      homework: 'كرر كلمات حرف غ دون ضغط زائد.'),
+  _LetterContent(
+      id: 'faa',
+      letter: 'ف',
+      initial: ['فيل', 'فراشة', 'فم'],
+      middle: ['مفتاح', 'دفتر', 'سفينة'],
+      finalWords: ['خروف', 'رف', 'كتف'],
+      sentence: 'فهد رأى فيلًا.',
+      homework: 'كرر كلمات حرف ف مع نفخ خفيف.'),
+  _LetterContent(
+      id: 'qaf',
+      letter: 'ق',
+      initial: ['قلم', 'قمر', 'قطة'],
+      middle: ['عقرب', 'بقرة', 'مقعد'],
+      finalWords: ['طبق', 'سوق', 'طريق'],
+      sentence: 'قاسم حمل قلمًا.',
+      homework: 'كرر حرف ق في أول ووسط وآخر الكلمة.'),
+  _LetterContent(
+      id: 'kaf',
+      letter: 'ك',
+      initial: ['كتاب', 'كرة', 'كأس'],
+      middle: ['مكتب', 'سكين', 'بكرة'],
+      finalWords: ['سمك', 'ملك', 'ضحك'],
+      sentence: 'كريم رمى الكرة.',
+      homework: 'كرر كلمات حرف ك بوضوح.'),
+  _LetterContent(
+      id: 'lam',
+      letter: 'ل',
+      initial: ['ليمون', 'لعبة', 'لبن'],
+      middle: ['قلم', 'ملعب', 'حليب'],
+      finalWords: ['جمل', 'فيل', 'حبل'],
+      sentence: 'ليلى لعبت باللعبة.',
+      homework: 'كرر كلمات حرف ل أمام المرآة.'),
+  _LetterContent(
+      id: 'meem',
+      letter: 'م',
+      initial: ['موز', 'ماء', 'مفتاح'],
+      middle: ['سمكة', 'قمر', 'حمام'],
+      finalWords: ['قلم', 'نجوم', 'علم'],
+      sentence: 'مها شربت ماء.',
+      homework: 'كرر 5 كلمات فيها حرف م.'),
+  _LetterContent(
+      id: 'noon',
+      letter: 'ن',
+      initial: ['نمر', 'نخلة', 'نجمة'],
+      middle: ['منزل', 'عنب', 'كنبة'],
+      finalWords: ['حصان', 'لبن', 'عين'],
+      sentence: 'نورا رأت نجمة.',
+      homework: 'كرر كلمات حرف ن مع ولي الأمر.'),
+  _LetterContent(
+      id: 'haa_soft',
+      letter: 'ه',
+      initial: ['هلال', 'هدية', 'هرم'],
+      middle: ['ذهب', 'مهارة', 'زهرة'],
+      finalWords: ['وجه', 'مياه', 'فمه'],
+      sentence: 'هند حملت هدية.',
+      homework: 'كرر حرف ه بهدوء ووضوح.'),
+  _LetterContent(
+      id: 'waw',
+      letter: 'و',
+      initial: ['وردة', 'ولد', 'وجه'],
+      middle: ['حوت', 'موزة', 'طاولة'],
+      finalWords: ['دلو', 'نمو', 'ضوء'],
+      sentence: 'وسام شم وردة.',
+      homework: 'كرر كلمات حرف و مع مد قصير.'),
+  _LetterContent(
+      id: 'yaa',
+      letter: 'ي',
+      initial: ['يد', 'ياسمين', 'يمامة'],
+      middle: ['بيت', 'سيارة', 'خيار'],
+      finalWords: ['كرسي', 'شاي', 'وادي'],
+      sentence: 'ياسر غسل يده.',
+      homework: 'كرر كلمات حرف ي في مواضع مختلفة.'),
+];
