@@ -37,7 +37,8 @@ class StaffScreen extends StatelessWidget {
     final email = TextEditingController();
     final password = TextEditingController(text: '123456');
     UserRole role = app.isOwner ? UserRole.admin : UserRole.specialist;
-    SanadCenter? center = app.currentCenter;
+    final centers = _uniqueCenters(app.centers);
+    String? selectedCenterId = app.currentCenter?.id ?? (centers.isEmpty ? null : centers.first.id);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -60,12 +61,19 @@ class StaffScreen extends StatelessWidget {
               ),
               if (app.isOwner) ...[
                 const SizedBox(height: 10),
-                DropdownButtonFormField<SanadCenter>(
-                  initialValue: center,
-                  decoration: const InputDecoration(labelText: 'المركز'),
-                  items: app.centers.map((item) => DropdownMenuItem(value: item, child: Text(item.name))).toList(),
-                  onChanged: (value) => setDialogState(() => center = value),
-                ),
+                if (centers.isEmpty)
+                  const ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.info_outline),
+                    title: Text('لا توجد مراكز متاحة. أضف مركزًا أولًا من شاشة إدارة المراكز.'),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    initialValue: centers.any((center) => center.id == selectedCenterId) ? selectedCenterId : centers.first.id,
+                    decoration: const InputDecoration(labelText: 'المركز'),
+                    items: centers.map((center) => DropdownMenuItem<String>(value: center.id, child: Text(center.name))).toList(),
+                    onChanged: (value) => setDialogState(() => selectedCenterId = value),
+                  ),
               ],
             ]),
           ),
@@ -73,9 +81,9 @@ class StaffScreen extends StatelessWidget {
             TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
             FilledButton(
               onPressed: () => runWithFeedback(context, () async {
-                final selectedCenter = center;
-                if (name.text.trim().isEmpty || email.text.trim().isEmpty || selectedCenter == null) throw StateError('أكمل بيانات الحساب.');
-                await app.saveStaffUser(AppUser(id: 'user_${DateTime.now().millisecondsSinceEpoch}', centerId: selectedCenter.id, email: email.text.trim(), passwordHash: AuthService.hashPassword(password.text), name: name.text.trim(), role: role, forcePasswordChange: true));
+                final centerId = app.isOwner ? selectedCenterId : app.activeCenterId;
+                if (name.text.trim().isEmpty || email.text.trim().isEmpty || centerId == null || centerId.isEmpty) throw StateError('أكمل بيانات الحساب واختر المركز.');
+                await app.saveStaffUser(AppUser(id: 'user_${DateTime.now().millisecondsSinceEpoch}', centerId: centerId, email: email.text.trim(), passwordHash: AuthService.hashPassword(password.text), name: name.text.trim(), role: role, forcePasswordChange: true));
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               }),
               child: const Text('حفظ'),
@@ -84,5 +92,13 @@ class StaffScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  List<SanadCenter> _uniqueCenters(List<SanadCenter> centers) {
+    final byId = <String, SanadCenter>{};
+    for (final center in centers) {
+      byId.putIfAbsent(center.id, () => center);
+    }
+    return byId.values.toList();
   }
 }
