@@ -6,6 +6,7 @@ import 'repositories/sanad_repository.dart';
 import 'screens/app_shell.dart';
 import 'screens/first_setup_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/startup_error_screen.dart';
 import 'services/database_service.dart';
 import 'services/pdf_service.dart';
 
@@ -23,7 +24,7 @@ class SanadApp extends StatelessWidget {
       create: (_) => AppProvider(SanadRepository(DatabaseService.instance), PdfService()),
       child: Consumer<AppProvider>(
         builder: (context, app, _) {
-          final seed = const Color(0xFF19706C);
+          const seed = Color(0xFF19706C);
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'Sanad',
@@ -71,8 +72,9 @@ class _HomeGateState extends State<_HomeGate> {
   Widget build(BuildContext context) {
     final app = widget.app;
     if (!app.initialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('جار تجهيز النظام...')])));
     }
+    if (app.startupError != null) return StartupErrorScreen(message: app.startupError!);
     if (app.setupRequired) return const FirstSetupScreen();
     return app.user == null ? const LoginScreen() : const AppShell();
   }

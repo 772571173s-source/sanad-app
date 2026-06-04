@@ -16,18 +16,21 @@ class StaffScreen extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => _showForm(context), icon: const Icon(Icons.person_add_alt), label: const Text('إضافة موظف'))),
       const SizedBox(height: 12),
-      ResponsiveGrid(
-        children: app.staff.map((account) {
-          return AppCard(
-            child: ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: Text(account.name),
-              subtitle: Text('${account.email}\n${account.role.label}'),
-              trailing: Chip(label: Text(account.isActive ? 'نشط' : 'متوقف')),
-            ),
-          );
-        }).toList(),
-      ),
+      if (app.staff.isEmpty)
+        const EmptyState(icon: Icons.badge_outlined, title: 'لا توجد حسابات موظفين', message: 'أنشئ مدير مركز أو موظفين حسب صلاحيتك الحالية.')
+      else
+        ResponsiveGrid(
+          children: app.staff.map((account) {
+            return AppCard(
+              child: ListTile(
+                leading: const Icon(Icons.badge_outlined),
+                title: Text(account.name),
+                subtitle: Text('${account.email}\n${account.role.label}'),
+                trailing: Chip(label: Text(account.isActive ? 'نشط' : 'متوقف')),
+              ),
+            );
+          }).toList(),
+        ),
     ]);
   }
 

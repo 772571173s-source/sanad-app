@@ -80,6 +80,7 @@ class SanadRepository {
         age: student.age,
         status: student.status,
         diagnosis: student.diagnosis,
+        programType: student.programType,
         parentName: student.parentName,
         parentPhone: student.parentPhone,
         portalEmail: student.portalEmail,
@@ -103,6 +104,9 @@ class SanadRepository {
       ).toMap(),
     );
     final existingParentUser = await _db.first('users', where: 'student_id = ?', whereArgs: [student.id]);
+    if (existingParentUser == null && student.portalPassword.isEmpty) {
+      throw StateError('كلمة مرور ولي الأمر مطلوبة عند إنشاء حساب جديد.');
+    }
     if (existingParentUser == null || student.portalPassword.isNotEmpty) {
       await _db.upsert(
         'users',
@@ -190,7 +194,18 @@ class SanadRepository {
 
   Future<void> deleteSignResource(String id) => _db.delete('sign_resources', id);
 
+  Future<List<AuditLog>> auditLogs({String? centerId, String? studentId}) async {
+    final rows = centerId == null
+        ? await _db.all('audit_logs', orderBy: 'created_at DESC')
+        : await _db.where('audit_logs', where: 'center_id = ?', whereArgs: [centerId], orderBy: 'created_at DESC');
+    return rows.map(AuditLog.fromMap).where((log) => studentId == null || log.entityId == studentId || log.details.contains(studentId)).toList();
+  }
+
+  Future<void> saveAuditLog(AuditLog log) => _db.upsert('audit_logs', log.toMap());
+
   Future<void> exportBackup(String targetPath) => _db.exportBackup(targetPath);
 
   Future<void> importBackup(String sourcePath) => _db.importBackup(sourcePath);
+
+  Future<void> resetLocalDatabase() => _db.resetLocalDatabase();
 }

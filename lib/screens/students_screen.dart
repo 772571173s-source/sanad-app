@@ -44,7 +44,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
         ),
         const SizedBox(height: 16),
         if (filtered.isEmpty)
-          const AppCard(child: Text('لا توجد نتائج.'))
+          EmptyState(
+            icon: Icons.school_outlined,
+            title: app.students.isEmpty ? 'لا يوجد طلاب' : 'لا توجد نتائج',
+            message: app.students.isEmpty ? 'أضف أول طالب في هذا المركز لتبدأ إدارة الملف والجلسات.' : 'جرّب تغيير البحث أو التصفية.',
+          )
         else
           ResponsiveGrid(
             children: filtered.map((student) {

@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 4;
+  static const currentVersion = 5;
 
   mobile.Database? _database;
 
@@ -57,6 +57,13 @@ class DatabaseService {
     _database = null;
     await File(sourcePath).copy(await databaseFilePath());
     await database;
+  }
+
+  Future<void> resetLocalDatabase() async {
+    await _database?.close();
+    _database = null;
+    final file = File(await databaseFilePath());
+    if (await file.exists()) await file.delete();
   }
 
   Future<void> _createSchema(mobile.Database db) async {
@@ -244,6 +251,20 @@ class DatabaseService {
         FOREIGN KEY(center_id) REFERENCES centers(id)
       )
     ''');
+    await db.execute('''
+      CREATE TABLE audit_logs (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        action TEXT NOT NULL,
+        entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        details TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
   }
 
   Future<void> _upgrade(mobile.Database db, int oldVersion, int newVersion) async {
@@ -267,6 +288,22 @@ class DatabaseService {
     }
     if (oldVersion < 4) {
       await _removeDemoData(db);
+    }
+    if (oldVersion < 5) {
+      await _ensureTable(db, 'audit_logs', '''
+        CREATE TABLE audit_logs (
+          id TEXT PRIMARY KEY,
+          center_id TEXT NOT NULL DEFAULT '',
+          user_id TEXT NOT NULL,
+          user_name TEXT NOT NULL,
+          action TEXT NOT NULL,
+          entity_type TEXT NOT NULL,
+          entity_id TEXT NOT NULL,
+          details TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
     }
   }
 

@@ -22,27 +22,30 @@ class _CentersScreenState extends State<CentersScreen> {
       children: [
         Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => _showCenterForm(context), icon: const Icon(Icons.add_business), label: const Text('إضافة مركز'))),
         const SizedBox(height: 12),
-        ResponsiveGrid(
-          children: app.centers.map((center) {
-            return AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [Expanded(child: Text(center.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))), Chip(label: Text(center.isActive ? 'نشط' : 'متوقف'))]),
-                  Text('المدير: ${center.managerName.isEmpty ? '-' : center.managerName}'),
-                  Text('الهاتف: ${center.phone.isEmpty ? '-' : center.phone}'),
-                  Text('العنوان: ${center.address.isEmpty ? '-' : center.address}'),
-                  const SizedBox(height: 8),
-                  Wrap(spacing: 8, children: [
-                    FilledButton.tonalIcon(onPressed: () => app.switchCenter(center), icon: const Icon(Icons.login), label: const Text('وضع مساعدة')),
-                    FilledButton.tonalIcon(onPressed: () => _showCenterForm(context, center: center), icon: const Icon(Icons.edit), label: const Text('تعديل')),
-                    FilledButton.tonalIcon(onPressed: () => _toggle(context, center), icon: Icon(center.isActive ? Icons.pause_circle_outline : Icons.play_circle_outline), label: Text(center.isActive ? 'إيقاف' : 'تفعيل')),
-                  ]),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
+        if (app.centers.isEmpty)
+          const EmptyState(icon: Icons.business_outlined, title: 'لا توجد مراكز', message: 'أنشئ أول مركز، ثم أنشئ له مدير مركز من شاشة الموظفين.')
+        else
+          ResponsiveGrid(
+            children: app.centers.map((center) {
+              return AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [Expanded(child: Text(center.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18))), Chip(label: Text(center.isActive ? 'نشط' : 'متوقف'))]),
+                    Text('المدير: ${center.managerName.isEmpty ? '-' : center.managerName}'),
+                    Text('الهاتف: ${center.phone.isEmpty ? '-' : center.phone}'),
+                    Text('العنوان: ${center.address.isEmpty ? '-' : center.address}'),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, children: [
+                      FilledButton.tonalIcon(onPressed: () => app.switchCenter(center), icon: const Icon(Icons.login), label: const Text('وضع مساعدة')),
+                      FilledButton.tonalIcon(onPressed: () => _showCenterForm(context, center: center), icon: const Icon(Icons.edit), label: const Text('تعديل')),
+                      FilledButton.tonalIcon(onPressed: () => _toggle(context, center), icon: Icon(center.isActive ? Icons.pause_circle_outline : Icons.play_circle_outline), label: Text(center.isActive ? 'إيقاف' : 'تفعيل')),
+                    ]),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }

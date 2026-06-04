@@ -18,6 +18,7 @@ extension UserRoleX on UserRole {
 
   static UserRole fromDb(String value) {
     if (value == 'systemOwner') return UserRole.sanadOwner;
+    if (value == 'owner') return UserRole.sanadOwner;
     if (value == 'admin') return UserRole.centerManager;
     return UserRole.values.firstWhere((role) => role.name == value, orElse: () => UserRole.parent);
   }
@@ -625,4 +626,72 @@ class SignResource {
         'media_path': mediaPath,
         'notes': notes,
       };
+}
+
+class AuditLog {
+  const AuditLog({
+    required this.id,
+    required this.centerId,
+    required this.userId,
+    required this.userName,
+    required this.action,
+    required this.entityType,
+    required this.entityId,
+    this.details = '',
+    required this.createdAt,
+  });
+
+  final String id;
+  final String centerId;
+  final String userId;
+  final String userName;
+  final String action;
+  final String entityType;
+  final String entityId;
+  final String details;
+  final String createdAt;
+
+  static AuditLog fromMap(Map<String, Object?> row) => AuditLog(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        userId: row['user_id'] as String,
+        userName: row['user_name'] as String,
+        action: row['action'] as String,
+        entityType: row['entity_type'] as String,
+        entityId: row['entity_id'] as String,
+        details: (row['details'] ?? '') as String,
+        createdAt: row['created_at'] as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'user_id': userId,
+        'user_name': userName,
+        'action': action,
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'details': details,
+        'created_at': createdAt,
+      };
+}
+
+class TrainingItem {
+  const TrainingItem({
+    required this.id,
+    required this.type,
+    required this.title,
+    this.letter = '',
+    this.position = '',
+    this.level = 'مبتدئ',
+    this.category = '',
+  });
+
+  final String id;
+  final String type;
+  final String title;
+  final String letter;
+  final String position;
+  final String level;
+  final String category;
 }

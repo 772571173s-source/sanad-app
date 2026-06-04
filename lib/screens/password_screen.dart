@@ -31,7 +31,7 @@ class _PasswordScreenState extends State<PasswordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(app.user?.forcePasswordChange == true ? 'يجب تغيير كلمة المرور التجريبية قبل المتابعة.' : 'تغيير كلمة المرور', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text(app.user?.forcePasswordChange == true ? 'يجب تغيير كلمة المرور المؤقتة قبل المتابعة.' : 'تغيير كلمة المرور', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور الجديدة')),
             const SizedBox(height: 12),

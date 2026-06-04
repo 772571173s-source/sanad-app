@@ -40,8 +40,47 @@ class StudentProfileScreen extends StatelessWidget {
           ...app.sessions.map((session) => ListTile(leading: const Icon(Icons.event_note_outlined), title: Text(session.cardTitle), subtitle: Text('${session.startedAt}\n${session.quickResult} - ${session.summary.isEmpty ? session.notes : session.summary}'))),
         ]),
       ),
+      const SizedBox(height: 16),
+      AppCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('الخط الزمني للطالب', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          if (_timeline(app).isEmpty) const Text('سيظهر هنا سجل زمني للجلسات والتقييمات والواجبات والتقارير والمكافآت.') else ..._timeline(app).map((item) => ListTile(leading: Icon(item.icon), title: Text(item.title), subtitle: Text(item.subtitle), trailing: Text(item.date.split('T').first))),
+        ]),
+      ),
+      const SizedBox(height: 16),
+      AppCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('سجل العمليات', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 10),
+          if (app.auditLogs.isEmpty) const Text('لا توجد عمليات مسجلة لهذا الطالب.'),
+          ...app.auditLogs.take(10).map((log) => ListTile(leading: const Icon(Icons.manage_history), title: Text(log.action), subtitle: Text('${log.userName} - ${log.details}'), trailing: Text(log.createdAt.split('T').first))),
+        ]),
+      ),
     ]);
   }
 
   Widget _field(String label, String value) => SizedBox(width: 240, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: const TextStyle(fontWeight: FontWeight.w700)), Text(value.isEmpty ? '-' : value)]));
+
+  List<_TimelineItem> _timeline(AppProvider app) {
+    final items = <_TimelineItem>[
+      ...app.sessions.map((session) => _TimelineItem(Icons.record_voice_over_outlined, 'جلسة ${session.sessionType}', '${session.cardTitle} - نجاح ${session.successRate}%', session.startedAt)),
+      ...app.evaluations.map((evaluation) => _TimelineItem(Icons.fact_check_outlined, 'تقييم حرف ${evaluation.letter}', '${evaluation.position} - ${evaluation.errorType} - شدة ${evaluation.severity}', evaluation.createdAt)),
+      ...app.exercises.map((exercise) => _TimelineItem(Icons.assignment_outlined, 'واجب منزلي', '${exercise.title} - ${exercise.status}', exercise.dueDate)),
+      ...app.reports.map((report) => _TimelineItem(Icons.picture_as_pdf_outlined, 'تقرير ${report.type}', 'نسبة التحسن ${report.improvementRate}%', report.createdAt)),
+    ];
+    final reward = app.reward;
+    if (reward != null) items.add(_TimelineItem(Icons.workspace_premium_outlined, 'مكافآت ونقاط', 'XP ${reward.xp} - المستوى ${reward.level}', DateTime.now().toIso8601String()));
+    items.sort((a, b) => b.date.compareTo(a.date));
+    return items;
+  }
+}
+
+class _TimelineItem {
+  const _TimelineItem(this.icon, this.title, this.subtitle, this.date);
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String date;
 }

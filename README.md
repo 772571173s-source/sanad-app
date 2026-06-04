@@ -4,7 +4,7 @@ Sanad is a Flutter application for speech therapy and rehabilitation centers. It
 
 ## First Run
 
-Sanad no longer creates demo accounts or a demo center.
+Sanad does not create any default account or default center.
 
 On the first launch, the app shows a setup screen where you create the system owner:
 
@@ -62,4 +62,4 @@ flutter run -d <android-device-id>
 
 ## Production Notes
 
-For a hosted production SaaS version, add server-side authentication, encrypted backup storage, audit logs, remote sync, and signed report archives.
+For a hosted production SaaS version, add server-side authentication, encrypted backup storage, remote sync, and signed report archives.

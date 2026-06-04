@@ -19,6 +19,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Timer? timer;
   int seconds = 0;
   int attempts = 0;
+  int correct = 0;
+  int partial = 0;
+  int wrong = 0;
   int successRate = 0;
   String sessionType = 'نطق وتخاطب';
   String targetLetter = '';
@@ -54,6 +57,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('جلسة ${student.name}', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 10),
+                    AppCard(
+                      padding: 12,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('قبل البدء', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 6),
+                          Text('آخر تقييم: ${app.evaluations.isEmpty ? 'لا يوجد' : '${app.evaluations.first.letter} - ${app.evaluations.first.score} - ${app.evaluations.first.errorType}'}'),
+                          Text('آخر جلسة: ${app.sessions.isEmpty ? 'لا يوجد' : '${app.sessions.first.sessionType} - ${app.sessions.first.quickResult} - ${app.sessions.first.successRate}%'}'),
+                          Text('اقتراح Sanad: ${app.smartSessionSuggestion}'),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Text('المؤقت: ${Duration(seconds: seconds).toString().split('.').first}', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 12),
@@ -91,6 +108,27 @@ class _SessionsScreenState extends State<SessionsScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: app.speechTrainingBank
+                          .where((item) => targetLetter.isEmpty || item.letter == targetLetter)
+                          .map(
+                            (item) => InputChip(
+                              label: Text('${item.title} (${item.level})'),
+                              onPressed: () {
+                                final current = practiceItems.text.trim();
+                                practiceItems.text = current.isEmpty ? item.title : '$current، ${item.title}';
+                                cardTitle = item.title;
+                                if (item.letter.isNotEmpty) targetLetter = item.letter;
+                                if (item.position.isNotEmpty) letterPosition = item.position;
+                                setState(() {});
+                              },
+                            ),
+                          )
+                          .toList(),
+                    ),
                     if (sessionType == 'نطق وتخاطب') ...[
                       const SizedBox(height: 12),
                       Wrap(
@@ -111,8 +149,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       children: [
                         SizedBox(width: 180, child: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'عدد التمارين'), onChanged: (value) => attempts = int.tryParse(value) ?? 0)),
                         SizedBox(width: 180, child: TextField(keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'نسبة النجاح %'), onChanged: (value) => successRate = int.tryParse(value) ?? 0)),
+                        FilledButton.tonal(onPressed: () => _recordAttempt('صحيح'), child: Text('صحيح: $correct')),
+                        FilledButton.tonal(onPressed: () => _recordAttempt('جزئي'), child: Text('جزئي: $partial')),
+                        FilledButton.tonal(onPressed: () => _recordAttempt('خطأ'), child: Text('خطأ: $wrong')),
                       ],
                     ),
+                    const SizedBox(height: 8),
+                    Text('الملخص التلقائي: $attempts تمرين، نسبة النجاح ${_computedSuccessRate()}%'),
                     const SizedBox(height: 12),
                     TextField(controller: notes, maxLines: 2, decoration: const InputDecoration(labelText: 'ملاحظات الجلسة', border: OutlineInputBorder())),
                     const SizedBox(height: 12),
@@ -130,21 +173,40 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 ),
         ),
         const SizedBox(height: 16),
-        ResponsiveGrid(
-          children: app.sessions.map((session) {
-            return AppCard(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.record_voice_over_outlined),
-                title: Text('${session.cardTitle} - ${session.quickResult}'),
-                subtitle: Text('${session.startedAt}\n${session.notes}'),
-                trailing: Text('${session.durationSeconds}s'),
-              ),
-            );
-          }).toList(),
-        ),
+        if (app.sessions.isEmpty)
+          const EmptyState(icon: Icons.event_note_outlined, title: 'لا توجد جلسات', message: 'بعد حفظ أول جلسة ستظهر هنا مع ملخصها ونسبة النجاح.')
+        else
+          ResponsiveGrid(
+            children: app.sessions.map((session) {
+              return AppCard(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.record_voice_over_outlined),
+                  title: Text('${session.cardTitle} - ${session.quickResult}'),
+                  subtitle: Text('${session.startedAt}\n${session.notes}'),
+                  trailing: Text('${session.successRate}%'),
+                ),
+              );
+            }).toList(),
+          ),
       ],
     );
+  }
+
+  void _recordAttempt(String value) {
+    setState(() {
+      attempts++;
+      result = value;
+      if (value == 'صحيح') correct++;
+      if (value == 'جزئي') partial++;
+      if (value == 'خطأ') wrong++;
+      successRate = _computedSuccessRate();
+    });
+  }
+
+  int _computedSuccessRate() {
+    if (attempts == 0) return successRate.clamp(0, 100).toInt();
+    return (((correct + partial * .5) / attempts) * 100).round().clamp(0, 100).toInt();
   }
 
   void _start() {
@@ -174,7 +236,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         errorType: sessionType == 'نطق وتخاطب' ? errorType : '',
         practiceItems: practiceItems.text.trim(),
         attempts: attempts,
-        successRate: successRate.clamp(0, 100).toInt(),
+        successRate: _computedSuccessRate(),
         startedAt: DateTime.now().toIso8601String(),
           durationSeconds: seconds,
           cardTitle: cardTitle,
@@ -190,6 +252,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
         practiceItems.clear();
         attempts = 0;
         successRate = 0;
+        correct = 0;
+        partial = 0;
+        wrong = 0;
       });
     });
   }

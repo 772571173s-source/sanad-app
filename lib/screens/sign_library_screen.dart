@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/feedback.dart';
 
 class SignLibraryScreen extends StatefulWidget {
   const SignLibraryScreen({super.key});
@@ -73,34 +74,37 @@ class _SignLibraryScreenState extends State<SignLibraryScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ResponsiveGrid(
-          children: app.signResources.map((resource) {
-            return AppCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (resource.mediaType == 'صورة' && File(resource.mediaPath).existsSync())
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(File(resource.mediaPath), height: 150, width: double.infinity, fit: BoxFit.cover),
-                    )
-                  else
-                    Container(
-                      height: 110,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Theme.of(context).colorScheme.surfaceContainerHighest),
-                      child: Icon(resource.mediaType == 'صورة' ? Icons.image_outlined : Icons.play_circle_outline, size: 48),
-                    ),
-                  const SizedBox(height: 10),
-                  Text(resource.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                  Text('${resource.category} - ${resource.mediaType}'),
-                  if (resource.notes.isNotEmpty) Text(resource.notes),
-                  Align(alignment: Alignment.centerLeft, child: IconButton(onPressed: () => app.deleteSignResource(resource.id), icon: const Icon(Icons.delete_outline))),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
+        if (app.signResources.isEmpty)
+          const EmptyState(icon: Icons.sign_language_outlined, title: 'لا توجد إشارات', message: 'أضف إشارات مصورة لتظهر في الجلسات وواجبات الأهل.')
+        else
+          ResponsiveGrid(
+            children: app.signResources.map((resource) {
+              return AppCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (resource.mediaType == 'صورة' && File(resource.mediaPath).existsSync())
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(File(resource.mediaPath), height: 150, width: double.infinity, fit: BoxFit.cover),
+                      )
+                    else
+                      Container(
+                        height: 110,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                        child: Icon(resource.mediaType == 'صورة' ? Icons.image_outlined : Icons.play_circle_outline, size: 48),
+                      ),
+                    const SizedBox(height: 10),
+                    Text(resource.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                    Text('${resource.category} - ${resource.mediaType}'),
+                    if (resource.notes.isNotEmpty) Text(resource.notes),
+                    Align(alignment: Alignment.centerLeft, child: IconButton(onPressed: () => runWithFeedback(context, () => app.deleteSignResource(resource.id), success: 'تم حذف الإشارة.'), icon: const Icon(Icons.delete_outline))),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
       ],
     );
   }
@@ -115,20 +119,22 @@ class _SignLibraryScreenState extends State<SignLibraryScreen> {
   }
 
   Future<void> _save(AppProvider app) async {
-    if (title.text.trim().isEmpty || mediaPath.isEmpty) return;
-    await app.saveSignResource(
-      SignResource(
-        id: 'sign_${DateTime.now().millisecondsSinceEpoch}',
-        centerId: app.activeCenterId,
-        title: title.text.trim(),
-        category: category.text.trim(),
-        mediaType: mediaType,
-        mediaPath: mediaPath,
-        notes: notes.text.trim(),
-      ),
-    );
-    title.clear();
-    notes.clear();
-    setState(() => mediaPath = '');
+    await runWithFeedback(context, () async {
+      if (title.text.trim().isEmpty || mediaPath.isEmpty) throw StateError('اسم الإشارة والصورة/الفيديو مطلوبة.');
+      await app.saveSignResource(
+        SignResource(
+          id: 'sign_${DateTime.now().millisecondsSinceEpoch}',
+          centerId: app.activeCenterId,
+          title: title.text.trim(),
+          category: category.text.trim(),
+          mediaType: mediaType,
+          mediaPath: mediaPath,
+          notes: notes.text.trim(),
+        ),
+      );
+      title.clear();
+      notes.clear();
+      setState(() => mediaPath = '');
+    }, success: 'تمت إضافة الإشارة.', loading: 'جار حفظ الإشارة...');
   }
 }

@@ -22,11 +22,13 @@ class AppProvider extends ChangeNotifier {
   List<Exercise> exercises = [];
   List<ReportRecord> reports = [];
   List<SignResource> signResources = [];
+  List<AuditLog> auditLogs = [];
   Reward? reward;
   bool loading = false;
   bool darkMode = false;
   bool initialized = false;
   bool setupRequired = false;
+  String? startupError;
 
   bool get isOwner => user?.role == UserRole.sanadOwner;
   bool get isCenterManager => user?.role == UserRole.centerManager;
@@ -41,6 +43,25 @@ class AppProvider extends ChangeNotifier {
   bool get canWriteParentArea => isParent || canWriteClinical;
   bool get canViewReports => isCenterManager || isSpecialist;
   String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
+  List<TrainingItem> get speechTrainingBank => const [
+        TrainingItem(id: 's1', type: 'word', title: 'باب', letter: 'ب', position: 'أول الكلمة', level: 'مبتدئ', category: 'كلمات'),
+        TrainingItem(id: 's2', type: 'word', title: 'كوب', letter: 'ب', position: 'آخر الكلمة', level: 'مبتدئ', category: 'كلمات'),
+        TrainingItem(id: 's3', type: 'sentence', title: 'باب البيت مفتوح', letter: 'ب', position: 'أول الكلمة', level: 'متوسط', category: 'جمل'),
+        TrainingItem(id: 's4', type: 'word', title: 'سمك', letter: 'س', position: 'أول الكلمة', level: 'مبتدئ', category: 'كلمات'),
+        TrainingItem(id: 's5', type: 'sentence', title: 'سامي يسمع الصوت', letter: 'س', position: 'وسط الكلمة', level: 'متوسط', category: 'جمل'),
+      ];
+  String get smartSessionSuggestion {
+    if (evaluations.isEmpty && sessions.isEmpty) return 'ابدأ بهدف قصير من الخطة الحالية ثم قيّم 5 محاولات.';
+    final weakEvaluation = evaluations.where((item) => item.score == 'خطأ' || item.severity >= 4).toList();
+    if (weakEvaluation.isNotEmpty) {
+      final item = weakEvaluation.first;
+      return 'اقترح تدريب حرف ${item.letter} في موضع ${item.position} بسبب تكرار ${item.errorType}.';
+    }
+    final lastSession = sessions.isEmpty ? null : sessions.first;
+    if (lastSession != null && lastSession.successRate >= 85) return 'الأداء ممتاز؛ جرّب مستوى أصعب وزد نقاط XP عند الإتقان.';
+    if (lastSession != null && lastSession.letterPosition == 'آخر الكلمة' && lastSession.quickResult == 'خطأ') return 'ركّز على تدريبات آخر الكلمة في الجلسة القادمة.';
+    return 'استمر على هدف الخطة الحالي مع تقليل المساعدة تدريجيًا.';
+  }
   bool get signLanguageEnabledForSelectedStudent {
     final student = selectedStudent;
     if (student == null) return true;
@@ -48,9 +69,15 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    setupRequired = !await _repository.hasUsers();
-    initialized = true;
-    notifyListeners();
+    try {
+      startupError = null;
+      setupRequired = !await _repository.hasUsers();
+    } catch (error) {
+      startupError = _cleanError(error);
+    } finally {
+      initialized = true;
+      notifyListeners();
+    }
   }
 
   Future<void> createSystemOwner({required String name, required String email, required String password, required String confirmPassword}) async {
@@ -65,11 +92,23 @@ class AppProvider extends ChangeNotifier {
   Future<bool> login(String email, String password) async {
     loading = true;
     notifyListeners();
-    user = await _repository.login(email.trim(), password.trim());
-    if (user != null) await loadHome();
-    loading = false;
-    notifyListeners();
-    return user != null;
+    try {
+      user = await _repository.login(email.trim(), password.trim());
+      if (user != null) await loadHome();
+      return user != null;
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetLocalDatabaseForDevelopment() async {
+    await _repository.resetLocalDatabase();
+    logout();
+    initialized = false;
+    setupRequired = false;
+    startupError = null;
+    await initialize();
   }
 
   Future<void> changePassword(String newPassword) async {
@@ -106,6 +145,7 @@ class AppProvider extends ChangeNotifier {
     exercises = [];
     reports = [];
     signResources = [];
+    auditLogs = [];
     reward = null;
     notifyListeners();
   }
@@ -130,6 +170,7 @@ class AppProvider extends ChangeNotifier {
     }
     staff = canManageStaff ? await _repository.users(centerId: isOwner ? null : activeCenterId) : [];
     signResources = activeCenterId.isEmpty ? [] : await _repository.signResources(activeCenterId);
+    auditLogs = isOwner || isCenterManager ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId) : [];
     students = current.role == UserRole.parent && current.studentId != null
         ? await _repository.studentsForParent(current.studentId!)
         : activeCenterId.isEmpty
@@ -156,6 +197,7 @@ class AppProvider extends ChangeNotifier {
       plans = [];
       exercises = [];
       reports = [];
+      auditLogs = isOwner || isCenterManager ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId) : [];
       reward = null;
     } else {
       sessions = await _repository.sessions(student.id);
@@ -163,6 +205,7 @@ class AppProvider extends ChangeNotifier {
       plans = await _repository.plans(student.id);
       exercises = await _repository.exercises(student.id);
       reports = await _repository.reports(student.id);
+      auditLogs = isOwner || isCenterManager ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId, studentId: student.id) : [];
       reward = await _repository.reward(student.id);
     }
     notifyListeners();
@@ -171,6 +214,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> saveCenter(SanadCenter center) async {
     _ensure(canManageCenters || (isCenterManager && center.id == activeCenterId), 'ليست لديك صلاحية تعديل هذا المركز.');
     await _repository.saveCenter(center);
+    await _log(action: 'حفظ مركز', entityType: 'center', entityId: center.id, centerId: center.id, details: center.name);
     await loadHome();
   }
 
@@ -181,6 +225,7 @@ class AppProvider extends ChangeNotifier {
     if (isOwner && account.role != UserRole.centerManager) throw StateError('مالك النظام ينشئ مدير مركز فقط.');
     if (isCenterManager && account.role != UserRole.specialist && account.role != UserRole.dataEntry) throw StateError('مدير المركز ينشئ أخصائي أو مدخل بيانات فقط.');
     await _repository.saveUser(account);
+    await _log(action: 'حفظ موظف', entityType: 'user', entityId: account.id, centerId: account.centerId, details: '${account.name} - ${account.role.label}');
     await loadHome();
   }
 
@@ -205,6 +250,7 @@ class AppProvider extends ChangeNotifier {
       updatedAt: student.updatedAt,
     );
     await _repository.saveStudent(centerStudent);
+    await _log(action: 'حفظ طالب', entityType: 'student', entityId: centerStudent.id, centerId: centerStudent.centerId, details: centerStudent.name);
     await loadHome();
     final saved = students.firstWhere((item) => item.id == student.id, orElse: () => centerStudent);
     selectedStudent = saved;
@@ -215,45 +261,57 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteStudent(String id) async {
     _ensure(canDeleteStudents, 'لا تملك صلاحية حذف الطلاب.');
     await _repository.softDeleteStudent(id);
+    await _log(action: 'حذف طالب', entityType: 'student', entityId: id, centerId: activeCenterId);
     selectedStudent = null;
     await loadHome();
   }
 
   Future<void> saveSession(TherapySession session) async {
-    _ensure(canWriteClinical, 'الجلسات يضيفها المدير أو الأخصائي فقط.');
+    _ensure(canWriteClinical, 'الجلسات يضيفها الأخصائي فقط.');
+    _ensureClinicalAccess(session.studentId, session.centerId);
     await _repository.saveSession(session);
+    await _log(action: 'إنشاء جلسة', entityType: 'session', entityId: session.id, centerId: session.centerId, details: '${session.studentId} - ${session.sessionType} - ${session.cardTitle}');
     await _grantXp(session.studentId, session.quickResult == 'صحيح' || session.quickResult == 'ناجح' ? 12 : 6);
     await selectStudent(selectedStudent);
   }
 
   Future<void> saveEvaluation(Evaluation evaluation) async {
-    _ensure(canWriteClinical, 'التقييم يضيفه المدير أو الأخصائي فقط.');
+    _ensure(canWriteClinical, 'التقييم يضيفه الأخصائي فقط.');
+    _ensureClinicalAccess(evaluation.studentId, evaluation.centerId);
     await _repository.saveEvaluation(evaluation);
+    await _log(action: 'حفظ تقييم', entityType: 'evaluation', entityId: evaluation.id, centerId: evaluation.centerId, details: '${evaluation.studentId} - ${evaluation.letter} - ${evaluation.errorType}');
     await _grantXp(evaluation.studentId, evaluation.score == 'صحيح' || evaluation.score == 'ناجح' ? 8 : 4);
     await selectStudent(selectedStudent);
   }
 
   Future<void> savePlan(TrainingPlan plan) async {
-    _ensure(canWriteClinical, 'الخطط يضيفها المدير أو الأخصائي فقط.');
+    _ensure(canWriteClinical, 'الخطط يضيفها الأخصائي فقط.');
+    _ensureClinicalAccess(plan.studentId, plan.centerId);
     await _repository.savePlan(plan);
+    await _log(action: 'حفظ خطة', entityType: 'plan', entityId: plan.id, centerId: plan.centerId, details: '${plan.studentId} - ${plan.goal}');
     await selectStudent(selectedStudent);
   }
 
   Future<void> saveExercise(Exercise exercise) async {
     _ensure(canWriteParentArea, 'لا تملك صلاحية تعديل واجبات هذا الطالب.');
+    _ensureStudentEntityAccess(exercise.studentId, exercise.centerId);
     await _repository.saveExercise(exercise);
+    await _log(action: 'حفظ واجب', entityType: 'exercise', entityId: exercise.id, centerId: exercise.centerId, details: '${exercise.studentId} - ${exercise.title}');
     await selectStudent(selectedStudent);
   }
 
   Future<void> saveReward(Reward reward) async {
     _ensure(canWriteClinical, 'المكافآت يعدلها المركز فقط.');
+    _ensureClinicalAccess(reward.studentId, reward.centerId);
     await _repository.saveReward(reward);
     await selectStudent(selectedStudent);
   }
 
   Future<void> saveSignResource(SignResource resource) async {
     _ensure(canWriteClinical, 'مكتبة الإشارة يعدلها المركز فقط.');
+    _ensure(resource.centerId == activeCenterId, 'لا يمكن تعديل إشارة خارج مركزك.');
     await _repository.saveSignResource(resource);
+    await _log(action: 'حفظ إشارة', entityType: 'sign_resource', entityId: resource.id, centerId: resource.centerId, details: resource.title);
     signResources = await _repository.signResources(activeCenterId);
     notifyListeners();
   }
@@ -261,6 +319,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteSignResource(String id) async {
     _ensure(canWriteClinical, 'مكتبة الإشارة يعدلها المركز فقط.');
     await _repository.deleteSignResource(id);
+    await _log(action: 'حذف إشارة', entityType: 'sign_resource', entityId: id, centerId: activeCenterId);
     signResources = await _repository.signResources(activeCenterId);
     notifyListeners();
   }
@@ -311,6 +370,7 @@ class AppProvider extends ChangeNotifier {
       managerSignature: managerSignature,
     );
     await _repository.saveReport(report);
+    await _log(action: 'طباعة تقرير', entityType: 'report', entityId: report.id, centerId: report.centerId, details: '${report.studentId} - $type');
     await _pdfService.printProgressReport(
       center: currentCenter,
       student: student,
@@ -350,6 +410,24 @@ class AppProvider extends ChangeNotifier {
     if (!allowed) throw StateError(message);
   }
 
+  void _ensureClinicalAccess(String studentId, String centerId) {
+    _ensure(centerId == activeCenterId, 'لا يمكن تنفيذ العملية خارج مركزك.');
+    _ensureStudentEntityAccess(studentId, centerId);
+  }
+
+  void _ensureStudentEntityAccess(String studentId, String centerId) {
+    Student? student;
+    for (final item in students) {
+      if (item.id == studentId) {
+        student = item;
+        break;
+      }
+    }
+    if (student != null) _ensureStudentAccess(student);
+    if (!isOwner && !isParent) _ensure(centerId == activeCenterId, 'لا يمكن الوصول لبيانات مركز آخر.');
+    if (isParent) _ensure(user?.studentId == studentId, 'ولي الأمر يرى بيانات طفله فقط.');
+  }
+
   void _ensureStudentAccess(Student student) {
     final current = _requireUser();
     if (current.role == UserRole.sanadOwner) return;
@@ -357,4 +435,24 @@ class AppProvider extends ChangeNotifier {
     if ((current.role == UserRole.centerManager || current.role == UserRole.specialist || current.role == UserRole.dataEntry) && current.centerId == student.centerId) return;
     throw StateError('لا تملك صلاحية الوصول لهذا الطالب.');
   }
+
+  Future<void> _log({required String action, required String entityType, required String entityId, String centerId = '', String details = ''}) async {
+    final current = user;
+    if (current == null) return;
+    await _repository.saveAuditLog(
+      AuditLog(
+        id: 'audit_${DateTime.now().microsecondsSinceEpoch}',
+        centerId: centerId,
+        userId: current.id,
+        userName: current.name,
+        action: action,
+        entityType: entityType,
+        entityId: entityId,
+        details: details,
+        createdAt: DateTime.now().toIso8601String(),
+      ),
+    );
+  }
+
+  String _cleanError(Object error) => error.toString().replaceFirst('Bad state: ', '').replaceFirst('Exception: ', '');
 }

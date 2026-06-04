@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
+import '../widgets/feedback.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -49,10 +50,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
             Wrap(
               spacing: 8,
               children: [
-                FilledButton.icon(onPressed: () => app.printReport(type, signature.text.trim(), manager.text.trim()), icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('إصدار PDF')),
+                FilledButton.icon(onPressed: () => runWithFeedback(context, () => app.printReport(type, signature.text.trim(), manager.text.trim()), success: 'تم إنشاء التقرير.', loading: 'جار إنشاء التقرير...'), icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('إصدار PDF')),
                 FilledButton.tonalIcon(onPressed: () => app.printCredentials(app.selectedStudent!), icon: const Icon(Icons.badge_outlined), label: const Text('ورقة البريد وكلمة السر')),
               ],
             ),
+            const SizedBox(height: 16),
+            if (app.reports.isEmpty) const Text('لا توجد تقارير بعد. بعد إصدار أول تقرير سيتم حفظه داخل سجل الطالب.') else ...app.reports.map((report) => ListTile(leading: const Icon(Icons.description_outlined), title: Text(report.type), subtitle: Text('نسبة التحسن ${report.improvementRate}%'), trailing: Text(report.createdAt.split('T').first))),
           ],
         ],
       ),
