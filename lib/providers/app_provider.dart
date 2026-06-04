@@ -616,6 +616,22 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteProgramActivity(ProgramActivity activity) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(
+        activity.centerId == activeCenterId, 'لا يمكن حذف نشاط خارج مركزك.');
+    await _repository.deleteProgramActivity(activity.id);
+    await _log(
+        action: 'حذف نشاط برنامج',
+        entityType: 'program_activity',
+        entityId: activity.id,
+        centerId: activity.centerId,
+        details: activity.title);
+    await _loadProgramTree();
+    notifyListeners();
+  }
+
   Future<void> deleteProgramContent(TherapyProgram program) async {
     _ensure(canManagePrograms,
         'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');

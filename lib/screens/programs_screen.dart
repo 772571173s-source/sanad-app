@@ -157,7 +157,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                       ...sectionSkills.map((skill) {
                         final skillActivities = activities
                             .where((activity) => activity.skillId == skill.id)
-                            .toList();
+                            .toList()
+                          ..sort(_compareActivities);
                         return ExpansionTile(
                           tilePadding: EdgeInsets.zero,
                           title: Text(skill.title),
@@ -166,18 +167,41 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               : skill.description),
                           children: skillActivities.map((activity) {
                             final structured =
-                                _StructuredLetterContent.tryParse(activity);
+                                _StructuredActivityContent.tryParse(activity);
                             return ListTile(
                               leading: const Icon(Icons.play_circle_outline),
                               title: Text(activity.title),
                               subtitle: Text(structured == null
                                   ? activity.instructions
                                   : structured.preview),
-                              trailing: Text(
-                                activity.evaluationType == 'sensory'
-                                    ? 'تكامل حسي'
-                                    : 'نطقي',
-                              ),
+                              trailing: app.canManagePrograms
+                                  ? Wrap(
+                                      spacing: 4,
+                                      children: [
+                                        IconButton(
+                                          tooltip: 'تعديل النشاط',
+                                          onPressed: () => _showActivityDialog(
+                                            context,
+                                            selectedProgram: selectedProgram!,
+                                            skills: skills,
+                                            activity: activity,
+                                          ),
+                                          icon: const Icon(Icons.edit_outlined),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'حذف النشاط',
+                                          onPressed: () => _deleteActivity(
+                                              context, activity),
+                                          icon:
+                                              const Icon(Icons.delete_outline),
+                                        ),
+                                      ],
+                                    )
+                                  : Text(
+                                      activity.evaluationType == 'sensory'
+                                          ? 'تكامل حسي'
+                                          : 'نطقي',
+                                    ),
                             );
                           }).toList(),
                         );
@@ -192,6 +216,34 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     );
   }
 
+  Future<void> _deleteActivity(
+      BuildContext context, ProgramActivity activity) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('حذف النشاط'),
+        content: Text('هل تريد حذف "${activity.title}"؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await runWithFeedback(
+        context,
+        () => context.read<AppProvider>().deleteProgramActivity(activity),
+        success: 'تم حذف النشاط.',
+      );
+    }
+  }
+
   TherapyProgram? _selectedProgram(AppProvider app) {
     if (app.programs.isEmpty) return null;
     if (selectedProgramId == null) return app.programs.first;
@@ -199,6 +251,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       if (program.id == selectedProgramId) return program;
     }
     return app.programs.first;
+  }
+
+  int _compareActivities(ProgramActivity a, ProgramActivity b) {
+    final aContent = _StructuredActivityContent.tryParse(a);
+    final bContent = _StructuredActivityContent.tryParse(b);
+    final aOrder = aContent?.sortOrder ?? 0;
+    final bOrder = bContent?.sortOrder ?? 0;
+    if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+    return a.title.compareTo(b.title);
   }
 
   Future<void> _showProgramDialog(BuildContext context) async {
@@ -353,93 +414,288 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   Future<void> _showActivityDialog(BuildContext context,
       {required TherapyProgram selectedProgram,
-      required List<ProgramSkill> skills}) async {
-    final title = TextEditingController();
-    final instructions = TextEditingController();
-    final homework = TextEditingController();
-    var skillId = skills.first.id;
-    var evaluationType =
-        selectedProgram.type == 'التكامل الحسي' ? 'sensory' : 'speech';
+      required List<ProgramSkill> skills,
+      ProgramActivity? activity}) async {
+    final parsed =
+        activity == null ? null : _StructuredActivityContent.tryParse(activity);
+    final title = TextEditingController(text: activity?.title ?? '');
+    final instructions = TextEditingController(
+        text: parsed?.instructions ?? activity?.instructions ?? '');
+    final homework = TextEditingController(text: activity?.homework ?? '');
+    final letter = TextEditingController(text: parsed?.letter ?? '');
+    final words = TextEditingController(text: parsed?.words.join('، ') ?? '');
+    final sentences =
+        TextEditingController(text: parsed?.sentences.join('\n') ?? '');
+    final sortOrder =
+        TextEditingController(text: parsed?.sortOrder.toString() ?? '');
+    var skillId = activity?.skillId ?? skills.first.id;
+    var activityType = _activityTypeForForm(parsed?.kind);
+    var vocalization = parsed?.vocalization ?? 'فتحة';
+    var position = parsed?.position ?? 'أول الكلمة';
+    var evaluationType = activity?.evaluationType ??
+        (selectedProgram.type == 'التكامل الحسي' ? 'sensory' : 'speech');
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة نشاط'),
-        content: SizedBox(
-          width: 560,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: skillId,
-                  decoration: const InputDecoration(labelText: 'المهارة'),
-                  items: skills
-                      .map((skill) => DropdownMenuItem(
-                          value: skill.id, child: Text(skill.title)))
-                      .toList(),
-                  onChanged: (value) => skillId = value ?? skillId,
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: title,
-                    decoration: const InputDecoration(labelText: 'اسم النشاط')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: instructions,
-                    maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'تعليمات')),
-                const SizedBox(height: 10),
-                TextField(
-                    controller: homework,
-                    maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'واجب مقترح')),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: evaluationType,
-                  decoration: const InputDecoration(labelText: 'نوع التقييم'),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'speech', child: Text('صحيح / جزئي / خطأ')),
-                    DropdownMenuItem(
-                        value: 'sensory',
-                        child: Text('لا يؤدي / بمساعدة / جيد')),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(activity == null ? 'إضافة نشاط' : 'تعديل نشاط'),
+          content: SizedBox(
+            width: 620,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    initialValue: skillId,
+                    decoration: const InputDecoration(labelText: 'المهارة'),
+                    items: skills
+                        .map((skill) => DropdownMenuItem(
+                            value: skill.id, child: Text(skill.title)))
+                        .toList(),
+                    onChanged: (value) => skillId = value ?? skillId,
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: activityType,
+                    decoration: const InputDecoration(labelText: 'نوع النشاط'),
+                    items: const [
+                      DropdownMenuItem(value: 'letter', child: Text('حرف')),
+                      DropdownMenuItem(value: 'word', child: Text('كلمة')),
+                      DropdownMenuItem(value: 'sentence', child: Text('جملة')),
+                      DropdownMenuItem(
+                          value: 'oralExercise', child: Text('تمرين فموي')),
+                      DropdownMenuItem(
+                          value: 'auditory', child: Text('تمييز سمعي')),
+                      DropdownMenuItem(
+                          value: 'sensoryActivity', child: Text('نشاط حسي')),
+                      DropdownMenuItem(value: 'sign', child: Text('لغة إشارة')),
+                      DropdownMenuItem(value: 'other', child: Text('أخرى')),
+                    ],
+                    onChanged: (value) => setDialogState(
+                        () => activityType = value ?? activityType),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                      controller: title,
+                      decoration:
+                          const InputDecoration(labelText: 'اسم النشاط')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: sortOrder,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                        labelText: 'ترتيب النشاط', hintText: 'مثال: 1، 2، 3'),
+                  ),
+                  const SizedBox(height: 10),
+                  if (activityType == 'letter' ||
+                      activityType == 'word' ||
+                      activityType == 'sentence') ...[
+                    TextField(
+                        controller: letter,
+                        decoration:
+                            const InputDecoration(labelText: 'الحرف المستهدف')),
+                    const SizedBox(height: 10),
                   ],
-                  onChanged: (value) =>
-                      evaluationType = value ?? evaluationType,
-                ),
-              ],
+                  if (activityType == 'letter') ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: vocalization,
+                      decoration: const InputDecoration(labelText: 'الحركة'),
+                      items: const [
+                        'فتحة',
+                        'كسرة',
+                        'ضمة',
+                        'سكون',
+                        'مد بالألف',
+                        'مد بالياء',
+                        'مد بالواو',
+                      ]
+                          .map((item) =>
+                              DropdownMenuItem(value: item, child: Text(item)))
+                          .toList(),
+                      onChanged: (value) =>
+                          vocalization = value ?? vocalization,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (activityType == 'word') ...[
+                    DropdownButtonFormField<String>(
+                      initialValue: position,
+                      decoration:
+                          const InputDecoration(labelText: 'موضع الحرف'),
+                      items: const ['أول الكلمة', 'وسط الكلمة', 'آخر الكلمة']
+                          .map((item) =>
+                              DropdownMenuItem(value: item, child: Text(item)))
+                          .toList(),
+                      onChanged: (value) => position = value ?? position,
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                        controller: words,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                            labelText: 'الكلمات',
+                            hintText: 'اكتب الكلمات مفصولة بفواصل')),
+                    const SizedBox(height: 10),
+                  ],
+                  if (activityType == 'sentence') ...[
+                    TextField(
+                        controller: sentences,
+                        maxLines: 4,
+                        decoration: const InputDecoration(
+                            labelText: 'الجمل',
+                            hintText: 'كل جملة في سطر مستقل')),
+                    const SizedBox(height: 10),
+                  ],
+                  TextField(
+                      controller: instructions,
+                      maxLines: 2,
+                      decoration: const InputDecoration(labelText: 'تعليمات')),
+                  const SizedBox(height: 10),
+                  TextField(
+                      controller: homework,
+                      maxLines: 2,
+                      decoration:
+                          const InputDecoration(labelText: 'واجب مقترح')),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: evaluationType,
+                    decoration: const InputDecoration(labelText: 'نوع التقييم'),
+                    items: const [
+                      DropdownMenuItem(
+                          value: 'speech', child: Text('صحيح / جزئي / خطأ')),
+                      DropdownMenuItem(
+                          value: 'sensory',
+                          child: Text('لا يؤدي / بمساعدة / جيد')),
+                    ],
+                    onChanged: (value) =>
+                        evaluationType = value ?? evaluationType,
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('إلغاء')),
+            FilledButton(
+                onPressed: () async {
+                  await runWithFeedback(context, () async {
+                    if (title.text.trim().isEmpty) {
+                      throw StateError('اسم النشاط مطلوب.');
+                    }
+                    await context.read<AppProvider>().saveProgramActivity(
+                          ProgramActivity(
+                            id: activity?.id ??
+                                'activity_${DateTime.now().millisecondsSinceEpoch}',
+                            centerId: selectedProgram.centerId,
+                            programId: selectedProgram.id,
+                            skillId: skillId,
+                            title: title.text.trim(),
+                            instructions: _activityInstructions(
+                              type: activityType,
+                              letter: letter.text.trim(),
+                              vocalization: vocalization,
+                              position: position,
+                              words: words.text,
+                              sentences: sentences.text,
+                              instructions: instructions.text.trim(),
+                              homework: homework.text.trim(),
+                              sortOrder:
+                                  int.tryParse(sortOrder.text.trim()) ?? 0,
+                            ),
+                            homework: homework.text.trim(),
+                            evaluationType: evaluationType,
+                            createdAt: activity?.createdAt ?? '',
+                          ),
+                        );
+                    if (dialogContext.mounted) Navigator.pop(dialogContext);
+                  });
+                },
+                child: const Text('حفظ')),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
-          FilledButton(
-              onPressed: () async {
-                await runWithFeedback(context, () async {
-                  if (title.text.trim().isEmpty) {
-                    throw StateError('اسم النشاط مطلوب.');
-                  }
-                  await context.read<AppProvider>().saveProgramActivity(
-                        ProgramActivity(
-                          id: 'activity_${DateTime.now().millisecondsSinceEpoch}',
-                          centerId: selectedProgram.centerId,
-                          programId: selectedProgram.id,
-                          skillId: skillId,
-                          title: title.text.trim(),
-                          instructions: instructions.text.trim(),
-                          homework: homework.text.trim(),
-                          evaluationType: evaluationType,
-                        ),
-                      );
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
-                });
-              },
-              child: const Text('حفظ')),
-        ],
       ),
     );
+  }
+
+  String _activityInstructions({
+    required String type,
+    required String letter,
+    required String vocalization,
+    required String position,
+    required String words,
+    required String sentences,
+    required String instructions,
+    required String homework,
+    required int sortOrder,
+  }) {
+    if (type == 'letter') {
+      return jsonEncode({
+        'kind': 'speechLetter',
+        'letter': letter,
+        'vocalization': vocalization,
+        'letterDisplay': _displayLetter(letter, vocalization),
+        'sortOrder': sortOrder,
+        'instructions': instructions,
+        'homework': homework,
+      });
+    }
+    if (type == 'word') {
+      return jsonEncode({
+        'kind': 'speechWord',
+        'letter': letter,
+        'position': position,
+        'words': _splitArabicList(words),
+        'sortOrder': sortOrder,
+        'instructions': instructions,
+        'homework': homework,
+      });
+    }
+    if (type == 'sentence') {
+      return jsonEncode({
+        'kind': 'speechSentence',
+        'letter': letter,
+        'sentences': sentences
+            .split('\n')
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
+            .toList(),
+        'sortOrder': sortOrder,
+        'instructions': instructions,
+        'homework': homework,
+      });
+    }
+    if (type != 'other') {
+      return jsonEncode({
+        'kind': type,
+        'sortOrder': sortOrder,
+        'instructions': instructions,
+        'homework': homework,
+      });
+    }
+    return instructions;
+  }
+
+  String _activityTypeForForm(String? kind) {
+    return switch (kind) {
+      'speechLetter' => 'letter',
+      'speechWord' => 'word',
+      'speechSentence' => 'sentence',
+      'oralExercise' => 'oralExercise',
+      'auditory' => 'auditory',
+      'sensoryActivity' => 'sensoryActivity',
+      'sign' => 'sign',
+      _ => 'other',
+    };
+  }
+
+  List<String> _splitArabicList(String value) {
+    return value
+        .split(RegExp(r'[,،\n]'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
   }
 
   Future<void> _simpleSaveDialog(
@@ -565,9 +821,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     return hasStructuredLetters &&
         _hasSections(app, program, const [
           'الحروف',
+          'الكلمات',
+          'الجمل',
           'أعضاء النطق',
           'التمييز السمعي',
-          'الكلمات والجمل',
         ]);
   }
 
@@ -605,7 +862,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         id: 'speech_letter_${letter.id}_$stamp',
         title: 'حرف ${letter.letter}',
         description:
-            'تدريب حرف ${letter.letter} بالحركات والمواضع داخل الكلمة والجملة.',
+            'تدريب حرف ${letter.letter} منفردًا بالحركات قبل الانتقال للكلمات.',
       );
       for (final vocalization in _vocalizations) {
         await _createActivity(
@@ -614,16 +871,73 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           skill,
           id: 'speech_${letter.id}_${vocalization.id}_$stamp',
           title:
-              'حرف ${letter.letter}${vocalization.mark} - ${vocalization.name}',
+              'حرف ${_displayLetterWithVocalization(letter, vocalization)} - ${vocalization.name}',
           instructions: _letterStructuredContent(letter, vocalization),
-          homework: letter.homework,
+          homework:
+              'كرر صوت ${_displayLetterWithVocalization(letter, vocalization)} 5 مرات بهدوء مع ولي الأمر.',
           evaluationType: 'speech',
         );
       }
     }
 
+    final words = await _createSection(app, program,
+        id: 'speech_words_$stamp', title: 'الكلمات', sortOrder: 2);
+    for (final letter in _arabicLetterContent) {
+      final skill = await _createSkill(
+        app,
+        program,
+        words,
+        id: 'speech_words_${letter.id}_$stamp',
+        title: 'كلمات حرف ${letter.letter}',
+        description: 'تدريب كلمات حرف ${letter.letter} حسب موضع الحرف.',
+      );
+      await _createActivity(app, program, skill,
+          id: 'speech_words_${letter.id}_initial_$stamp',
+          title: 'حرف ${letter.letter} - أول الكلمة',
+          instructions: _wordStructuredContent(
+              letter, 'أول الكلمة', letter.initial, 'اقرأ الكلمات ببطء ووضوح.'),
+          homework: 'كرر كلمات حرف ${letter.letter} في أول الكلمة.',
+          evaluationType: 'speech');
+      await _createActivity(app, program, skill,
+          id: 'speech_words_${letter.id}_middle_$stamp',
+          title: 'حرف ${letter.letter} - وسط الكلمة',
+          instructions: _wordStructuredContent(letter, 'وسط الكلمة',
+              letter.middle, 'ركز على صوت الحرف داخل الكلمة.'),
+          homework: 'كرر كلمات حرف ${letter.letter} في وسط الكلمة.',
+          evaluationType: 'speech');
+      await _createActivity(app, program, skill,
+          id: 'speech_words_${letter.id}_final_$stamp',
+          title: 'حرف ${letter.letter} - آخر الكلمة',
+          instructions: _wordStructuredContent(letter, 'آخر الكلمة',
+              letter.finalWords, 'انتبه لظهور صوت الحرف في نهاية الكلمة.'),
+          homework: 'كرر كلمات حرف ${letter.letter} في آخر الكلمة.',
+          evaluationType: 'speech');
+    }
+
+    final sentences = await _createSection(app, program,
+        id: 'speech_sentences_$stamp', title: 'الجمل', sortOrder: 3);
+    for (final letter in _arabicLetterContent) {
+      final skill = await _createSkill(
+        app,
+        program,
+        sentences,
+        id: 'speech_sentences_${letter.id}_$stamp',
+        title: 'جمل حرف ${letter.letter}',
+        description: 'استخدام حرف ${letter.letter} داخل جمل قصيرة.',
+      );
+      await _createActivity(app, program, skill,
+          id: 'speech_sentence_${letter.id}_$stamp',
+          title: 'جملة حرف ${letter.letter}',
+          instructions: _sentenceStructuredContent(letter, [
+            letter.sentence,
+            _extraSentence(letter),
+          ]),
+          homework: 'اقرأ جملة حرف ${letter.letter} مرتين مع ولي الأمر.',
+          evaluationType: 'speech');
+    }
+
     final organs = await _createSection(app, program,
-        id: 'speech_organs_$stamp', title: 'أعضاء النطق', sortOrder: 2);
+        id: 'speech_organs_$stamp', title: 'أعضاء النطق', sortOrder: 4);
     await _seedSimpleSpeechSection(app, program, organs, stamp, const [
       _ContentSkill('تمارين الشفاه', [
         _ContentActivity(
@@ -668,7 +982,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     ]);
 
     final auditory = await _createSection(app, program,
-        id: 'speech_auditory_$stamp', title: 'التمييز السمعي', sortOrder: 3);
+        id: 'speech_auditory_$stamp', title: 'التمييز السمعي', sortOrder: 5);
     await _seedSimpleSpeechSection(app, program, auditory, stamp, const [
       _ContentSkill('تمييز صوت الحرف', [
         _ContentActivity(
@@ -687,31 +1001,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             'أي صوت سمعت؟',
             'يشير الطفل إلى الحرف أو الصورة التي تمثل الصوت المسموع.',
             'اختر الصوت الصحيح من بين خيارين في 5 محاولات.'),
-      ]),
-    ]);
-
-    final words = await _createSection(app, program,
-        id: 'speech_words_sentences_$stamp',
-        title: 'الكلمات والجمل',
-        sortOrder: 4);
-    await _seedSimpleSpeechSection(app, program, words, stamp, const [
-      _ContentSkill('كلمات بسيطة', [
-        _ContentActivity(
-            'تسمية صور بسيطة',
-            'سمّ صورًا يومية مثل باب، ماء، كرة، قلم.',
-            'سمّ 5 أشياء في المنزل بصوت واضح.'),
-      ]),
-      _ContentSkill('جمل من كلمتين', [
-        _ContentActivity(
-            'بناء جملة قصيرة',
-            'استخدم نمطًا مثل: أريد ماء، هذه كرة، باب مفتوح.',
-            'كوّن 5 جمل من كلمتين مع ولي الأمر.'),
-      ]),
-      _ContentSkill('جمل من ثلاث كلمات', [
-        _ContentActivity(
-            'توسيع الجملة',
-            'وسّع الجملة إلى ثلاث كلمات مثل: أريد ماء بارد.',
-            'قل 3 جمل من ثلاث كلمات عن صور أو أشياء في المنزل.'),
       ]),
     ]);
   }
@@ -932,12 +1221,32 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       'letter': letter.letter,
       'vocalization': vocalization.name,
       'letterDisplay': _displayLetterWithVocalization(letter, vocalization),
-      'position': 'كل المواضع',
-      'initialWords': letter.initial,
-      'middleWords': letter.middle,
-      'finalWords': letter.finalWords,
-      'sentence': letter.sentence,
-      'homework': letter.homework,
+      'instructions': 'انطق الصوت منفردًا ثم كرره بإيقاع هادئ.',
+      'homework':
+          'كرر صوت ${_displayLetterWithVocalization(letter, vocalization)} 5 مرات بهدوء مع ولي الأمر.',
+    });
+  }
+
+  String _wordStructuredContent(_LetterContent letter, String position,
+      List<String> words, String instructions) {
+    return jsonEncode({
+      'kind': 'speechWord',
+      'letter': letter.letter,
+      'position': position,
+      'words': words,
+      'instructions': instructions,
+      'homework': 'كرر كلمات حرف ${letter.letter} في موضع $position.',
+    });
+  }
+
+  String _sentenceStructuredContent(
+      _LetterContent letter, List<String> sentences) {
+    return jsonEncode({
+      'kind': 'speechSentence',
+      'letter': letter.letter,
+      'sentences': sentences,
+      'instructions': 'اقرأ الجملة ببطء، ثم أعدها بصوت واضح.',
+      'homework': 'اقرأ جملة حرف ${letter.letter} مرتين مع ولي الأمر.',
     });
   }
 
@@ -956,41 +1265,86 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     }
     return '${letter.letter}${vocalization.mark}';
   }
+
+  String _displayLetter(String letter, String vocalization) {
+    final content = _LetterContent(
+      id: letter == 'أ' ? 'alef' : 'custom',
+      letter: letter,
+      initial: const [],
+      middle: const [],
+      finalWords: const [],
+      sentence: '',
+      homework: '',
+    );
+    final vocal = _vocalizations.firstWhere(
+      (item) => item.name == vocalization,
+      orElse: () => _vocalizations.first,
+    );
+    return _displayLetterWithVocalization(content, vocal);
+  }
+
+  String _extraSentence(_LetterContent letter) {
+    final firstWord =
+        letter.initial.isEmpty ? letter.letter : letter.initial.first;
+    return 'كرر $firstWord بصوت واضح.';
+  }
 }
 
-class _StructuredLetterContent {
-  const _StructuredLetterContent({
-    required this.letterDisplay,
-    required this.initialWords,
-    required this.middleWords,
-    required this.finalWords,
-    required this.sentence,
-    required this.homework,
+class _StructuredActivityContent {
+  const _StructuredActivityContent({
+    required this.kind,
+    this.letter = '',
+    this.letterDisplay = '',
+    this.vocalization = '',
+    this.position = '',
+    this.words = const [],
+    this.sentences = const [],
+    this.instructions = '',
+    this.homework = '',
+    this.sortOrder = 0,
   });
 
+  final String kind;
+  final String letter;
   final String letterDisplay;
-  final List<String> initialWords;
-  final List<String> middleWords;
-  final List<String> finalWords;
-  final String sentence;
+  final String vocalization;
+  final String position;
+  final List<String> words;
+  final List<String> sentences;
+  final String instructions;
   final String homework;
+  final int sortOrder;
 
-  String get preview =>
-      'الحرف: $letterDisplay\nأول: ${initialWords.join(' - ')}\nوسط: ${middleWords.join(' - ')}\nآخر: ${finalWords.join(' - ')}';
+  String get preview {
+    if (kind == 'speechLetter') {
+      return 'حرف: $letterDisplay - $vocalization';
+    }
+    if (kind == 'speechWord') {
+      return 'حرف $letter - $position: ${words.join(' - ')}';
+    }
+    if (kind == 'speechSentence') {
+      return 'حرف $letter: ${sentences.join(' / ')}';
+    }
+    return instructions;
+  }
 
-  static _StructuredLetterContent? tryParse(ProgramActivity activity) {
+  static _StructuredActivityContent? tryParse(ProgramActivity activity) {
     try {
       final json = jsonDecode(activity.instructions);
-      if (json is! Map<String, dynamic> || json['kind'] != 'speechLetter') {
+      if (json is! Map<String, dynamic>) {
         return null;
       }
-      return _StructuredLetterContent(
+      return _StructuredActivityContent(
+        kind: json['kind'] as String? ?? 'other',
+        letter: json['letter'] as String? ?? '',
         letterDisplay: json['letterDisplay'] as String? ?? '',
-        initialWords: _stringList(json['initialWords']),
-        middleWords: _stringList(json['middleWords']),
-        finalWords: _stringList(json['finalWords']),
-        sentence: json['sentence'] as String? ?? '',
+        vocalization: json['vocalization'] as String? ?? '',
+        position: json['position'] as String? ?? '',
+        words: _stringList(json['words']),
+        sentences: _stringList(json['sentences']),
+        instructions: json['instructions'] as String? ?? '',
         homework: json['homework'] as String? ?? activity.homework,
+        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
       );
     } catch (_) {
       return null;

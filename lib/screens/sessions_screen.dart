@@ -20,11 +20,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Timer? timer;
   int seconds = 0;
   String? programId;
-  String? sectionId;
-  String? skillId;
   bool sessionStarted = false;
   int activityIndex = 0;
   int homeworkSentCount = 0;
+  final selectedActivityIds = <String>{};
   final activityResults = <String, String>{};
   final notes = TextEditingController();
 
@@ -46,18 +45,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
             .where((section) => section.programId == program.id)
             .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final sectionSkills = sectionId == null
+    final programSkills = program == null
         ? <ProgramSkill>[]
         : app.programSkills
-            .where((skill) =>
-                skill.programId == program?.id && skill.sectionId == sectionId)
+            .where((skill) => skill.programId == program.id)
             .toList();
-    final skill = _skill(app);
-    final activities = skill == null
+    final libraryActivities = program == null
         ? <ProgramActivity>[]
         : app.programActivities
-            .where((activity) => activity.skillId == skill.id)
-            .toList();
+            .where((activity) => activity.programId == program.id)
+            .toList()
+      ..sort(_compareActivities);
+    final activities = libraryActivities
+        .where((activity) => selectedActivityIds.contains(activity.id))
+        .toList();
     if (activityIndex >= activities.length) activityIndex = 0;
 
     return Column(
@@ -67,6 +68,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
           _SetupCard(
             title: 'اختيار سريع للجلسة',
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: student?.id,
@@ -100,49 +102,32 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       ? null
                       : (value) => setState(() {
                             programId = value;
-                            sectionId = null;
-                            skillId = null;
                             activityIndex = 0;
+                            selectedActivityIds.clear();
                             activityResults.clear();
                           }),
                 ),
                 const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: sectionId,
-                  decoration: const InputDecoration(labelText: 'القسم'),
-                  items: sections
-                      .map((item) => DropdownMenuItem(
-                          value: item.id,
-                          child: Text(item.title,
-                              overflow: TextOverflow.ellipsis)))
-                      .toList(),
-                  onChanged: program == null
-                      ? null
-                      : (value) => setState(() {
-                            sectionId = value;
-                            skillId = null;
-                            activityIndex = 0;
-                            activityResults.clear();
-                          }),
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<String>(
-                  initialValue: skillId,
-                  decoration: const InputDecoration(labelText: 'المهارة'),
-                  items: sectionSkills
-                      .map((item) => DropdownMenuItem(
-                          value: item.id,
-                          child: Text(item.title,
-                              overflow: TextOverflow.ellipsis)))
-                      .toList(),
-                  onChanged: sectionId == null
-                      ? null
-                      : (value) => setState(() {
-                            skillId = value;
-                            activityIndex = 0;
-                            activityResults.clear();
-                          }),
-                ),
+                if (program == null)
+                  const Text('اختر الطالب والبرنامج أولًا.')
+                else
+                  _ActivityLibraryPicker(
+                    sections: sections,
+                    skills: programSkills,
+                    activities: libraryActivities,
+                    selectedActivityIds: selectedActivityIds,
+                    onChanged: (activityId, selected) {
+                      setState(() {
+                        if (selected) {
+                          selectedActivityIds.add(activityId);
+                        } else {
+                          selectedActivityIds.remove(activityId);
+                          activityResults.remove(activityId);
+                        }
+                        activityIndex = 0;
+                      });
+                    },
+                  ),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerRight,
@@ -150,7 +135,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     onPressed:
                         activities.isEmpty ? null : () => _startSession(),
                     icon: const Icon(Icons.play_arrow),
-                    label: const Text('ابدأ الجلسة'),
+                    label: Text('ابدأ الجلسة (${activities.length})'),
                   ),
                 ),
               ],
@@ -191,9 +176,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   void _resetSelectionAfterStudent() {
     programId = null;
-    sectionId = null;
-    skillId = null;
     activityIndex = 0;
+    selectedActivityIds.clear();
     activityResults.clear();
     sessionStarted = false;
   }
@@ -212,14 +196,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
     if (programId == null) return null;
     for (final program in app.programs) {
       if (program.id == programId) return program;
-    }
-    return null;
-  }
-
-  ProgramSkill? _skill(AppProvider app) {
-    if (skillId == null) return null;
-    for (final skill in app.programSkills) {
-      if (skill.id == skillId) return skill;
     }
     return null;
   }
@@ -252,7 +228,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _sendHomework(AppProvider app, ProgramActivity activity) {
     final student = app.selectedStudent;
     final program = _program(app);
-    final content = _StructuredLetterContent.tryParse(activity);
+    final content = _StructuredActivityContent.tryParse(activity);
     final homework = content?.homework ?? activity.homework;
     if (student == null || homework.isEmpty) return Future.value();
     return runWithFeedback(context, () async {
@@ -276,15 +252,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _saveSession(AppProvider app, List<ProgramActivity> activities) {
     final student = app.selectedStudent;
     final program = _program(app);
-    final skill = _skill(app);
+    final firstActivity = activities.isEmpty ? null : activities.first;
+    final skill = firstActivity == null
+        ? null
+        : _findSkill(app.programSkills, firstActivity.skillId);
     return runWithFeedback(context, () async {
       if (student == null || program == null || skill == null) {
-        throw StateError('اختر الطالب والبرنامج والقسم والمهارة أولًا.');
+        throw StateError('اختر الطالب والبرنامج والأنشطة أولًا.');
       }
       if (activityResults.isEmpty) {
         throw StateError('قيّم نشاطًا واحدًا على الأقل قبل حفظ الجلسة.');
       }
-      final firstActivity = activities.isEmpty ? null : activities.first;
       await app.saveSession(TherapySession(
         id: 'session_${DateTime.now().millisecondsSinceEpoch}',
         centerId: student.centerId,
@@ -318,6 +296,94 @@ class _SessionsScreenState extends State<SessionsScreen> {
         notes.clear();
       });
     }, success: 'تم حفظ الجلسة.');
+  }
+
+  ProgramSkill? _findSkill(List<ProgramSkill> skills, String id) {
+    for (final skill in skills) {
+      if (skill.id == id) return skill;
+    }
+    return null;
+  }
+
+  int _compareActivities(ProgramActivity a, ProgramActivity b) {
+    final aContent = _StructuredActivityContent.tryParse(a);
+    final bContent = _StructuredActivityContent.tryParse(b);
+    final aOrder = aContent?.sortOrder ?? 0;
+    final bOrder = bContent?.sortOrder ?? 0;
+    if (aOrder != bOrder) return aOrder.compareTo(bOrder);
+    return a.title.compareTo(b.title);
+  }
+}
+
+class _ActivityLibraryPicker extends StatelessWidget {
+  const _ActivityLibraryPicker({
+    required this.sections,
+    required this.skills,
+    required this.activities,
+    required this.selectedActivityIds,
+    required this.onChanged,
+  });
+
+  final List<ProgramSection> sections;
+  final List<ProgramSkill> skills;
+  final List<ProgramActivity> activities;
+  final Set<String> selectedActivityIds;
+  final void Function(String activityId, bool selected) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    if (activities.isEmpty) {
+      return const EmptyState(
+        icon: Icons.library_books_outlined,
+        title: 'لا توجد أنشطة في البرنامج',
+        message: 'أضف أنشطة من شاشة البرامج أو أعد إنشاء البرامج الأساسية.',
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('اختر أنشطة من مكتبة البرنامج',
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        ...sections.map((section) {
+          final sectionSkills =
+              skills.where((skill) => skill.sectionId == section.id).toList();
+          return ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: Text(section.title),
+            children: sectionSkills.map((skill) {
+              final skillActivities = activities
+                  .where((activity) => activity.skillId == skill.id)
+                  .toList();
+              if (skillActivities.isEmpty) return const SizedBox.shrink();
+              return ExpansionTile(
+                tilePadding: const EdgeInsetsDirectional.only(start: 12),
+                title: Text(skill.title),
+                children: skillActivities.map((activity) {
+                  final content = _StructuredActivityContent.tryParse(activity);
+                  return CheckboxListTile(
+                    value: selectedActivityIds.contains(activity.id),
+                    onChanged: (value) =>
+                        onChanged(activity.id, value ?? false),
+                    title: Text(activity.title),
+                    subtitle: Text(content?.summary ?? activity.instructions),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  );
+                }).toList(),
+              );
+            }).toList(),
+          );
+        }),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerRight,
+          child: Chip(label: Text('المحدد: ${selectedActivityIds.length}')),
+        ),
+      ],
+    );
   }
 }
 
@@ -383,7 +449,7 @@ class _ActiveSessionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = _StructuredLetterContent.tryParse(activity);
+    final content = _StructuredActivityContent.tryParse(activity);
     final homework = content?.homework ?? activity.homework;
     return AppCard(
       child: Column(
@@ -414,7 +480,7 @@ class _ActiveSessionCard extends StatelessWidget {
           if (content == null)
             Text(activity.instructions)
           else
-            _LetterContentView(content: content),
+            _ActivityContentView(content: content),
           if (homework.isNotEmpty) ...[
             const SizedBox(height: 12),
             ExpansionTile(
@@ -516,15 +582,42 @@ class _ActiveSessionCard extends StatelessWidget {
   }
 }
 
-class _LetterContentView extends StatelessWidget {
-  const _LetterContentView({required this.content});
+class _ActivityContentView extends StatelessWidget {
+  const _ActivityContentView({required this.content});
 
-  final _StructuredLetterContent content;
+  final _StructuredActivityContent content;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    if (content.kind == 'speechWord') {
+      return _Panel(
+        title: 'كلمات حرف ${content.letter}',
+        subtitle: content.position,
+        child: _chips(content.words),
+      );
+    }
+    if (content.kind == 'speechSentence') {
+      return _Panel(
+        title: 'جمل حرف ${content.letter}',
+        subtitle: content.instructions,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: content.sentences
+              .map((sentence) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(sentence,
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700)),
+                  ))
+              .toList(),
+        ),
+      );
+    }
+    if (content.kind != 'speechLetter') {
+      return Text(content.instructions);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -556,101 +649,113 @@ class _LetterContentView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _wordGroup(context, 'أول الكلمة', content.initialWords),
-        _wordGroup(context, 'وسط الكلمة', content.middleWords),
-        _wordGroup(context, 'آخر الكلمة', content.finalWords),
-        Container(
-          width: double.infinity,
-          margin: const EdgeInsets.only(top: 6),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('الجملة',
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-              const SizedBox(height: 6),
-              Text(content.sentence,
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700)),
-            ],
-          ),
-        ),
+        if (content.instructions.isNotEmpty)
+          Text(content.instructions,
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
       ],
     );
   }
 
-  Widget _wordGroup(BuildContext context, String label, List<String> values) {
+  Widget _chips(List<String> values) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: values
+          .map((value) => Chip(
+                label: Text(value),
+                visualDensity: VisualDensity.compact,
+              ))
+          .toList(),
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  const _Panel(
+      {required this.title, required this.subtitle, required this.child});
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
         border: Border.all(color: theme.colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.labelLarge
+          Text(title,
+              style: theme.textTheme.titleMedium
                   ?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: values
-                .map((word) => Chip(
-                      label: Text(word),
-                      visualDensity: VisualDensity.compact,
-                    ))
-                .toList(),
-          ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(subtitle),
+          ],
+          const SizedBox(height: 10),
+          child,
         ],
       ),
     );
   }
 }
 
-class _StructuredLetterContent {
-  const _StructuredLetterContent({
-    required this.letterDisplay,
-    required this.vocalization,
-    required this.initialWords,
-    required this.middleWords,
-    required this.finalWords,
-    required this.sentence,
-    required this.homework,
+class _StructuredActivityContent {
+  const _StructuredActivityContent({
+    required this.kind,
+    this.letter = '',
+    this.letterDisplay = '',
+    this.vocalization = '',
+    this.position = '',
+    this.words = const [],
+    this.sentences = const [],
+    this.instructions = '',
+    this.homework = '',
+    this.sortOrder = 0,
   });
 
+  final String kind;
+  final String letter;
   final String letterDisplay;
   final String vocalization;
-  final List<String> initialWords;
-  final List<String> middleWords;
-  final List<String> finalWords;
-  final String sentence;
+  final String position;
+  final List<String> words;
+  final List<String> sentences;
+  final String instructions;
   final String homework;
+  final int sortOrder;
 
-  static _StructuredLetterContent? tryParse(ProgramActivity activity) {
+  String get summary {
+    if (kind == 'speechLetter') return '$letterDisplay - $vocalization';
+    if (kind == 'speechWord') return '$position: ${words.join(' - ')}';
+    if (kind == 'speechSentence') return sentences.join(' / ');
+    return instructions;
+  }
+
+  static _StructuredActivityContent? tryParse(ProgramActivity activity) {
     try {
       final json = jsonDecode(activity.instructions);
-      if (json is! Map<String, dynamic> || json['kind'] != 'speechLetter') {
+      if (json is! Map<String, dynamic>) {
         return null;
       }
-      return _StructuredLetterContent(
+      return _StructuredActivityContent(
+        kind: json['kind'] as String? ?? 'other',
+        letter: json['letter'] as String? ?? '',
         letterDisplay: json['letterDisplay'] as String? ?? '',
         vocalization: json['vocalization'] as String? ?? '',
-        initialWords: _stringList(json['initialWords']),
-        middleWords: _stringList(json['middleWords']),
-        finalWords: _stringList(json['finalWords']),
-        sentence: json['sentence'] as String? ?? '',
+        position: json['position'] as String? ?? '',
+        words: _stringList(json['words']),
+        sentences: _stringList(json['sentences']),
+        instructions: json['instructions'] as String? ?? '',
         homework: json['homework'] as String? ?? activity.homework,
+        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
       );
     } catch (_) {
       return null;
