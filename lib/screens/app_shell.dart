@@ -2,22 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
-import 'backup_screen.dart';
-import 'center_settings_screen.dart';
 import 'centers_screen.dart';
 import 'dashboard_screen.dart';
-import 'evaluations_screen.dart';
+import 'data_entry_screen.dart';
 import 'exercises_parent_screen.dart';
-import 'password_screen.dart';
-import 'plans_screen.dart';
+import 'owner_support_screen.dart';
 import 'programs_screen.dart';
-import 'reports_screen.dart';
 import 'rewards_screen.dart';
 import 'sessions_screen.dart';
-import 'sign_library_screen.dart';
+import 'settings_hub_screen.dart';
 import 'staff_screen.dart';
 import 'student_profile_screen.dart';
 import 'students_screen.dart';
+import 'tools_screen.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -33,10 +30,12 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final items = _items(app);
-    if (index >= items.length) index = 0;
+    if (index >= items.length) {
+      index = 0;
+    }
     final selected = app.user?.forcePasswordChange == true
         ? const _NavItem(
-            'تغيير كلمة المرور', Icons.lock_reset, PasswordScreen())
+            'تغيير كلمة المرور', Icons.lock_reset, SettingsHubScreen())
         : items[index];
 
     return Directionality(
@@ -64,11 +63,13 @@ class _AppShellState extends State<AppShell> {
               return Row(
                 children: [
                   SizedBox(
-                      width: 270,
-                      child: _Sidebar(
-                          items: items,
-                          index: index,
-                          onChanged: (value) => setState(() => index = value))),
+                    width: 270,
+                    child: _Sidebar(
+                      items: items,
+                      index: index,
+                      onChanged: (value) => setState(() => index = value),
+                    ),
+                  ),
                   Expanded(child: content),
                 ],
               );
@@ -76,10 +77,12 @@ class _AppShellState extends State<AppShell> {
             return Scaffold(
               appBar: AppBar(title: Text(selected.title)),
               drawer: Drawer(
-                  child: _Sidebar(
-                      items: items,
-                      index: index,
-                      onChanged: (value) => setState(() => index = value))),
+                child: _Sidebar(
+                  items: items,
+                  index: index,
+                  onChanged: (value) => setState(() => index = value),
+                ),
+              ),
               body: content,
             );
           },
@@ -89,50 +92,63 @@ class _AppShellState extends State<AppShell> {
   }
 
   List<_NavItem> _items(AppProvider app) {
-    final base = <_NavItem>[
-      const _NavItem(
-          'لوحة التحكم', Icons.dashboard_outlined, DashboardScreen()),
-      if (app.canManageStudents)
-        const _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
-      if (app.canViewStudents)
-        const _NavItem(
-            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
-      if (app.canWriteClinical)
-        const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
-      if (app.canWriteClinical)
-        const _NavItem('تقييم الحروف', Icons.record_voice_over_outlined,
-            EvaluationsScreen()),
-      if (app.canWriteClinical)
-        const _NavItem('الخطط الدراسية', Icons.route_outlined, PlansScreen()),
-      if (app.canUsePrograms)
-        const _NavItem(
+    if (app.isOwner) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem('المراكز', Icons.business_outlined, CentersScreen()),
+        _NavItem('المدراء', Icons.manage_accounts_outlined, StaffScreen()),
+        _NavItem('المساعدة', Icons.support_agent, OwnerSupportScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    if (app.isCenterManager) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem('الموظفون', Icons.manage_accounts_outlined, StaffScreen()),
+        _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    if (app.isSpecialist) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
             'البرامج العلاجية', Icons.extension_outlined, ProgramsScreen()),
-      if (app.canWriteClinical && app.signLanguageEnabledForSelectedStudent)
-        const _NavItem(
-            'لغة الإشارة', Icons.sign_language_outlined, SignLibraryScreen()),
-      if (app.canWriteParentArea)
-        const _NavItem('واجهة الأهل', Icons.family_restroom_outlined,
+        _NavItem(
+            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
+        _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    if (app.isDataEntry) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem('الإدخال', Icons.person_add_alt, DataEntryScreen()),
+        _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    if (app.isProgramEntry) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem('البرامج', Icons.extension_outlined, ProgramsScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    if (app.isParent) {
+      return const [
+        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
+            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
+        _NavItem('واجهة الأهل', Icons.family_restroom_outlined,
             ExercisesParentScreen()),
-      if (app.isParent || app.canWriteClinical || app.isCenterManager)
-        const _NavItem(
-            'المكافآت', Icons.emoji_events_outlined, RewardsScreen()),
-      if (app.canViewReports)
-        const _NavItem(
-            'التقارير PDF', Icons.picture_as_pdf_outlined, ReportsScreen()),
-      if (app.canManageCenters)
-        const _NavItem(
-            'إدارة المراكز', Icons.business_outlined, CentersScreen()),
-      if (app.canManageStaff)
-        const _NavItem(
-            'الموظفون والمدراء', Icons.manage_accounts_outlined, StaffScreen()),
-      if (app.isCenterManager)
-        const _NavItem(
-            'إعدادات المركز', Icons.settings_outlined, CenterSettingsScreen()),
-      if (app.isOwner || app.isCenterManager)
-        const _NavItem('Backup', Icons.backup_outlined, BackupScreen()),
-      const _NavItem('تغيير كلمة المرور', Icons.lock_reset, PasswordScreen()),
+        _NavItem('المكافآت', Icons.emoji_events_outlined, RewardsScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
+    return const [
+      _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
     ];
-    return base;
   }
 }
 
@@ -147,29 +163,37 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-            child: Text(title,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineMedium
-                    ?.copyWith(fontWeight: FontWeight.w900))),
+          child: Text(
+            title,
+            style: Theme.of(context)
+                .textTheme
+                .headlineMedium
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ),
         Text(app.user?.name ?? ''),
         const SizedBox(width: 8),
         IconButton(
-            tooltip: 'الوضع الليلي',
-            onPressed: app.toggleTheme,
-            icon: Icon(app.darkMode ? Icons.light_mode : Icons.dark_mode)),
+          tooltip: 'الوضع الليلي',
+          onPressed: app.toggleTheme,
+          icon: Icon(app.darkMode ? Icons.light_mode : Icons.dark_mode),
+        ),
         IconButton(
-            tooltip: 'خروج',
-            onPressed: app.logout,
-            icon: const Icon(Icons.logout)),
+          tooltip: 'خروج',
+          onPressed: app.logout,
+          icon: const Icon(Icons.logout),
+        ),
       ],
     );
   }
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar(
-      {required this.items, required this.index, required this.onChanged});
+  const _Sidebar({
+    required this.items,
+    required this.index,
+    required this.onChanged,
+  });
 
   final List<_NavItem> items;
   final int index;
@@ -190,13 +214,15 @@ class _Sidebar extends StatelessWidget {
             children: [
               ListTile(
                 leading: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    child: const Text('س')),
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: const Text('س'),
+                ),
                 title: const Text('Sanad',
                     style: TextStyle(fontWeight: FontWeight.w900)),
                 subtitle: Text(
-                    context.watch<AppProvider>().currentCenter?.name ??
-                        'إدارة التخاطب والتأهيل'),
+                  context.watch<AppProvider>().currentCenter?.name ??
+                      'إدارة التخاطب والتأهيل',
+                ),
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -211,7 +237,8 @@ class _Sidebar extends StatelessWidget {
                         selectedTileColor:
                             Theme.of(context).colorScheme.primaryContainer,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                         leading: Icon(item.icon),
                         title: Text(item.title),
                         onTap: () {

@@ -47,21 +47,22 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               FilledButton.icon(
                   onPressed: () => _showProgramDialog(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('إضافة برنامج')),
+                  label: const Text('ط¥ط¶ط§ظپط© ط¨ط±ظ†ط§ظ…ط¬')),
             if (app.canManagePrograms)
               FilledButton.tonalIcon(
                   onPressed: () => _seedCorePrograms(app),
                   icon: const Icon(Icons.auto_awesome),
-                  label: const Text('إنشاء البرامج الأساسية')),
+                  label:
+                      const Text('ط¥ظ†ط´ط§ط، ط§ظ„ط¨ط±ط§ظ…ط¬ ط§ظ„ط£ط³ط§ط³ظٹط©')),
           ],
         ),
         const SizedBox(height: 12),
         if (app.programs.isEmpty)
           const EmptyState(
               icon: Icons.extension_outlined,
-              title: 'لا توجد برامج علاجية',
+              title: 'ظ„ط§ طھظˆط¬ط¯ ط¨ط±ط§ظ…ط¬ ط¹ظ„ط§ط¬ظٹط©',
               message:
-                  'ابدأ بإنشاء العلاج النطقي والتكامل الحسي ثم أضف المهارات والأنشطة.')
+                  'ط§ط¨ط¯ط£ ط¨ط¥ظ†ط´ط§ط، ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ ظˆط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ ط«ظ… ط£ط¶ظپ ط§ظ„ظ…ظ‡ط§ط±ط§طھ ظˆط§ظ„ط£ظ†ط´ط·ط©.')
         else ...[
           AppCard(
             child: Wrap(
@@ -100,7 +101,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               : () => _showSectionDialog(context,
                                   selectedProgram: selectedProgram),
                           icon: const Icon(Icons.view_agenda_outlined),
-                          label: const Text('مرحلة')),
+                          label: const Text('ظ…ط±ط­ظ„ط©')),
                       FilledButton.tonalIcon(
                           onPressed: selectedProgram == null || sections.isEmpty
                               ? null
@@ -108,7 +109,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                   selectedProgram: selectedProgram,
                                   sections: sections),
                           icon: const Icon(Icons.psychology_outlined),
-                          label: const Text('مهارة')),
+                          label: const Text('ظ…ظ‡ط§ط±ط©')),
                       FilledButton.tonalIcon(
                           onPressed: selectedProgram == null || skills.isEmpty
                               ? null
@@ -116,7 +117,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                   selectedProgram: selectedProgram,
                                   skills: skills),
                           icon: const Icon(Icons.local_activity_outlined),
-                          label: const Text('نشاط')),
+                          label: const Text('ظ†ط´ط§ط·')),
                     ],
                   ),
               ],
@@ -137,7 +138,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             fontWeight: FontWeight.w900, fontSize: 18)),
                     const SizedBox(height: 8),
                     if (sectionSkills.isEmpty)
-                      const Text('لا توجد مهارات في هذه المرحلة.')
+                      const Text(
+                          'ظ„ط§ طھظˆط¬ط¯ ظ…ظ‡ط§ط±ط§طھ ظپظٹ ظ‡ط°ظ‡ ط§ظ„ظ…ط±ط­ظ„ط©.')
                     else
                       ...sectionSkills.map((skill) {
                         final skillActivities = activities
@@ -147,7 +149,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           tilePadding: EdgeInsets.zero,
                           title: Text(skill.title),
                           subtitle: Text(skill.description.isEmpty
-                              ? 'مهارة علاجية'
+                              ? 'ظ…ظ‡ط§ط±ط© ط¹ظ„ط§ط¬ظٹط©'
                               : skill.description),
                           children: skillActivities
                               .map((activity) => ListTile(
@@ -157,8 +159,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                     subtitle: Text(activity.instructions),
                                     trailing: Text(
                                         activity.evaluationType == 'sensory'
-                                            ? 'حسي'
-                                            : 'نطقي'),
+                                            ? 'ط­ط³ظٹ'
+                                            : 'ظ†ط·ظ‚ظٹ'),
                                   ))
                               .toList(),
                         );
@@ -176,11 +178,11 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   Future<void> _showProgramDialog(BuildContext context) async {
     final name = TextEditingController();
     final description = TextEditingController();
-    var type = 'العلاج النطقي';
+    var type = 'ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ';
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة برنامج علاجي'),
+        title: const Text('ط¥ط¶ط§ظپط© ط¨ط±ظ†ط§ظ…ط¬ ط¹ظ„ط§ط¬ظٹ'),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -188,16 +190,18 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             children: [
               TextField(
                   controller: name,
-                  decoration: const InputDecoration(labelText: 'اسم البرنامج')),
+                  decoration: const InputDecoration(
+                      labelText: 'ط§ط³ظ… ط§ظ„ط¨ط±ظ†ط§ظ…ط¬')),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: type,
-                decoration: const InputDecoration(labelText: 'نوع البرنامج'),
+                decoration:
+                    const InputDecoration(labelText: 'ظ†ظˆط¹ ط§ظ„ط¨ط±ظ†ط§ظ…ط¬'),
                 items: const [
-                  'العلاج النطقي',
-                  'التكامل الحسي',
-                  'لغة إشارة',
-                  'أخرى'
+                  'ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ',
+                  'ط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ',
+                  'ظ„ط؛ط© ط¥ط´ط§ط±ط©',
+                  'ط£ط®ط±ظ‰'
                 ]
                     .map((item) =>
                         DropdownMenuItem(value: item, child: Text(item)))
@@ -208,20 +212,21 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               TextField(
                   controller: description,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'وصف مختصر')),
+                  decoration:
+                      const InputDecoration(labelText: 'ظˆطµظپ ظ…ط®طھطµط±')),
             ],
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
+              child: const Text('ط¥ظ„ط؛ط§ط،')),
           FilledButton(
               onPressed: () async {
                 final app = context.read<AppProvider>();
                 await runWithFeedback(context, () async {
                   if (name.text.trim().isEmpty) {
-                    throw StateError('اسم البرنامج مطلوب.');
+                    throw StateError('ط§ط³ظ… ط§ظ„ط¨ط±ظ†ط§ظ…ط¬ ظ…ط·ظ„ظˆط¨.');
                   }
                   await app.saveProgram(TherapyProgram(
                       id: 'program_${DateTime.now().millisecondsSinceEpoch}',
@@ -232,7 +237,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 });
               },
-              child: const Text('حفظ')),
+              child: const Text('ط­ظپط¸')),
         ],
       ),
     );
@@ -243,8 +248,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     final title = TextEditingController();
     await _simpleSaveDialog(
       context,
-      titleText: 'إضافة مرحلة',
-      labelText: 'عنوان المرحلة',
+      titleText: 'ط¥ط¶ط§ظپط© ظ…ط±ط­ظ„ط©',
+      labelText: 'ط¹ظ†ظˆط§ظ† ط§ظ„ظ…ط±ط­ظ„ط©',
       controller: title,
       onSave: () => context.read<AppProvider>().saveProgramSection(
             ProgramSection(
@@ -265,7 +270,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة مهارة'),
+        title: const Text('ط¥ط¶ط§ظپط© ظ…ظ‡ط§ط±ط©'),
         content: SizedBox(
           width: 520,
           child: Column(
@@ -273,7 +278,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             children: [
               DropdownButtonFormField<String>(
                 initialValue: sectionId,
-                decoration: const InputDecoration(labelText: 'المرحلة'),
+                decoration: const InputDecoration(labelText: 'ط§ظ„ظ…ط±ط­ظ„ط©'),
                 items: sections
                     .map((section) => DropdownMenuItem(
                         value: section.id, child: Text(section.title)))
@@ -283,24 +288,26 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               const SizedBox(height: 10),
               TextField(
                   controller: title,
-                  decoration: const InputDecoration(labelText: 'اسم المهارة')),
+                  decoration: const InputDecoration(
+                      labelText: 'ط§ط³ظ… ط§ظ„ظ…ظ‡ط§ط±ط©')),
               const SizedBox(height: 10),
               TextField(
                   controller: description,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'وصف المهارة')),
+                  decoration: const InputDecoration(
+                      labelText: 'ظˆطµظپ ط§ظ„ظ…ظ‡ط§ط±ط©')),
             ],
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
+              child: const Text('ط¥ظ„ط؛ط§ط،')),
           FilledButton(
               onPressed: () async {
                 await runWithFeedback(context, () async {
                   if (title.text.trim().isEmpty) {
-                    throw StateError('اسم المهارة مطلوب.');
+                    throw StateError('ط§ط³ظ… ط§ظ„ظ…ظ‡ط§ط±ط© ظ…ط·ظ„ظˆط¨.');
                   }
                   await context.read<AppProvider>().saveProgramSkill(
                         ProgramSkill(
@@ -314,7 +321,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 });
               },
-              child: const Text('حفظ')),
+              child: const Text('ط­ظپط¸')),
         ],
       ),
     );
@@ -327,12 +334,13 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     final instructions = TextEditingController();
     final homework = TextEditingController();
     var skillId = skills.first.id;
-    var evaluationType =
-        selectedProgram.type == 'التكامل الحسي' ? 'sensory' : 'speech';
+    var evaluationType = selectedProgram.type == 'ط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ'
+        ? 'sensory'
+        : 'speech';
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('إضافة نشاط'),
+        title: const Text('ط¥ط¶ط§ظپط© ظ†ط´ط§ط·'),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
@@ -341,7 +349,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: skillId,
-                  decoration: const InputDecoration(labelText: 'المهارة'),
+                  decoration:
+                      const InputDecoration(labelText: 'ط§ظ„ظ…ظ‡ط§ط±ط©'),
                   items: skills
                       .map((skill) => DropdownMenuItem(
                           value: skill.id, child: Text(skill.title)))
@@ -351,27 +360,32 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 const SizedBox(height: 10),
                 TextField(
                     controller: title,
-                    decoration: const InputDecoration(labelText: 'اسم النشاط')),
+                    decoration: const InputDecoration(
+                        labelText: 'ط§ط³ظ… ط§ظ„ظ†ط´ط§ط·')),
                 const SizedBox(height: 10),
                 TextField(
                     controller: instructions,
                     maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'تعليمات')),
+                    decoration:
+                        const InputDecoration(labelText: 'طھط¹ظ„ظٹظ…ط§طھ')),
                 const SizedBox(height: 10),
                 TextField(
                     controller: homework,
                     maxLines: 2,
-                    decoration: const InputDecoration(labelText: 'واجب مقترح')),
+                    decoration: const InputDecoration(
+                        labelText: 'ظˆط§ط¬ط¨ ظ…ظ‚طھط±ط­')),
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   initialValue: evaluationType,
-                  decoration: const InputDecoration(labelText: 'نوع التقييم'),
+                  decoration:
+                      const InputDecoration(labelText: 'ظ†ظˆط¹ ط§ظ„طھظ‚ظٹظٹظ…'),
                   items: const [
                     DropdownMenuItem(
-                        value: 'speech', child: Text('صحيح / جزئي / خطأ')),
+                        value: 'speech',
+                        child: Text('طµط­ظٹط­ / ط¬ط²ط¦ظٹ / ط®ط·ط£')),
                     DropdownMenuItem(
                         value: 'sensory',
-                        child: Text('لا يؤدي / بمساعدة / جيد')),
+                        child: Text('ظ„ط§ ظٹط¤ط¯ظٹ / ط¨ظ…ط³ط§ط¹ط¯ط© / ط¬ظٹط¯')),
                   ],
                   onChanged: (value) =>
                       evaluationType = value ?? evaluationType,
@@ -383,12 +397,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
+              child: const Text('ط¥ظ„ط؛ط§ط،')),
           FilledButton(
               onPressed: () async {
                 await runWithFeedback(context, () async {
                   if (title.text.trim().isEmpty) {
-                    throw StateError('اسم النشاط مطلوب.');
+                    throw StateError('ط§ط³ظ… ط§ظ„ظ†ط´ط§ط· ظ…ط·ظ„ظˆط¨.');
                   }
                   await context.read<AppProvider>().saveProgramActivity(
                         ProgramActivity(
@@ -404,7 +418,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 });
               },
-              child: const Text('حفظ')),
+              child: const Text('ط­ظپط¸')),
         ],
       ),
     );
@@ -427,7 +441,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
+              child: const Text('ط¥ظ„ط؛ط§ط،')),
           FilledButton(
               onPressed: () async {
                 await runWithFeedback(context, () async {
@@ -438,7 +452,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                 });
               },
-              child: const Text('حفظ')),
+              child: const Text('ط­ظپط¸')),
         ],
       ),
     );
@@ -446,68 +460,176 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   Future<void> _seedCorePrograms(AppProvider app) async {
     await runWithFeedback(context, () async {
-      if (app.programs.any((program) => program.type == 'العلاج النطقي') ||
-          app.programs.any((program) => program.type == 'التكامل الحسي')) {
-        throw StateError('البرامج الأساسية موجودة مسبقًا.');
+      if (app.programs
+              .any((program) => program.type == 'ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ') ||
+          app.programs
+              .any((program) => program.type == 'ط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ')) {
+        throw StateError(
+            'ط§ظ„ط¨ط±ط§ظ…ط¬ ط§ظ„ط£ط³ط§ط³ظٹط© ظ…ظˆط¬ظˆط¯ط© ظ…ط³ط¨ظ‚ظ‹ط§.');
       }
       final now = DateTime.now().millisecondsSinceEpoch;
       final speech = TherapyProgram(
           id: 'program_speech_$now',
           centerId: app.activeCenterId,
-          name: 'العلاج النطقي',
-          type: 'العلاج النطقي',
+          name: 'ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ',
+          type: 'ط§ظ„ط¹ظ„ط§ط¬ ط§ظ„ظ†ط·ظ‚ظٹ',
           description:
-              'الحروف، الكلمات، الجمل، التمييز السمعي، اللغة التعبيرية والاستقبالية.');
+              'ط§ظ„ط­ط±ظˆظپطŒ ط§ظ„ظƒظ„ظ…ط§طھطŒ ط§ظ„ط¬ظ…ظ„طŒ ط§ظ„طھظ…ظٹظٹط² ط§ظ„ط³ظ…ط¹ظٹطŒ ط§ظ„ظ„ط؛ط© ط§ظ„طھط¹ط¨ظٹط±ظٹط© ظˆط§ظ„ط§ط³طھظ‚ط¨ط§ظ„ظٹط©.');
       final sensory = TherapyProgram(
           id: 'program_sensory_$now',
           centerId: app.activeCenterId,
-          name: 'التكامل الحسي',
-          type: 'التكامل الحسي',
-          description: 'أنشطة سمعية وبصرية ولمسية وتوازن وحركة وإدراك.');
+          name: 'ط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ',
+          type: 'ط§ظ„طھظƒط§ظ…ظ„ ط§ظ„ط­ط³ظٹ',
+          description:
+              'ط£ظ†ط´ط·ط© ط³ظ…ط¹ظٹط© ظˆط¨طµط±ظٹط© ظˆظ„ظ…ط³ظٹط© ظˆطھظˆط§ط²ظ† ظˆط­ط±ظƒط© ظˆط¥ط¯ط±ط§ظƒ.');
       await app.saveProgram(speech);
       await app.saveProgram(sensory);
       await app.saveProgramSection(ProgramSection(
           id: 'section_speech_letters_$now',
           centerId: app.activeCenterId,
           programId: speech.id,
-          title: 'الحروف والكلمات'));
+          title: 'ط§ظ„ط­ط±ظˆظپ ظˆط§ظ„ظƒظ„ظ…ط§طھ'));
       await app.saveProgramSkill(ProgramSkill(
           id: 'skill_speech_b_$now',
           centerId: app.activeCenterId,
           programId: speech.id,
           sectionId: 'section_speech_letters_$now',
-          title: 'إنتاج الحرف في الكلمة',
-          description: 'أول ووسط وآخر الكلمة'));
+          title: 'ط¥ظ†طھط§ط¬ ط§ظ„ط­ط±ظپ ظپظٹ ط§ظ„ظƒظ„ظ…ط©',
+          description: 'ط£ظˆظ„ ظˆظˆط³ط· ظˆط¢ط®ط± ط§ظ„ظƒظ„ظ…ط©'));
       await app.saveProgramActivity(ProgramActivity(
           id: 'activity_speech_words_$now',
           centerId: app.activeCenterId,
           programId: speech.id,
           skillId: 'skill_speech_b_$now',
-          title: 'بطاقات كلمات قصيرة',
-          instructions: 'اعرض بطاقة، ثم قيّم صحيح / جزئي / خطأ.',
-          homework: 'تدريب 5 كلمات أمام ولي الأمر',
+          title: 'ط¨ط·ط§ظ‚ط§طھ ظƒظ„ظ…ط§طھ ظ‚طµظٹط±ط©',
+          instructions:
+              'ط§ط¹ط±ط¶ ط¨ط·ط§ظ‚ط©طŒ ط«ظ… ظ‚ظٹظ‘ظ… طµط­ظٹط­ / ط¬ط²ط¦ظٹ / ط®ط·ط£.',
+          homework: 'طھط¯ط±ظٹط¨ 5 ظƒظ„ظ…ط§طھ ط£ظ…ط§ظ… ظˆظ„ظٹ ط§ظ„ط£ظ…ط±',
           evaluationType: 'speech'));
+      final speechAreas = [
+        ['words', 'الكلمات', 'إنتاج كلمات قصيرة', 'تدريب كلمات وظيفية'],
+        [
+          'sentences',
+          'الجمل',
+          'إنتاج جملة قصيرة',
+          'تدريب جمل من كلمتين أو ثلاث'
+        ],
+        ['organs', 'أعضاء النطق', 'تهيئة أعضاء النطق', 'تمارين شفاه ولسان وفك'],
+        [
+          'auditory',
+          'التمييز السمعي',
+          'تمييز الصوت المستهدف',
+          'استماع واختيار الصوت الصحيح'
+        ],
+        ['breathing', 'التنفس', 'تنظيم النفس', 'شهيق وزفير مضبوط قبل النطق'],
+        [
+          'expressive',
+          'اللغة التعبيرية',
+          'تسمية ووصف',
+          'تسمية صورة أو وصف فعل'
+        ],
+        [
+          'receptive',
+          'اللغة الاستقبالية',
+          'اتباع التعليمات',
+          'تنفيذ أمر بسيط أو مركب'
+        ],
+      ];
+      for (var index = 0; index < speechAreas.length; index++) {
+        final area = speechAreas[index];
+        final sectionId = 'section_speech_${area[0]}_$now';
+        final skillId = 'skill_speech_${area[0]}_$now';
+        await app.saveProgramSection(ProgramSection(
+            id: sectionId,
+            centerId: app.activeCenterId,
+            programId: speech.id,
+            title: area[1],
+            sortOrder: index + 2));
+        await app.saveProgramSkill(ProgramSkill(
+            id: skillId,
+            centerId: app.activeCenterId,
+            programId: speech.id,
+            sectionId: sectionId,
+            title: area[2],
+            description: area[3]));
+        await app.saveProgramActivity(ProgramActivity(
+            id: 'activity_speech_${area[0]}_$now',
+            centerId: app.activeCenterId,
+            programId: speech.id,
+            skillId: skillId,
+            title: area[3],
+            instructions: 'اختر بطاقة تدريب ثم قيّم الأداء: صحيح / جزئي / خطأ.',
+            homework: 'تكرار النشاط في المنزل لمدة 5 دقائق',
+            evaluationType: 'speech'));
+      }
       await app.saveProgramSection(ProgramSection(
           id: 'section_sensory_balance_$now',
           centerId: app.activeCenterId,
           programId: sensory.id,
-          title: 'التوازن والحركة'));
+          title: 'ط§ظ„طھظˆط§ط²ظ† ظˆط§ظ„ط­ط±ظƒط©'));
       await app.saveProgramSkill(ProgramSkill(
           id: 'skill_sensory_balance_$now',
           centerId: app.activeCenterId,
           programId: sensory.id,
           sectionId: 'section_sensory_balance_$now',
-          title: 'تنظيم الاستجابة الحركية',
-          description: 'تدرج حركي آمن وملاحظات أداء'));
+          title: 'طھظ†ط¸ظٹظ… ط§ظ„ط§ط³طھط¬ط§ط¨ط© ط§ظ„ط­ط±ظƒظٹط©',
+          description: 'طھط¯ط±ط¬ ط­ط±ظƒظٹ ط¢ظ…ظ† ظˆظ…ظ„ط§ط­ط¸ط§طھ ط£ط¯ط§ط،'));
       await app.saveProgramActivity(ProgramActivity(
           id: 'activity_sensory_path_$now',
           centerId: app.activeCenterId,
           programId: sensory.id,
           skillId: 'skill_sensory_balance_$now',
-          title: 'مسار توازن بسيط',
-          instructions: 'يمشي الطفل على مسار محدد مع دعم تدريجي.',
-          homework: 'نشاط توازن آمن لمدة 3 دقائق',
+          title: 'ظ…ط³ط§ط± طھظˆط§ط²ظ† ط¨ط³ظٹط·',
+          instructions:
+              'ظٹظ…ط´ظٹ ط§ظ„ط·ظپظ„ ط¹ظ„ظ‰ ظ…ط³ط§ط± ظ…ط­ط¯ط¯ ظ…ط¹ ط¯ط¹ظ… طھط¯ط±ظٹط¬ظٹ.',
+          homework: 'ظ†ط´ط§ط· طھظˆط§ط²ظ† ط¢ظ…ظ† ظ„ظ…ط¯ط© 3 ط¯ظ‚ط§ط¦ظ‚',
           evaluationType: 'sensory'));
-    }, success: 'تم إنشاء البرامج الأساسية.');
+      final sensoryAreas = [
+        [
+          'auditory',
+          'الأنشطة السمعية',
+          'تحمل المثير السمعي',
+          'تمييز أصوات بيئية'
+        ],
+        ['visual', 'الأنشطة البصرية', 'تتبع بصري', 'متابعة هدف بصري متحرك'],
+        ['tactile', 'الأنشطة اللمسية', 'تقبل اللمس', 'استكشاف خامات مختلفة'],
+        ['movement', 'الحركة', 'تنظيم الحركة', 'نشاط حركة موجه'],
+        [
+          'perception',
+          'الإدراك',
+          'مطابقة وتصنيف',
+          'تصنيف أشياء حسب اللون أو الشكل'
+        ],
+        ['motor', 'التكامل الحركي', 'تناسق حركي', 'نشاط يد وعين'],
+      ];
+      for (var index = 0; index < sensoryAreas.length; index++) {
+        final area = sensoryAreas[index];
+        final sectionId = 'section_sensory_${area[0]}_$now';
+        final skillId = 'skill_sensory_${area[0]}_$now';
+        await app.saveProgramSection(ProgramSection(
+            id: sectionId,
+            centerId: app.activeCenterId,
+            programId: sensory.id,
+            title: area[1],
+            sortOrder: index + 2));
+        await app.saveProgramSkill(ProgramSkill(
+            id: skillId,
+            centerId: app.activeCenterId,
+            programId: sensory.id,
+            sectionId: sectionId,
+            title: area[2],
+            description: area[3]));
+        await app.saveProgramActivity(ProgramActivity(
+            id: 'activity_sensory_${area[0]}_$now',
+            centerId: app.activeCenterId,
+            programId: sensory.id,
+            skillId: skillId,
+            title: area[3],
+            instructions:
+                'نفذ النشاط تدريجيًا ثم قيّم الأداء: لا يؤدي / يؤدي بمساعدة / يؤدي جيدًا.',
+            homework: 'نشاط منزلي قصير بإشراف ولي الأمر',
+            evaluationType: 'sensory'));
+      }
+    }, success: 'طھظ… ط¥ظ†ط´ط§ط، ط§ظ„ط¨ط±ط§ظ…ط¬ ط§ظ„ط£ط³ط§ط³ظٹط©.');
   }
 }

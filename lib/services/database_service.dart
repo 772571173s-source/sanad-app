@@ -668,6 +668,14 @@ class DatabaseService {
     return (result.first['total'] as int?) ?? 0;
   }
 
+  Future<int> countWhere(
+      String table, String where, List<Object?> whereArgs) async {
+    final db = await database;
+    final result = await db.rawQuery(
+        'SELECT COUNT(*) AS total FROM $table WHERE $where', whereArgs);
+    return (result.first['total'] as int?) ?? 0;
+  }
+
   Future<List<Map<String, Object?>>> all(String table,
       {String? orderBy}) async {
     final db = await database;

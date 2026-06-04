@@ -68,6 +68,23 @@ class _SessionsScreenState extends State<SessionsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppCard(
+          child: DropdownButtonFormField<String>(
+            initialValue: student?.id,
+            decoration: const InputDecoration(labelText: 'اختيار الطالب'),
+            items: app.students
+                .map((item) => DropdownMenuItem(
+                    value: item.id,
+                    child: Text(item.name, overflow: TextOverflow.ellipsis)))
+                .toList(),
+            onChanged: (value) async {
+              final matches =
+                  app.students.where((item) => item.id == value).toList();
+              await app.selectStudent(matches.isEmpty ? null : matches.first);
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        AppCard(
           child: student == null
               ? const Text('اختر طالبًا أولًا.')
               : Column(

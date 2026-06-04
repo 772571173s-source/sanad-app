@@ -25,13 +25,16 @@ class _CentersScreenState extends State<CentersScreen> {
             child: FilledButton.icon(
                 onPressed: () => _showCenterForm(context),
                 icon: const Icon(Icons.add_business),
-                label: const Text('إضافة مركز'))),
+                label: const Text(
+                    'ط·آ·ط¢آ¥ط·آ·ط¢آ¶ط·آ·ط¢آ§ط·آ¸ط¸آ¾ط·آ·ط¢آ© ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²'))),
         const SizedBox(height: 12),
         if (app.centers.isEmpty)
           const EmptyState(
               icon: Icons.business_outlined,
-              title: 'لا توجد مراكز',
-              message: 'أنشئ أول مركز، ثم أنشئ له مدير مركز من شاشة الموظفين.')
+              title:
+                  'ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ·ط¢آ¬ط·آ·ط¢آ¯ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ¸ط¦â€™ط·آ·ط¢آ²',
+              message:
+                  'ط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ¦ ط·آ·ط¢آ£ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²ط·آ·ط¥â€™ ط·آ·ط¢آ«ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ¦ ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬طŒ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ² ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬آ  ط·آ·ط¢آ´ط·آ·ط¢آ§ط·آ·ط¢آ´ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ¸ط«â€ ط·آ·ط¢آ¸ط·آ¸ط¸آ¾ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬آ .')
         else
           ResponsiveGrid(
             children: app.centers.map((center) {
@@ -44,31 +47,42 @@ class _CentersScreenState extends State<CentersScreen> {
                           child: Text(center.name,
                               style: const TextStyle(
                                   fontWeight: FontWeight.w800, fontSize: 18))),
-                      Chip(label: Text(center.isActive ? 'نشط' : 'متوقف'))
+                      Chip(
+                          label: Text(center.isActive
+                              ? 'ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ·'
+                              : 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¾'))
                     ]),
                     Text(
-                        'المدير: ${center.managerName.isEmpty ? '-' : center.managerName}'),
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ±: ${center.managerName.isEmpty ? '-' : center.managerName}'),
                     Text(
-                        'الهاتف: ${center.phone.isEmpty ? '-' : center.phone}'),
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬طŒط·آ·ط¢آ§ط·آ·ط¹آ¾ط·آ¸ط¸آ¾: ${center.phone.isEmpty ? '-' : center.phone}'),
                     Text(
-                        'العنوان: ${center.address.isEmpty ? '-' : center.address}'),
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ : ${center.address.isEmpty ? '-' : center.address}'),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, children: [
                       FilledButton.tonalIcon(
                           onPressed: () => app.switchCenter(center),
                           icon: const Icon(Icons.login),
-                          label: const Text('وضع مساعدة')),
+                          label: const Text(
+                              'ط·آ¸ط«â€ ط·آ·ط¢آ¶ط·آ·ط¢آ¹ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ©')),
                       FilledButton.tonalIcon(
                           onPressed: () =>
                               _showCenterForm(context, center: center),
                           icon: const Icon(Icons.edit),
-                          label: const Text('تعديل')),
+                          label: const Text(
+                              'ط·آ·ط¹آ¾ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬â€چ')),
                       FilledButton.tonalIcon(
                           onPressed: () => _toggle(context, center),
                           icon: Icon(center.isActive
                               ? Icons.pause_circle_outline
                               : Icons.play_circle_outline),
-                          label: Text(center.isActive ? 'إيقاف' : 'تفعيل')),
+                          label: Text(center.isActive
+                              ? 'ط·آ·ط¢آ¥ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ§ط·آ¸ط¸آ¾'
+                              : 'ط·آ·ط¹آ¾ط·آ¸ط¸آ¾ط·آ·ط¢آ¹ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬â€چ')),
+                      FilledButton.tonalIcon(
+                          onPressed: () => _delete(context, center),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('ط·آ­ط·آ°ط¸ظ¾')),
                     ]),
                   ],
                 ),
@@ -93,6 +107,30 @@ class _CentersScreenState extends State<CentersScreen> {
             createdAt: center.createdAt)));
   }
 
+  Future<void> _delete(BuildContext context, SanadCenter center) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('ط·آ­ط·آ°ط¸ظ¾ ط·آ§ط¸â€‍ط¸â€¦ط·آ±ط¸ئ’ط·آ²'),
+            content:
+                const Text('ط¸â€،ط¸â€‍ ط·ع¾ط·آ±ط¸ظ¹ط·آ¯ ط·آ­ط·آ°ط¸ظ¾ ط·ع؛'),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('ط·آ¥ط¸â€‍ط·ط›ط·آ§ط·طŒ')),
+              FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  child: const Text('ط·آ­ط·آ°ط¸ظ¾')),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    await runWithFeedback(
+        context, () => context.read<AppProvider>().deleteCenter(center.id),
+        success: 'ط·ع¾ط¸â€¦ ط·آ­ط·آ°ط¸ظ¾ ط·آ§ط¸â€‍ط¸â€¦ط·آ±ط¸ئ’ط·آ².');
+  }
+
   Future<void> _showCenterForm(BuildContext context,
       {SanadCenter? center}) async {
     final name = TextEditingController(text: center?.name ?? '');
@@ -102,35 +140,47 @@ class _CentersScreenState extends State<CentersScreen> {
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(center == null ? 'إضافة مركز' : 'تعديل مركز'),
+        title: Text(center == null
+            ? 'ط·آ·ط¢آ¥ط·آ·ط¢آ¶ط·آ·ط¢آ§ط·آ¸ط¸آ¾ط·آ·ط¢آ© ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²'
+            : 'ط·آ·ط¹آ¾ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬â€چ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²'),
         content: SizedBox(
           width: 520,
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
                 controller: name,
-                decoration: const InputDecoration(labelText: 'اسم المركز')),
+                decoration: const InputDecoration(
+                    labelText:
+                        'ط·آ·ط¢آ§ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²')),
             const SizedBox(height: 10),
             TextField(
                 controller: address,
-                decoration: const InputDecoration(labelText: 'العنوان')),
+                decoration: const InputDecoration(
+                    labelText:
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ ')),
             const SizedBox(height: 10),
             TextField(
                 controller: phone,
-                decoration: const InputDecoration(labelText: 'الهاتف')),
+                decoration: const InputDecoration(
+                    labelText:
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬طŒط·آ·ط¢آ§ط·آ·ط¹آ¾ط·آ¸ط¸آ¾')),
             const SizedBox(height: 10),
             TextField(
                 controller: manager,
-                decoration: const InputDecoration(labelText: 'المدير')),
+                decoration: const InputDecoration(
+                    labelText:
+                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ±')),
           ]),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء')),
+              child:
+                  const Text('ط·آ·ط¢آ¥ط·آ¸أ¢â‚¬â€چط·آ·ط·â€؛ط·آ·ط¢آ§ط·آ·ط·إ’')),
           FilledButton(
             onPressed: () => runWithFeedback(context, () async {
               if (name.text.trim().isEmpty) {
-                throw StateError('اسم المركز مطلوب.');
+                throw StateError(
+                    'ط·آ·ط¢آ§ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ² ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ·ط·آ¸أ¢â‚¬â€چط·آ¸ط«â€ ط·آ·ط¢آ¨.');
               }
               await context.read<AppProvider>().saveCenter(SanadCenter(
                   id: center?.id ??
@@ -143,7 +193,7 @@ class _CentersScreenState extends State<CentersScreen> {
                   createdAt: center?.createdAt ?? ''));
               if (dialogContext.mounted) Navigator.pop(dialogContext);
             }),
-            child: const Text('حفظ'),
+            child: const Text('ط·آ·ط¢آ­ط·آ¸ط¸آ¾ط·آ·ط¢آ¸'),
           ),
         ],
       ),
