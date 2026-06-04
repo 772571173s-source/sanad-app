@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
   String? programId;
   String? sectionId;
   String? skillId;
+  bool sessionStarted = false;
+  int activityIndex = 0;
+  int homeworkSentCount = 0;
   final activityResults = <String, String>{};
   final notes = TextEditingController();
 
@@ -54,204 +58,154 @@ class _SessionsScreenState extends State<SessionsScreen> {
         : app.programActivities
             .where((activity) => activity.skillId == skill.id)
             .toList();
+    if (activityIndex >= activities.length) activityIndex = 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _StepCard(
-          number: 1,
-          title: 'اختيار الطالب',
-          child: DropdownButtonFormField<String>(
-            initialValue: student?.id,
-            decoration: const InputDecoration(labelText: 'الطالب'),
-            items: app.students
-                .map((item) => DropdownMenuItem(
-                    value: item.id,
-                    child: Text(item.name, overflow: TextOverflow.ellipsis)))
-                .toList(),
-            onChanged: (value) async {
-              final matches =
-                  app.students.where((item) => item.id == value).toList();
-              await app.selectStudent(matches.isEmpty ? null : matches.first);
-              setState(() {
-                programId = null;
-                sectionId = null;
-                skillId = null;
-                activityResults.clear();
-              });
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (student != null)
-          _StepCard(
-            number: 2,
-            title: 'اختيار البرنامج',
-            child: DropdownButtonFormField<String>(
-              initialValue: programId,
-              decoration: const InputDecoration(labelText: 'البرنامج العلاجي'),
-              items: app.programs
-                  .map((item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.name, overflow: TextOverflow.ellipsis)))
-                  .toList(),
-              onChanged: (value) => setState(() {
-                programId = value;
-                sectionId = null;
-                skillId = null;
-                activityResults.clear();
-              }),
-            ),
-          ),
-        if (program != null) ...[
-          const SizedBox(height: 12),
-          _StepCard(
-            number: 3,
-            title: 'اختيار القسم/المرحلة',
-            child: DropdownButtonFormField<String>(
-              initialValue: sectionId,
-              decoration: const InputDecoration(labelText: 'القسم'),
-              items: sections
-                  .map((item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.title, overflow: TextOverflow.ellipsis)))
-                  .toList(),
-              onChanged: (value) => setState(() {
-                sectionId = value;
-                skillId = null;
-                activityResults.clear();
-              }),
-            ),
-          ),
-        ],
-        if (sectionId != null) ...[
-          const SizedBox(height: 12),
-          _StepCard(
-            number: 4,
-            title: 'اختيار المهارة',
-            child: DropdownButtonFormField<String>(
-              initialValue: skillId,
-              decoration: const InputDecoration(labelText: 'المهارة'),
-              items: sectionSkills
-                  .map((item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.title, overflow: TextOverflow.ellipsis)))
-                  .toList(),
-              onChanged: (value) => setState(() {
-                skillId = value;
-                activityResults.clear();
-              }),
-            ),
-          ),
-        ],
-        if (activities.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _StepCard(
-            number: 5,
-            title: 'تقييم الأنشطة',
-            child: ResponsiveGrid(
-              children: activities.map((activity) {
-                final options = _options(activity);
-                return AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(activity.title,
-                          style: const TextStyle(fontWeight: FontWeight.w900)),
-                      if (activity.instructions.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(activity.instructions),
-                        ),
-                      if (activity.homework.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text('الواجب المقترح: ${activity.homework}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w700)),
-                        ),
-                      const SizedBox(height: 10),
-                      SegmentedButton<String>(
-                        segments: options
-                            .map((item) =>
-                                ButtonSegment(value: item, label: Text(item)))
-                            .toList(),
-                        selected: {
-                          activityResults[activity.id] ?? options.first
-                        },
-                        onSelectionChanged: (value) => setState(
-                            () => activityResults[activity.id] = value.first),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: activity.homework.isEmpty
-                              ? null
-                              : () => _sendHomework(app, activity),
-                          icon: const Icon(Icons.assignment_add),
-                          label: const Text('إرسال واجب'),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-        if (activities.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          _StepCard(
-            number: 6,
-            title: 'حفظ الجلسة والتقرير',
+        if (!sessionStarted) ...[
+          _SetupCard(
+            title: 'اختيار سريع للجلسة',
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(
-                  controller: notes,
-                  maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'ملاحظة مختصرة'),
+                DropdownButtonFormField<String>(
+                  initialValue: student?.id,
+                  decoration: const InputDecoration(labelText: 'الطالب'),
+                  items: app.students
+                      .map((item) => DropdownMenuItem(
+                          value: item.id,
+                          child:
+                              Text(item.name, overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: (value) async {
+                    final matches =
+                        app.students.where((item) => item.id == value).toList();
+                    await app
+                        .selectStudent(matches.isEmpty ? null : matches.first);
+                    setState(_resetSelectionAfterStudent);
+                  },
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: programId,
+                  decoration:
+                      const InputDecoration(labelText: 'البرنامج العلاجي'),
+                  items: app.programs
+                      .map((item) => DropdownMenuItem(
+                          value: item.id,
+                          child:
+                              Text(item.name, overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: student == null
+                      ? null
+                      : (value) => setState(() {
+                            programId = value;
+                            sectionId = null;
+                            skillId = null;
+                            activityIndex = 0;
+                            activityResults.clear();
+                          }),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: sectionId,
+                  decoration: const InputDecoration(labelText: 'القسم'),
+                  items: sections
+                      .map((item) => DropdownMenuItem(
+                          value: item.id,
+                          child: Text(item.title,
+                              overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: program == null
+                      ? null
+                      : (value) => setState(() {
+                            sectionId = value;
+                            skillId = null;
+                            activityIndex = 0;
+                            activityResults.clear();
+                          }),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: skillId,
+                  decoration: const InputDecoration(labelText: 'المهارة'),
+                  items: sectionSkills
+                      .map((item) => DropdownMenuItem(
+                          value: item.id,
+                          child: Text(item.title,
+                              overflow: TextOverflow.ellipsis)))
+                      .toList(),
+                  onChanged: sectionId == null
+                      ? null
+                      : (value) => setState(() {
+                            skillId = value;
+                            activityIndex = 0;
+                            activityResults.clear();
+                          }),
                 ),
                 const SizedBox(height: 12),
-                Text(
-                    'مدة الجلسة: ${Duration(seconds: seconds).toString().split('.').first}'),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      onPressed: _startTimer,
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('بدء المؤقت'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => timer?.cancel(),
-                      icon: const Icon(Icons.pause),
-                      label: const Text('إيقاف'),
-                    ),
-                    FilledButton.icon(
-                      onPressed: () => _saveSession(app),
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('حفظ الجلسة'),
-                    ),
-                    FilledButton.tonalIcon(
-                      onPressed: () => app.printReport(
-                          'تقرير جلسة', app.user?.name ?? '', ''),
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('تقرير الجلسة PDF'),
-                    ),
-                  ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed:
+                        activities.isEmpty ? null : () => _startSession(),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('ابدأ الجلسة'),
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          _PreviousSessions(app: app),
+        ] else ...[
+          _ActiveSessionCard(
+            activity: activities[activityIndex],
+            index: activityIndex,
+            total: activities.length,
+            selectedValue: activityResults[activities[activityIndex].id],
+            options: _options(activities[activityIndex]),
+            elapsedSeconds: seconds,
+            successRate: _successRate(activities),
+            homeworkSentCount: homeworkSentCount,
+            notes: notes,
+            onEvaluate: (value) => setState(
+                () => activityResults[activities[activityIndex].id] = value),
+            onPrevious: activityIndex == 0
+                ? null
+                : () => setState(() => activityIndex--),
+            onNext: activityIndex >= activities.length - 1
+                ? null
+                : () => setState(() => activityIndex++),
+            onSendHomework: () => _sendHomework(app, activities[activityIndex]),
+            onSave: () => _saveSession(app, activities),
+            onStop: () => setState(() {
+              sessionStarted = false;
+              timer?.cancel();
+            }),
+          ),
         ],
-        const SizedBox(height: 16),
-        _PreviousSessions(app: app),
       ],
     );
+  }
+
+  void _resetSelectionAfterStudent() {
+    programId = null;
+    sectionId = null;
+    skillId = null;
+    activityIndex = 0;
+    activityResults.clear();
+    sessionStarted = false;
+  }
+
+  void _startSession() {
+    setState(() {
+      sessionStarted = true;
+      activityIndex = 0;
+      homeworkSentCount = 0;
+      seconds = 0;
+    });
+    _startTimer();
   }
 
   TherapyProgram? _program(AppProvider app) {
@@ -272,7 +226,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   List<String> _options(ProgramActivity activity) {
     if (activity.evaluationType == 'sensory') {
-      return const ['لا يؤدي', 'يؤدي بمساعدة', 'يؤدي جيدًا'];
+      return const ['لا يؤدي', 'بمساعدة', 'جيد'];
     }
     return const ['صحيح', 'جزئي', 'خطأ'];
   }
@@ -287,9 +241,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
     if (activities.isEmpty) return 0;
     var score = 0.0;
     for (final activity in activities) {
-      final value = activityResults[activity.id] ?? _options(activity).first;
-      if (value == 'صحيح' || value == 'يؤدي جيدًا') score += 1;
-      if (value == 'جزئي' || value == 'يؤدي بمساعدة') score += .5;
+      final value = activityResults[activity.id];
+      if (value == null) continue;
+      if (value == 'صحيح' || value == 'جيد') score += 1;
+      if (value == 'جزئي' || value == 'بمساعدة') score += .5;
     }
     return ((score / activities.length) * 100).round();
   }
@@ -297,14 +252,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _sendHomework(AppProvider app, ProgramActivity activity) {
     final student = app.selectedStudent;
     final program = _program(app);
-    if (student == null) return Future.value();
+    final content = _StructuredLetterContent.tryParse(activity);
+    final homework = content?.homework ?? activity.homework;
+    if (student == null || homework.isEmpty) return Future.value();
     return runWithFeedback(context, () async {
       await app.saveExercise(Exercise(
         id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
         centerId: student.centerId,
         studentId: student.id,
         title: '${program?.name ?? 'برنامج علاجي'} - ${activity.title}',
-        instructions: activity.homework,
+        instructions: homework,
         dueDate: DateTime.now()
             .add(const Duration(days: 1))
             .toIso8601String()
@@ -312,24 +269,20 @@ class _SessionsScreenState extends State<SessionsScreen> {
             .first,
         status: 'مرسل',
       ));
+      setState(() => homeworkSentCount++);
     }, success: 'تم إرسال الواجب لولي الأمر.');
   }
 
-  Future<void> _saveSession(AppProvider app) {
+  Future<void> _saveSession(AppProvider app, List<ProgramActivity> activities) {
     final student = app.selectedStudent;
     final program = _program(app);
     final skill = _skill(app);
-    final activities = skill == null
-        ? <ProgramActivity>[]
-        : app.programActivities
-            .where((activity) => activity.skillId == skill.id)
-            .toList();
     return runWithFeedback(context, () async {
       if (student == null || program == null || skill == null) {
         throw StateError('اختر الطالب والبرنامج والقسم والمهارة أولًا.');
       }
-      if (activityResults.length < activities.length) {
-        throw StateError('قيّم كل الأنشطة قبل حفظ الجلسة.');
+      if (activityResults.isEmpty) {
+        throw StateError('قيّم نشاطًا واحدًا على الأقل قبل حفظ الجلسة.');
       }
       final firstActivity = activities.isEmpty ? null : activities.first;
       await app.saveSession(TherapySession(
@@ -343,37 +296,34 @@ class _SessionsScreenState extends State<SessionsScreen> {
             .join('|'),
         sessionType: program.type,
         practiceItems: activities.map((activity) => activity.title).join('، '),
-        attempts: activities.length,
+        attempts: activityResults.length,
         successRate: _successRate(activities),
         startedAt: DateTime.now().toIso8601String(),
         durationSeconds: seconds,
         cardTitle: skill.title,
         quickResult: firstActivity == null
-            ? 'صحيح'
-            : activityResults[firstActivity.id] ??
-                _options(firstActivity).first,
+            ? activityResults.values.first
+            : activityResults[firstActivity.id] ?? activityResults.values.first,
         notes: notes.text.trim(),
         summary:
-            'تم تنفيذ ${activities.length} نشاط بنسبة نجاح ${_successRate(activities)}%.',
+            'تم تقييم ${activityResults.length} من ${activities.length} نشاط، بنسبة نجاح ${_successRate(activities)}%. الواجبات المرسلة: $homeworkSentCount.',
       ));
       timer?.cancel();
       setState(() {
+        sessionStarted = false;
         seconds = 0;
+        activityIndex = 0;
         activityResults.clear();
+        homeworkSentCount = 0;
         notes.clear();
       });
     }, success: 'تم حفظ الجلسة.');
   }
 }
 
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.number,
-    required this.title,
-    required this.child,
-  });
+class _SetupCard extends StatelessWidget {
+  const _SetupCard({required this.title, required this.child});
 
-  final int number;
   final String title;
   final Widget child;
 
@@ -383,22 +333,246 @@ class _StepCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              CircleAvatar(radius: 14, child: Text('$number')),
-              const SizedBox(width: 8),
-              Text(title,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w900)),
-            ],
-          ),
+          Text(title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
           child,
         ],
       ),
     );
+  }
+}
+
+class _ActiveSessionCard extends StatelessWidget {
+  const _ActiveSessionCard({
+    required this.activity,
+    required this.index,
+    required this.total,
+    required this.selectedValue,
+    required this.options,
+    required this.elapsedSeconds,
+    required this.successRate,
+    required this.homeworkSentCount,
+    required this.notes,
+    required this.onEvaluate,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onSendHomework,
+    required this.onSave,
+    required this.onStop,
+  });
+
+  final ProgramActivity activity;
+  final int index;
+  final int total;
+  final String? selectedValue;
+  final List<String> options;
+  final int elapsedSeconds;
+  final int successRate;
+  final int homeworkSentCount;
+  final TextEditingController notes;
+  final ValueChanged<String> onEvaluate;
+  final VoidCallback? onPrevious;
+  final VoidCallback? onNext;
+  final VoidCallback onSendHomework;
+  final VoidCallback onSave;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _StructuredLetterContent.tryParse(activity);
+    final homework = content?.homework ?? activity.homework;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('نشاط ${index + 1} من $total',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w900)),
+              ),
+              Text(Duration(seconds: elapsedSeconds)
+                  .toString()
+                  .split('.')
+                  .first),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(activity.title,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 12),
+          if (content == null)
+            Text(activity.instructions)
+          else
+            _LetterContentView(content: content),
+          if (homework.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('الواجب المقترح'),
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(homework),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: options.map((option) {
+              final selected = selectedValue == option;
+              return SizedBox(
+                height: 54,
+                child: selected
+                    ? FilledButton(
+                        onPressed: () => onEvaluate(option),
+                        child: Text(option),
+                      )
+                    : FilledButton.tonal(
+                        onPressed: () => onEvaluate(option),
+                        child: Text(option),
+                      ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: notes,
+            maxLines: 2,
+            decoration: const InputDecoration(labelText: 'ملاحظة الأخصائي'),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: onPrevious,
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('النشاط السابق'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: onNext,
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('النشاط التالي'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: homework.isEmpty ? null : onSendHomework,
+                icon: const Icon(Icons.assignment_add),
+                label: const Text('إرسال واجب'),
+              ),
+              FilledButton.icon(
+                onPressed: onSave,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('حفظ الجلسة'),
+              ),
+              TextButton.icon(
+                onPressed: onStop,
+                icon: const Icon(Icons.close),
+                label: const Text('إنهاء العرض'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            children: [
+              Chip(label: Text('الأنشطة: $total')),
+              Chip(label: Text('نسبة النجاح: $successRate%')),
+              Chip(label: Text('واجبات مرسلة: $homeworkSentCount')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LetterContentView extends StatelessWidget {
+  const _LetterContentView({required this.content});
+
+  final _StructuredLetterContent content;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('الحرف: ${content.letterDisplay}',
+            style: Theme.of(context)
+                .textTheme
+                .headlineMedium
+                ?.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        _line('أول الكلمة', content.initialWords),
+        _line('وسط الكلمة', content.middleWords),
+        _line('آخر الكلمة', content.finalWords),
+        Text('الجملة: ${content.sentence}',
+            style: const TextStyle(fontWeight: FontWeight.w700)),
+      ],
+    );
+  }
+
+  Widget _line(String label, List<String> values) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text('$label: ${values.join(' - ')}'),
+    );
+  }
+}
+
+class _StructuredLetterContent {
+  const _StructuredLetterContent({
+    required this.letterDisplay,
+    required this.initialWords,
+    required this.middleWords,
+    required this.finalWords,
+    required this.sentence,
+    required this.homework,
+  });
+
+  final String letterDisplay;
+  final List<String> initialWords;
+  final List<String> middleWords;
+  final List<String> finalWords;
+  final String sentence;
+  final String homework;
+
+  static _StructuredLetterContent? tryParse(ProgramActivity activity) {
+    try {
+      final json = jsonDecode(activity.instructions);
+      if (json is! Map<String, dynamic> || json['kind'] != 'speechLetter') {
+        return null;
+      }
+      return _StructuredLetterContent(
+        letterDisplay: json['letterDisplay'] as String? ?? '',
+        initialWords: _stringList(json['initialWords']),
+        middleWords: _stringList(json['middleWords']),
+        finalWords: _stringList(json['finalWords']),
+        sentence: json['sentence'] as String? ?? '',
+        homework: json['homework'] as String? ?? activity.homework,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<String> _stringList(Object? value) {
+    if (value is List) return value.map((item) => '$item').toList();
+    return const [];
   }
 }
 

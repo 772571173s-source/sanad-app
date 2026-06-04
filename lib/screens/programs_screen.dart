@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -158,10 +160,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                               ? 'مهارة علاجية'
                               : skill.description),
                           children: skillActivities.map((activity) {
+                            final structured =
+                                _StructuredLetterContent.tryParse(activity);
                             return ListTile(
                               leading: const Icon(Icons.play_circle_outline),
                               title: Text(activity.title),
-                              subtitle: Text(activity.instructions),
+                              subtitle: Text(structured == null
+                                  ? activity.instructions
+                                  : structured.preview),
                               trailing: Text(
                                 activity.evaluationType == 'sensory'
                                     ? 'تكامل حسي'
@@ -391,7 +397,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                         value: 'speech', child: Text('صحيح / جزئي / خطأ')),
                     DropdownMenuItem(
                         value: 'sensory',
-                        child: Text('لا يؤدي / يؤدي بمساعدة / يؤدي جيدًا')),
+                        child: Text('لا يؤدي / بمساعدة / جيد')),
                   ],
                   onChanged: (value) =>
                       evaluationType = value ?? evaluationType,
@@ -467,43 +473,63 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   Future<void> _seedCorePrograms(AppProvider app) async {
     await runWithFeedback(context, () async {
-      if (app.programs.any((program) => program.type == 'العلاج النطقي') ||
-          app.programs.any((program) => program.type == 'التكامل الحسي')) {
-        throw StateError('البرامج الأساسية موجودة مسبقًا.');
-      }
-
       final now = DateTime.now().millisecondsSinceEpoch;
-      final speech = TherapyProgram(
-        id: 'program_speech_$now',
-        centerId: app.activeCenterId,
-        name: 'العلاج النطقي',
-        type: 'العلاج النطقي',
-        description:
-            'الحروف العربية، أعضاء النطق، التمييز السمعي، الكلمات والجمل، مع واجبات منزلية مقترحة.',
-      );
-      final sensory = TherapyProgram(
-        id: 'program_sensory_$now',
-        centerId: app.activeCenterId,
-        name: 'التكامل الحسي',
-        type: 'التكامل الحسي',
-        description: 'أنشطة سمعية وبصرية ولمسية وتوازن وحركة وتكامل بصري حركي.',
-      );
-      await app.saveProgram(speech);
-      await app.saveProgram(sensory);
-      await _seedSpeechProgram(app, speech, now);
-      await _seedSensoryProgram(app, sensory, now);
-    }, success: 'تم إنشاء البرامج الأساسية بمحتوى علاجي قابل للتجربة.');
+      final speech = _findProgramByType(app, 'العلاج النطقي') ??
+          TherapyProgram(
+            id: 'program_speech_$now',
+            centerId: app.activeCenterId,
+            name: 'العلاج النطقي',
+            type: 'العلاج النطقي',
+            description:
+                'الحروف العربية، الحركات الصوتية، أعضاء النطق، التمييز السمعي، الكلمات والجمل.',
+          );
+      final sensory = _findProgramByType(app, 'التكامل الحسي') ??
+          TherapyProgram(
+            id: 'program_sensory_$now',
+            centerId: app.activeCenterId,
+            name: 'التكامل الحسي',
+            type: 'التكامل الحسي',
+            description:
+                'أنشطة سمعية وبصرية ولمسية وتوازن وحركة وتكامل بصري حركي.',
+          );
+
+      if (_findProgramByType(app, 'العلاج النطقي') == null) {
+        await app.saveProgram(speech);
+      }
+      if (_findProgramByType(app, 'التكامل الحسي') == null) {
+        await app.saveProgram(sensory);
+      }
+      if (!_hasStructuredSpeechContent(app, speech)) {
+        await _seedSpeechProgram(app, speech, now);
+      }
+      if (!_hasSensoryContent(app, sensory)) {
+        await _seedSensoryProgram(app, sensory, now);
+      }
+    }, success: 'تم تجهيز البرامج الأساسية بمحتوى علاجي منظم.');
+  }
+
+  TherapyProgram? _findProgramByType(AppProvider app, String type) {
+    for (final program in app.programs) {
+      if (program.type == type) return program;
+    }
+    return null;
+  }
+
+  bool _hasStructuredSpeechContent(AppProvider app, TherapyProgram program) {
+    return app.programActivities.any((activity) =>
+        activity.programId == program.id &&
+        activity.instructions.contains('"kind":"speechLetter"'));
+  }
+
+  bool _hasSensoryContent(AppProvider app, TherapyProgram program) {
+    return app.programActivities
+        .any((activity) => activity.programId == program.id);
   }
 
   Future<void> _seedSpeechProgram(
       AppProvider app, TherapyProgram program, int stamp) async {
-    final lettersSection = await _createSection(
-      app,
-      program,
-      id: 'speech_letters_$stamp',
-      title: 'الحروف',
-      sortOrder: 1,
-    );
+    final lettersSection = await _createSection(app, program,
+        id: 'speech_letters_$stamp', title: 'الحروف', sortOrder: 1);
     for (final letter in _arabicLetterContent) {
       final skill = await _createSkill(
         app,
@@ -512,41 +538,27 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         id: 'speech_letter_${letter.id}_$stamp',
         title: 'حرف ${letter.letter}',
         description:
-            'تدريب حرف ${letter.letter} في أول ووسط وآخر الكلمة ثم داخل جملة قصيرة.',
+            'تدريب حرف ${letter.letter} بالحركات والمواضع داخل الكلمة والجملة.',
       );
-      await _createActivity(app, program, skill,
-          id: 'speech_${letter.id}_initial_$stamp',
-          title: 'حرف ${letter.letter} - أول الكلمة',
-          instructions: 'درّب الكلمات: ${letter.initial.join('، ')}.',
-          homework:
-              'كرر 5 كلمات تبدأ بحرف ${letter.letter} بصوت واضح مع ولي الأمر.',
-          evaluationType: 'speech');
-      await _createActivity(app, program, skill,
-          id: 'speech_${letter.id}_middle_$stamp',
-          title: 'حرف ${letter.letter} - وسط الكلمة',
-          instructions: 'درّب الكلمات: ${letter.middle.join('، ')}.',
-          homework:
-              'اختر 3 كلمات فيها حرف ${letter.letter} وسط الكلمة وكررها ببطء.',
-          evaluationType: 'speech');
-      await _createActivity(app, program, skill,
-          id: 'speech_${letter.id}_final_$stamp',
-          title: 'حرف ${letter.letter} - آخر الكلمة',
-          instructions: 'درّب الكلمات: ${letter.finalWords.join('، ')}.',
-          homework:
-              'كرر كلمات تنتهي بحرف ${letter.letter} مع الانتباه لنهاية الصوت.',
-          evaluationType: 'speech');
-      await _createActivity(app, program, skill,
-          id: 'speech_${letter.id}_sentence_$stamp',
-          title: 'حرف ${letter.letter} - جملة قصيرة',
-          instructions: letter.sentence,
+      for (final vocalization in _vocalizations) {
+        await _createActivity(
+          app,
+          program,
+          skill,
+          id: 'speech_${letter.id}_${vocalization.id}_$stamp',
+          title:
+              'حرف ${letter.letter}${vocalization.mark} - ${vocalization.name}',
+          instructions: _letterStructuredContent(letter, vocalization),
           homework: letter.homework,
-          evaluationType: 'speech');
+          evaluationType: 'speech',
+        );
+      }
     }
 
     final organs = await _createSection(app, program,
         id: 'speech_organs_$stamp', title: 'أعضاء النطق', sortOrder: 2);
-    await _seedSimpleSpeechSection(app, program, organs, stamp, [
-      const _ContentSkill('تمارين الشفاه', [
+    await _seedSimpleSpeechSection(app, program, organs, stamp, const [
+      _ContentSkill('تمارين الشفاه', [
         _ContentActivity(
             'ضم الشفاه وفتحها',
             'اطلب من الطفل ضم الشفاه ثم فتحها 10 مرات أمام المرآة.',
@@ -556,7 +568,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             'انتقل بين الابتسامة وضم الشفاه ببطء مع العد.',
             'نفذ 10 محاولات ابتسامة ثم ضم مع ولي الأمر.'),
       ]),
-      const _ContentSkill('تمارين اللسان', [
+      _ContentSkill('تمارين اللسان', [
         _ContentActivity(
             'رفع اللسان',
             'يرفع الطفل اللسان خلف الأسنان العلوية ثم يعود للوضع الطبيعي.',
@@ -566,13 +578,13 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             'حرك اللسان باتجاه زاويتي الفم مع ثبات الفك قدر الإمكان.',
             'نفذ 10 حركات يمين ويسار ببطء.'),
       ]),
-      const _ContentSkill('تمارين الفك', [
+      _ContentSkill('تمارين الفك', [
         _ContentActivity(
             'فتح وإغلاق الفك',
             'فتح الفم وإغلاقه ببطء مع مراقبة التحكم.',
             'كرر التمرين 10 مرات بدون استعجال.'),
       ]),
-      const _ContentSkill('النفخ والشفط والتنفس', [
+      _ContentSkill('النفخ والشفط والتنفس', [
         _ContentActivity(
             'نفخ الريشة',
             'ينفخ الطفل ريشة أو منديلًا خفيفًا لمسافة قصيرة.',
@@ -590,20 +602,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
     final auditory = await _createSection(app, program,
         id: 'speech_auditory_$stamp', title: 'التمييز السمعي', sortOrder: 3);
-    await _seedSimpleSpeechSection(app, program, auditory, stamp, [
-      const _ContentSkill('تمييز صوت الحرف', [
+    await _seedSimpleSpeechSection(app, program, auditory, stamp, const [
+      _ContentSkill('تمييز صوت الحرف', [
         _ContentActivity(
             'اسمع حرف الهدف',
             'اعرض كلمات فيها صوت الهدف وأخرى لا تحتويه، والطفل يرفع يده عند سماعه.',
             'استمع إلى 6 كلمات وحدد هل يوجد صوت الهدف أم لا.'),
       ]),
-      const _ContentSkill('تمييز كلمتين متشابهتين', [
+      _ContentSkill('تمييز كلمتين متشابهتين', [
         _ContentActivity(
             'اختيار الكلمة الصحيحة',
             'قل كلمتين متقاربتين صوتيًا واطلب من الطفل الإشارة للصورة الصحيحة.',
             'كرر 5 أزواج كلمات متشابهة مع ولي الأمر.'),
       ]),
-      const _ContentSkill('اختيار الصوت الصحيح', [
+      _ContentSkill('اختيار الصوت الصحيح', [
         _ContentActivity(
             'أي صوت سمعت؟',
             'يشير الطفل إلى الحرف أو الصورة التي تمثل الصوت المسموع.',
@@ -615,20 +627,20 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         id: 'speech_words_sentences_$stamp',
         title: 'الكلمات والجمل',
         sortOrder: 4);
-    await _seedSimpleSpeechSection(app, program, words, stamp, [
-      const _ContentSkill('كلمات بسيطة', [
+    await _seedSimpleSpeechSection(app, program, words, stamp, const [
+      _ContentSkill('كلمات بسيطة', [
         _ContentActivity(
             'تسمية صور بسيطة',
             'سمّ صورًا يومية مثل باب، ماء، كرة، قلم.',
             'سمّ 5 أشياء في المنزل بصوت واضح.'),
       ]),
-      const _ContentSkill('جمل من كلمتين', [
+      _ContentSkill('جمل من كلمتين', [
         _ContentActivity(
             'بناء جملة قصيرة',
             'استخدم نمطًا مثل: أريد ماء، هذه كرة، باب مفتوح.',
             'كوّن 5 جمل من كلمتين مع ولي الأمر.'),
       ]),
-      const _ContentSkill('جمل من ثلاث كلمات', [
+      _ContentSkill('جمل من ثلاث كلمات', [
         _ContentActivity(
             'توسيع الجملة',
             'وسّع الجملة إلى ثلاث كلمات مثل: أريد ماء بارد.',
@@ -639,8 +651,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   Future<void> _seedSensoryProgram(
       AppProvider app, TherapyProgram program, int stamp) async {
-    final sections = [
-      const _ContentSection('sensory_auditory', 'أنشطة سمعية', 1, [
+    const sections = [
+      _ContentSection('sensory_auditory', 'أنشطة سمعية', 1, [
         _ContentSkill('تمييز الأصوات', [
           _ContentActivity(
               'تمييز صوت الحيوان',
@@ -656,7 +668,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               'نفذ لعبة صوت الهدف لمدة 3 دقائق.'),
         ]),
       ]),
-      const _ContentSection('sensory_visual', 'أنشطة بصرية', 2, [
+      _ContentSection('sensory_visual', 'أنشطة بصرية', 2, [
         _ContentSkill('انتباه بصري', [
           _ContentActivity(
               'تتبع جسم متحرك',
@@ -670,7 +682,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               'افرز 6 أشكال أو ألعاب حسب الشكل.'),
         ]),
       ]),
-      const _ContentSection('sensory_tactile', 'أنشطة لمسية', 3, [
+      _ContentSection('sensory_tactile', 'أنشطة لمسية', 3, [
         _ContentSkill('استكشاف اللمس', [
           _ContentActivity(
               'لمس خامات مختلفة',
@@ -686,7 +698,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               'ابحث عن لعبتين داخل كيس أو صندوق حسي.'),
         ]),
       ]),
-      const _ContentSection('sensory_balance', 'التوازن والحركة', 4, [
+      _ContentSection('sensory_balance', 'التوازن والحركة', 4, [
         _ContentSkill('توازن وحركة كبيرة', [
           _ContentActivity('المشي على خط', 'امش على خط مستقيم مع النظر للأمام.',
               'امش على خط مرسوم على الأرض 3 مرات.'),
@@ -702,7 +714,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               'ارم والتقط كرة خفيفة 10 مرات.'),
         ]),
       ]),
-      const _ContentSection('sensory_visual_motor', 'التكامل البصري الحركي', 5, [
+      _ContentSection('sensory_visual_motor', 'التكامل البصري الحركي', 5, [
         _ContentSkill('عين ويد', [
           _ContentActivity('تتبع خط', 'تتبع خطًا مستقيمًا أو متعرجًا بالقلم.',
               'تتبع خطًا قصيرًا على ورقة.'),
@@ -845,6 +857,67 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       }
     }
   }
+
+  String _letterStructuredContent(
+      _LetterContent letter, _Vocalization vocalization) {
+    return jsonEncode({
+      'kind': 'speechLetter',
+      'letter': letter.letter,
+      'vocalization': vocalization.name,
+      'letterDisplay': '${letter.letter}${vocalization.mark}',
+      'position': 'كل المواضع',
+      'initialWords': letter.initial,
+      'middleWords': letter.middle,
+      'finalWords': letter.finalWords,
+      'sentence': letter.sentence,
+      'homework': letter.homework,
+    });
+  }
+}
+
+class _StructuredLetterContent {
+  const _StructuredLetterContent({
+    required this.letterDisplay,
+    required this.initialWords,
+    required this.middleWords,
+    required this.finalWords,
+    required this.sentence,
+    required this.homework,
+  });
+
+  final String letterDisplay;
+  final List<String> initialWords;
+  final List<String> middleWords;
+  final List<String> finalWords;
+  final String sentence;
+  final String homework;
+
+  String get preview =>
+      'الحرف: $letterDisplay\nأول: ${initialWords.join(' - ')}\nوسط: ${middleWords.join(' - ')}\nآخر: ${finalWords.join(' - ')}';
+
+  static _StructuredLetterContent? tryParse(ProgramActivity activity) {
+    try {
+      final json = jsonDecode(activity.instructions);
+      if (json is! Map<String, dynamic> || json['kind'] != 'speechLetter') {
+        return null;
+      }
+      return _StructuredLetterContent(
+        letterDisplay: json['letterDisplay'] as String? ?? '',
+        initialWords: _stringList(json['initialWords']),
+        middleWords: _stringList(json['middleWords']),
+        finalWords: _stringList(json['finalWords']),
+        sentence: json['sentence'] as String? ?? '',
+        homework: json['homework'] as String? ?? activity.homework,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static List<String> _stringList(Object? value) {
+    if (value is List) return value.map((item) => '$item').toList();
+    return const [];
+  }
 }
 
 class _LetterContent {
@@ -890,6 +963,24 @@ class _ContentActivity {
   final String instructions;
   final String homework;
 }
+
+class _Vocalization {
+  const _Vocalization(this.id, this.name, this.mark);
+
+  final String id;
+  final String name;
+  final String mark;
+}
+
+const _vocalizations = [
+  _Vocalization('fatha', 'فتحة', 'َ'),
+  _Vocalization('kasra', 'كسرة', 'ِ'),
+  _Vocalization('damma', 'ضمة', 'ُ'),
+  _Vocalization('sukoon', 'سكون', 'ْ'),
+  _Vocalization('alef_madd', 'مد بالألف', 'ا'),
+  _Vocalization('yaa_madd', 'مد بالياء', 'ي'),
+  _Vocalization('waw_madd', 'مد بالواو', 'و'),
+];
 
 const _arabicLetterContent = [
   _LetterContent(
