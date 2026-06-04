@@ -24,6 +24,43 @@ After creating the owner, sign in with that account. The system owner can then c
 5. Specialists create evaluations, plans, sessions, homework, and therapy reports.
 6. Parents see only their child, homework, notes, rewards, and simplified progress.
 
+## Parent Accounts
+
+When a student is created, Sanad creates a parent account automatically:
+
+- Email: `<parent-phone>@sanad.com`
+- Temporary password: the parent phone number
+- The password is stored as a hash only.
+- Temporary credentials are shown once after creating the student, with copy and print actions.
+- The parent is forced to change the temporary password on first login.
+- Reusing the same parent phone/email for another student is blocked.
+
+## Sessions
+
+Sessions support a live therapy workflow:
+
+- Pre-session context: latest evaluation, latest session, active plan goals, and a smart suggestion.
+- Speech sessions: target letter, word position, training bank, attempts, correct/partial/wrong scoring, and error type.
+- Sign-language sessions: choose signs from the sign library and score performance.
+- Autosave stores a draft every 30 seconds during a running session.
+- Homework can be sent directly from the session content.
+
+## Sign Language
+
+The sign library supports categories, image/video upload, levels, favorites, search, and safe media preview. It appears only when the selected student has a hearing/sign-language program or a sign-language plan.
+
+## Metrics
+
+The dashboard includes center-level analytics:
+
+- Student count
+- Session count
+- Evaluation count
+- Improvement rate
+- Hardest letter
+- Most used sign
+- Completed homework count
+
 ## Roles
 
 | Role | Scope |
@@ -59,6 +96,8 @@ flutter run -d <android-device-id>
 - Parent passwords are generated during student creation, printed once for handover, and not stored as plain text.
 - Role checks run inside the provider layer before write operations.
 - Center-scoped data is loaded by `center_id`; parents are restricted to their own `student_id`.
+- Audit logs record key create/update/delete/report/session operations.
+- A notification structure is prepared for homework and report events.
 
 ## Production Notes
 

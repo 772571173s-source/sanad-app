@@ -21,7 +21,8 @@ class SanadApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AppProvider(SanadRepository(DatabaseService.instance), PdfService()),
+      create: (_) =>
+          AppProvider(SanadRepository(DatabaseService.instance), PdfService()),
       child: Consumer<AppProvider>(
         builder: (context, app, _) {
           const seed = Color(0xFF19706C);
@@ -32,14 +33,17 @@ class SanadApp extends StatelessWidget {
             theme: ThemeData(
               useMaterial3: true,
               colorScheme: ColorScheme.fromSeed(seedColor: seed),
-              inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+              inputDecorationTheme:
+                  const InputDecorationTheme(border: OutlineInputBorder()),
               cardTheme: const CardThemeData(margin: EdgeInsets.zero),
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
               brightness: Brightness.dark,
-              colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
-              inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+              colorScheme: ColorScheme.fromSeed(
+                  seedColor: seed, brightness: Brightness.dark),
+              inputDecorationTheme:
+                  const InputDecorationTheme(border: OutlineInputBorder()),
               cardTheme: const CardThemeData(margin: EdgeInsets.zero),
             ),
             home: _HomeGate(app: app),
@@ -72,9 +76,17 @@ class _HomeGateState extends State<_HomeGate> {
   Widget build(BuildContext context) {
     final app = widget.app;
     if (!app.initialized) {
-      return const Scaffold(body: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(height: 12), Text('جار تجهيز النظام...')])));
+      return const Scaffold(
+          body: Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+        CircularProgressIndicator(),
+        SizedBox(height: 12),
+        Text('جار تجهيز النظام...')
+      ])));
     }
-    if (app.startupError != null) return StartupErrorScreen(message: app.startupError!);
+    if (app.startupError != null) {
+      return StartupErrorScreen(message: app.startupError!);
+    }
     if (app.setupRequired) return const FirstSetupScreen();
     return app.user == null ? const LoginScreen() : const AppShell();
   }

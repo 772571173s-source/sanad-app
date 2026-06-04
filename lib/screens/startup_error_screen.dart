@@ -21,9 +21,15 @@ class StartupErrorScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(Icons.error_outline, size: 56, color: Theme.of(context).colorScheme.error),
+                Icon(Icons.error_outline,
+                    size: 56, color: Theme.of(context).colorScheme.error),
                 const SizedBox(height: 16),
-                Text('تعذر تشغيل Sanad', textAlign: TextAlign.center, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                Text('تعذر تشغيل Sanad',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 10),
                 Text(message, textAlign: TextAlign.center),
                 const SizedBox(height: 20),
@@ -52,10 +58,15 @@ class StartupErrorScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('إعادة تهيئة قاعدة البيانات المحلية؟'),
-        content: const Text('هذا الخيار للتطوير فقط وسيحذف بيانات الجهاز الحالي.'),
+        content:
+            const Text('هذا الخيار للتطوير فقط وسيحذف بيانات الجهاز الحالي.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('متابعة')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('إلغاء')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('متابعة')),
         ],
       ),
     );

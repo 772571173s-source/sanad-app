@@ -44,17 +44,53 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        SizedBox(width: 130, child: TextField(controller: letter, decoration: const InputDecoration(labelText: 'الحرف'))),
-                        _select('الموضع', position, const ['أول الكلمة', 'وسط الكلمة', 'آخر الكلمة'], (value) => setState(() => position = value)),
-                        _select('نوع الخطأ', errorType, const ['حذف', 'إبدال', 'تشويه', 'إضافة'], (value) => setState(() => errorType = value)),
-                        _select('التقييم', score, const ['صحيح', 'جزئي', 'خطأ'], (value) => setState(() => score = value)),
-                        SizedBox(width: 180, child: DropdownButtonFormField<int>(initialValue: severity, decoration: const InputDecoration(labelText: 'درجة الشدة'), items: List.generate(5, (index) => DropdownMenuItem(value: index + 1, child: Text('${index + 1}'))), onChanged: (value) => setState(() => severity = value ?? 1))),
+                        SizedBox(
+                            width: 130,
+                            child: TextField(
+                                controller: letter,
+                                decoration:
+                                    const InputDecoration(labelText: 'الحرف'))),
+                        _select(
+                            'الموضع',
+                            position,
+                            const ['أول الكلمة', 'وسط الكلمة', 'آخر الكلمة'],
+                            (value) => setState(() => position = value)),
+                        _select(
+                            'نوع الخطأ',
+                            errorType,
+                            const ['حذف', 'إبدال', 'تشويه', 'إضافة'],
+                            (value) => setState(() => errorType = value)),
+                        _select('التقييم', score, const ['صحيح', 'جزئي', 'خطأ'],
+                            (value) => setState(() => score = value)),
+                        SizedBox(
+                            width: 180,
+                            child: DropdownButtonFormField<int>(
+                                initialValue: severity,
+                                decoration: const InputDecoration(
+                                    labelText: 'درجة الشدة'),
+                                items: List.generate(
+                                    5,
+                                    (index) => DropdownMenuItem(
+                                        value: index + 1,
+                                        child: Text('${index + 1}'))),
+                                onChanged: (value) =>
+                                    setState(() => severity = value ?? 1))),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    TextField(controller: notes, maxLines: 2, decoration: const InputDecoration(labelText: 'ملاحظات', border: OutlineInputBorder())),
+                    TextField(
+                        controller: notes,
+                        maxLines: 2,
+                        decoration: const InputDecoration(
+                            labelText: 'ملاحظات',
+                            border: OutlineInputBorder())),
                     const SizedBox(height: 12),
-                    Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => _save(app), icon: const Icon(Icons.save), label: const Text('حفظ التقييم'))),
+                    Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                            onPressed: () => _save(app),
+                            icon: const Icon(Icons.save),
+                            label: const Text('حفظ التقييم'))),
                   ],
                 ),
         ),
@@ -66,7 +102,8 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.hearing_outlined),
                 title: Text('${evaluation.letter} - ${evaluation.position}'),
-                subtitle: Text('${evaluation.errorType} - ${evaluation.score} - شدة ${evaluation.severity}\n${evaluation.recommendation}\n${evaluation.notes}'),
+                subtitle: Text(
+                    '${evaluation.errorType} - ${evaluation.score} - شدة ${evaluation.severity}\n${evaluation.recommendation}\n${evaluation.notes}'),
               ),
             );
           }).toList(),
@@ -75,13 +112,16 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
     );
   }
 
-  Widget _select(String label, String value, List<String> values, ValueChanged<String> onChanged) {
+  Widget _select(String label, String value, List<String> values,
+      ValueChanged<String> onChanged) {
     return SizedBox(
       width: 180,
       child: DropdownButtonFormField<String>(
         initialValue: value,
         decoration: InputDecoration(labelText: label),
-        items: values.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+        items: values
+            .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+            .toList(),
         onChanged: (value) => onChanged(value ?? values.first),
       ),
     );
@@ -102,7 +142,8 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
           errorType: errorType,
           score: score,
           severity: severity,
-          recommendation: app.recommendationFor(errorType: errorType, severity: severity),
+          recommendation:
+              app.recommendationFor(errorType: errorType, severity: severity),
           createdAt: DateTime.now().toIso8601String(),
           notes: notes.text.trim(),
         ),

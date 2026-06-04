@@ -39,13 +39,24 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                 ? const Text('اختر طالبًا أولًا.')
                 : Column(
                     children: [
-                      TextField(controller: title, decoration: const InputDecoration(labelText: 'عنوان الواجب اليومي')),
+                      TextField(
+                          controller: title,
+                          decoration: const InputDecoration(
+                              labelText: 'عنوان الواجب اليومي')),
                       const SizedBox(height: 10),
-                      TextField(controller: instructions, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'تعليمات الأهل')),
+                      TextField(
+                          controller: instructions,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                              labelText: 'تعليمات الأهل')),
                       const SizedBox(height: 12),
                       Align(
                         alignment: Alignment.centerRight,
-                        child: FilledButton.icon(onPressed: () => _addExercise(app), icon: const Icon(Icons.assignment_add), label: const Text('إرسال واجب')),
+                        child: FilledButton.icon(
+                            onPressed: () => _addExercise(app),
+                            icon: const Icon(Icons.assignment_add),
+                            label: const Text('إرسال واجب')),
                       ),
                     ],
                   ),
@@ -61,19 +72,34 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.home_work_outlined),
                     title: Text(exercise.title),
-                    subtitle: Text('${exercise.instructions}\nتاريخ التسليم: ${exercise.dueDate}'),
+                    subtitle: Text(
+                        '${exercise.instructions}\nتاريخ التسليم: ${exercise.dueDate}'),
                     trailing: Chip(label: Text(exercise.status)),
                   ),
-                  if (exercise.audioPath.isNotEmpty) Text('تسجيل مرفوع: ${exercise.audioPath}', maxLines: 1, overflow: TextOverflow.ellipsis),
-                  if (exercise.parentNote.isNotEmpty) Text('ملاحظة ولي الأمر: ${exercise.parentNote}'),
+                  if (exercise.audioPath.isNotEmpty)
+                    Text('تسجيل مرفوع: ${exercise.audioPath}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (exercise.parentNote.isNotEmpty)
+                    Text('ملاحظة ولي الأمر: ${exercise.parentNote}'),
                   Text('النجوم: ${exercise.stars}'),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     children: [
-                      FilledButton.tonalIcon(onPressed: () => _addParentNote(context, app, exercise), icon: const Icon(Icons.note_add_outlined), label: const Text('ملاحظة ولي الأمر')),
-                      FilledButton.tonalIcon(onPressed: () => _uploadAudio(app, exercise), icon: const Icon(Icons.mic), label: const Text('رفع تسجيل')),
-                      if (!app.isParent) FilledButton.tonalIcon(onPressed: () => _markDone(app, exercise), icon: const Icon(Icons.done_all), label: const Text('اعتماد')),
+                      FilledButton.tonalIcon(
+                          onPressed: () =>
+                              _addParentNote(context, app, exercise),
+                          icon: const Icon(Icons.note_add_outlined),
+                          label: const Text('ملاحظة ولي الأمر')),
+                      FilledButton.tonalIcon(
+                          onPressed: () => _uploadAudio(app, exercise),
+                          icon: const Icon(Icons.mic),
+                          label: const Text('رفع تسجيل')),
+                      if (!app.isParent)
+                        FilledButton.tonalIcon(
+                            onPressed: () => _markDone(app, exercise),
+                            icon: const Icon(Icons.done_all),
+                            label: const Text('اعتماد')),
                     ],
                   ),
                 ],
@@ -81,7 +107,8 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
             );
           }).toList(),
         ),
-        if (app.exercises.isEmpty) const AppCard(child: Text('لا توجد واجبات بعد.')),
+        if (app.exercises.isEmpty)
+          const AppCard(child: Text('لا توجد واجبات بعد.')),
       ],
     );
   }
@@ -97,7 +124,11 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
           studentId: student.id,
           title: title.text.trim(),
           instructions: instructions.text.trim(),
-          dueDate: DateTime.now().add(const Duration(days: 1)).toIso8601String().split('T').first,
+          dueDate: DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String()
+              .split('T')
+              .first,
           status: 'مرسل',
         ),
       );
@@ -126,15 +157,21 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
     );
   }
 
-  Future<void> _addParentNote(BuildContext context, AppProvider app, Exercise exercise) async {
+  Future<void> _addParentNote(
+      BuildContext context, AppProvider app, Exercise exercise) async {
     final note = TextEditingController(text: exercise.parentNote);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('ملاحظة ولي الأمر'),
-        content: TextField(controller: note, maxLines: 4, decoration: const InputDecoration(labelText: 'الملاحظة')),
+        content: TextField(
+            controller: note,
+            maxLines: 4,
+            decoration: const InputDecoration(labelText: 'الملاحظة')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('إلغاء')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إلغاء')),
           FilledButton(
             onPressed: () async {
               await app.saveExercise(

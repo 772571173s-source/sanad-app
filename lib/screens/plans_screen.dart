@@ -34,15 +34,36 @@ class _PlansScreenState extends State<PlansScreen> {
               ? const Text('اختر طالبًا أولًا.')
               : Column(
                   children: [
-                    TextField(controller: goal, decoration: const InputDecoration(labelText: 'هدف الخطة')),
-                    Slider(value: progress.toDouble(), min: 0, max: 100, divisions: 10, label: '$progress%', onChanged: (value) => setState(() => progress = value.round())),
-                    Align(alignment: Alignment.centerRight, child: FilledButton.icon(onPressed: () => _save(app), icon: const Icon(Icons.add_task), label: const Text('حفظ الهدف'))),
+                    TextField(
+                        controller: goal,
+                        decoration:
+                            const InputDecoration(labelText: 'هدف الخطة')),
+                    Slider(
+                        value: progress.toDouble(),
+                        min: 0,
+                        max: 100,
+                        divisions: 10,
+                        label: '$progress%',
+                        onChanged: (value) =>
+                            setState(() => progress = value.round())),
+                    Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton.icon(
+                            onPressed: () => _save(app),
+                            icon: const Icon(Icons.add_task),
+                            label: const Text('حفظ الهدف'))),
                   ],
                 ),
         ),
         const SizedBox(height: 16),
         ResponsiveGrid(
-          children: app.plans.map((plan) => AppCard(child: ListTile(title: Text(plan.goal), subtitle: Text('تاريخ الهدف: ${plan.targetDate}'), trailing: Text('${plan.progress}%')))).toList(),
+          children: app.plans
+              .map((plan) => AppCard(
+                  child: ListTile(
+                      title: Text(plan.goal),
+                      subtitle: Text('تاريخ الهدف: ${plan.targetDate}'),
+                      trailing: Text('${plan.progress}%'))))
+              .toList(),
         ),
       ],
     );
@@ -58,7 +79,11 @@ class _PlansScreenState extends State<PlansScreen> {
           centerId: student.centerId,
           studentId: student.id,
           goal: goal.text.trim(),
-          targetDate: DateTime.now().add(const Duration(days: 30)).toIso8601String().split('T').first,
+          targetDate: DateTime.now()
+              .add(const Duration(days: 30))
+              .toIso8601String()
+              .split('T')
+              .first,
           progress: progress,
         ),
       );

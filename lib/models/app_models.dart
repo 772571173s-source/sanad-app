@@ -1,4 +1,4 @@
-﻿enum UserRole { sanadOwner, centerManager, specialist, dataEntry, parent }
+enum UserRole { sanadOwner, centerManager, specialist, dataEntry, parent }
 
 extension UserRoleX on UserRole {
   String get label {
@@ -20,7 +20,8 @@ extension UserRoleX on UserRole {
     if (value == 'systemOwner') return UserRole.sanadOwner;
     if (value == 'owner') return UserRole.sanadOwner;
     if (value == 'admin') return UserRole.centerManager;
-    return UserRole.values.firstWhere((role) => role.name == value, orElse: () => UserRole.parent);
+    return UserRole.values.firstWhere((role) => role.name == value,
+        orElse: () => UserRole.parent);
   }
 }
 
@@ -597,6 +598,8 @@ class SignResource {
     required this.mediaType,
     required this.mediaPath,
     this.notes = '',
+    this.level = 'مبتدئ',
+    this.isFavorite = false,
   });
 
   final String id;
@@ -606,6 +609,8 @@ class SignResource {
   final String mediaType;
   final String mediaPath;
   final String notes;
+  final String level;
+  final bool isFavorite;
 
   static SignResource fromMap(Map<String, Object?> row) => SignResource(
         id: row['id'] as String,
@@ -615,6 +620,8 @@ class SignResource {
         mediaType: row['media_type'] as String,
         mediaPath: row['media_path'] as String,
         notes: row['notes'] as String,
+        level: (row['level'] ?? 'مبتدئ') as String,
+        isFavorite: ((row['is_favorite'] ?? 0) as int) == 1,
       );
 
   Map<String, Object?> toMap() => {
@@ -625,6 +632,8 @@ class SignResource {
         'media_type': mediaType,
         'media_path': mediaPath,
         'notes': notes,
+        'level': level,
+        'is_favorite': isFavorite ? 1 : 0,
       };
 }
 

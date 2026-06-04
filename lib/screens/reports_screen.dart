@@ -31,7 +31,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('التقارير الاحترافية', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+          Text('التقارير الاحترافية',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800)),
           const SizedBox(height: 12),
           if (app.selectedStudent == null)
             const Text('اختر طالبًا أولًا.')
@@ -39,23 +43,50 @@ class _ReportsScreenState extends State<ReportsScreen> {
             DropdownButtonFormField<String>(
               initialValue: type,
               decoration: const InputDecoration(labelText: 'نوع التقرير'),
-              items: const ['تقرير جلسة', 'تقرير شهري', 'تقرير ربع سنوي', 'تقرير ختامي'].map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
+              items: const [
+                'تقرير جلسة',
+                'تقرير شهري',
+                'تقرير ربع سنوي',
+                'تقرير ختامي'
+              ]
+                  .map((item) =>
+                      DropdownMenuItem(value: item, child: Text(item)))
+                  .toList(),
               onChanged: (value) => setState(() => type = value ?? type),
             ),
             const SizedBox(height: 12),
-            TextField(controller: signature, decoration: const InputDecoration(labelText: 'توقيع الأخصائي')),
+            TextField(
+                controller: signature,
+                decoration: const InputDecoration(labelText: 'توقيع الأخصائي')),
             const SizedBox(height: 12),
-            TextField(controller: manager, decoration: const InputDecoration(labelText: 'توقيع المدير')),
+            TextField(
+                controller: manager,
+                decoration: const InputDecoration(labelText: 'توقيع المدير')),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
               children: [
-                FilledButton.icon(onPressed: () => runWithFeedback(context, () => app.printReport(type, signature.text.trim(), manager.text.trim()), success: 'تم إنشاء التقرير.', loading: 'جار إنشاء التقرير...'), icon: const Icon(Icons.picture_as_pdf_outlined), label: const Text('إصدار PDF')),
-                FilledButton.tonalIcon(onPressed: () => app.printCredentials(app.selectedStudent!), icon: const Icon(Icons.badge_outlined), label: const Text('ورقة البريد وكلمة السر')),
+                FilledButton.icon(
+                    onPressed: () => runWithFeedback(
+                        context,
+                        () => app.printReport(
+                            type, signature.text.trim(), manager.text.trim()),
+                        success: 'تم إنشاء التقرير.',
+                        loading: 'جار إنشاء التقرير...'),
+                    icon: const Icon(Icons.picture_as_pdf_outlined),
+                    label: const Text('إصدار PDF')),
               ],
             ),
             const SizedBox(height: 16),
-            if (app.reports.isEmpty) const Text('لا توجد تقارير بعد. بعد إصدار أول تقرير سيتم حفظه داخل سجل الطالب.') else ...app.reports.map((report) => ListTile(leading: const Icon(Icons.description_outlined), title: Text(report.type), subtitle: Text('نسبة التحسن ${report.improvementRate}%'), trailing: Text(report.createdAt.split('T').first))),
+            if (app.reports.isEmpty)
+              const Text(
+                  'لا توجد تقارير بعد. بعد إصدار أول تقرير سيتم حفظه داخل سجل الطالب.')
+            else
+              ...app.reports.map((report) => ListTile(
+                  leading: const Icon(Icons.description_outlined),
+                  title: Text(report.type),
+                  subtitle: Text('نسبة التحسن ${report.improvementRate}%'),
+                  trailing: Text(report.createdAt.split('T').first))),
           ],
         ],
       ),

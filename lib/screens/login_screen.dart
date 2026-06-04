@@ -46,9 +46,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('سند', style: TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.w900)),
+                          Text('سند',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 42,
+                                  fontWeight: FontWeight.w900)),
                           SizedBox(height: 10),
-                          Text('نظام إدارة التخاطب والتأهيل للمراكز: مراكز، موظفون، طلاب، جلسات، واجبات، وتقارير.', style: TextStyle(color: Color(0xFFD8ECE8), height: 1.7)),
+                          Text(
+                              'نظام إدارة التخاطب والتأهيل للمراكز: مراكز، موظفون، طلاب، جلسات، واجبات، وتقارير.',
+                              style: TextStyle(
+                                  color: Color(0xFFD8ECE8), height: 1.7)),
                         ],
                       ),
                     );
@@ -58,23 +65,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const Text('تسجيل الدخول', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+                          const Text('تسجيل الدخول',
+                              style: TextStyle(
+                                  fontSize: 26, fontWeight: FontWeight.w800)),
                           const SizedBox(height: 18),
-                          TextField(controller: email, decoration: const InputDecoration(labelText: 'البريد')),
+                          TextField(
+                              controller: email,
+                              decoration:
+                                  const InputDecoration(labelText: 'البريد')),
                           const SizedBox(height: 12),
-                          TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور')),
+                          TextField(
+                              controller: password,
+                              obscureText: true,
+                              decoration: const InputDecoration(
+                                  labelText: 'كلمة المرور')),
                           if (error != null) ...[
                             const SizedBox(height: 10),
-                            Text(error!, style: const TextStyle(color: Colors.red)),
+                            Text(error!,
+                                style: const TextStyle(color: Colors.red)),
                           ],
                           const SizedBox(height: 18),
                           FilledButton.icon(
                             onPressed: app.loading ? null : _login,
                             icon: const Icon(Icons.login),
-                            label: Text(app.loading ? 'جاري الدخول...' : 'دخول'),
+                            label:
+                                Text(app.loading ? 'جاري الدخول...' : 'دخول'),
                           ),
                           const SizedBox(height: 8),
-                          const Text('استخدم الحساب الذي أنشأته في أول تشغيل أو الحساب الذي أنشأه مدير المركز.'),
+                          const Text(
+                              'استخدم الحساب الذي أنشأته في أول تشغيل أو الحساب الذي أنشأه مدير المركز.'),
                         ],
                       ),
                     );
@@ -98,7 +117,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    final ok = await context.read<AppProvider>().login(email.text, password.text);
+    final ok =
+        await context.read<AppProvider>().login(email.text, password.text);
     if (!ok && mounted) setState(() => error = 'بيانات الدخول غير صحيحة.');
   }
 }

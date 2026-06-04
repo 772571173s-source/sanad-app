@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 5;
+  static const currentVersion = 6;
 
   mobile.Database? _database;
 
@@ -246,6 +246,8 @@ class DatabaseService {
         media_type TEXT NOT NULL,
         media_path TEXT NOT NULL,
         notes TEXT NOT NULL,
+        level TEXT NOT NULL DEFAULT 'مبتدئ',
+        is_favorite INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT '',
         FOREIGN KEY(center_id) REFERENCES centers(id)
@@ -267,7 +269,8 @@ class DatabaseService {
     ''');
   }
 
-  Future<void> _upgrade(mobile.Database db, int oldVersion, int newVersion) async {
+  Future<void> _upgrade(
+      mobile.Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _ensureTable(db, 'sign_resources', '''
         CREATE TABLE sign_resources (
@@ -278,6 +281,8 @@ class DatabaseService {
           media_type TEXT NOT NULL,
           media_path TEXT NOT NULL,
           notes TEXT NOT NULL,
+          level TEXT NOT NULL DEFAULT 'مبتدئ',
+          is_favorite INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT '',
           updated_at TEXT NOT NULL DEFAULT ''
         )
@@ -304,6 +309,14 @@ class DatabaseService {
           updated_at TEXT NOT NULL DEFAULT ''
         )
       ''');
+    }
+    if (oldVersion < 6) {
+      await _addColumns(db, {
+        'sign_resources': {
+          'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
+          'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
+        },
+      });
     }
   }
 
@@ -390,6 +403,8 @@ class DatabaseService {
       },
       'sign_resources': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
+        'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
+        'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
@@ -401,7 +416,11 @@ class DatabaseService {
       if (existingHash.isEmpty && legacyPassword.isNotEmpty) {
         await db.update(
           'users',
-          {'password_hash': AuthService.hashPassword(legacyPassword), 'password': '', 'updated_at': now},
+          {
+            'password_hash': AuthService.hashPassword(legacyPassword),
+            'password': '',
+            'updated_at': now
+          },
           where: 'id = ?',
           whereArgs: [user['id']],
         );
@@ -494,18 +513,23 @@ class DatabaseService {
     ''');
   }
 
-  Future<void> _ensureTable(mobile.Database db, String table, String createSql) async {
-    final rows = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?", [table]);
+  Future<void> _ensureTable(
+      mobile.Database db, String table, String createSql) async {
+    final rows = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [table]);
     if (rows.isEmpty) await db.execute(createSql);
   }
 
-  Future<void> _addColumns(mobile.Database db, Map<String, Map<String, String>> columnsByTable) async {
+  Future<void> _addColumns(mobile.Database db,
+      Map<String, Map<String, String>> columnsByTable) async {
     for (final entry in columnsByTable.entries) {
       final existing = await db.rawQuery('PRAGMA table_info(${entry.key})');
       final names = existing.map((row) => row['name']).toSet();
       for (final column in entry.value.entries) {
         if (!names.contains(column.key)) {
-          await db.execute('ALTER TABLE ${entry.key} ADD COLUMN ${column.key} ${column.value}');
+          await db.execute(
+              'ALTER TABLE ${entry.key} ADD COLUMN ${column.key} ${column.value}');
         }
       }
     }
@@ -517,7 +541,8 @@ class DatabaseService {
     return (result.first['total'] as int?) ?? 0;
   }
 
-  Future<List<Map<String, Object?>>> all(String table, {String? orderBy}) async {
+  Future<List<Map<String, Object?>>> all(String table,
+      {String? orderBy}) async {
     final db = await database;
     return db.query(table, orderBy: orderBy);
   }
@@ -529,7 +554,8 @@ class DatabaseService {
     String? orderBy,
   }) async {
     final db = await database;
-    return db.query(table, where: where, whereArgs: whereArgs, orderBy: orderBy);
+    return db.query(table,
+        where: where, whereArgs: whereArgs, orderBy: orderBy);
   }
 
   Future<Map<String, Object?>?> first(
@@ -546,13 +572,19 @@ class DatabaseService {
     final now = DateTime.now().toIso8601String();
     final normalized = Map<String, Object?>.from(data);
     normalized['updated_at'] = now;
-    normalized['created_at'] = (normalized['created_at'] as String?)?.isNotEmpty == true ? normalized['created_at'] : now;
-    await db.insert(table, normalized, conflictAlgorithm: mobile.ConflictAlgorithm.replace);
+    normalized['created_at'] =
+        (normalized['created_at'] as String?)?.isNotEmpty == true
+            ? normalized['created_at']
+            : now;
+    await db.insert(table, normalized,
+        conflictAlgorithm: mobile.ConflictAlgorithm.replace);
   }
 
-  Future<void> updateWhere(String table, Map<String, Object?> data, String where, List<Object?> whereArgs) async {
+  Future<void> updateWhere(String table, Map<String, Object?> data,
+      String where, List<Object?> whereArgs) async {
     final db = await database;
-    final normalized = Map<String, Object?>.from(data)..['updated_at'] = DateTime.now().toIso8601String();
+    final normalized = Map<String, Object?>.from(data)
+      ..['updated_at'] = DateTime.now().toIso8601String();
     await db.update(table, normalized, where: where, whereArgs: whereArgs);
   }
 
@@ -561,7 +593,8 @@ class DatabaseService {
     await db.delete(table, where: 'id = ?', whereArgs: [id]);
   }
 
-  Future<void> deleteWhere(String table, String where, List<Object?> whereArgs) async {
+  Future<void> deleteWhere(
+      String table, String where, List<Object?> whereArgs) async {
     final db = await database;
     await db.delete(table, where: where, whereArgs: whereArgs);
   }

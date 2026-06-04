@@ -43,17 +43,35 @@ class _FirstSetupScreenState extends State<FirstSetupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('إعداد سند لأول مرة', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900)),
+                      const Text('إعداد سند لأول مرة',
+                          style: TextStyle(
+                              fontSize: 26, fontWeight: FontWeight.w900)),
                       const SizedBox(height: 8),
-                      const Text('أنشئ حساب مالك النظام. لن يتم إنشاء أي حساب أو مركز تلقائيًا.'),
+                      const Text(
+                          'أنشئ حساب مالك النظام. لن يتم إنشاء أي حساب أو مركز تلقائيًا.'),
                       const SizedBox(height: 18),
-                      TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم مالك النظام')),
+                      TextField(
+                          controller: name,
+                          decoration: const InputDecoration(
+                              labelText: 'اسم مالك النظام')),
                       const SizedBox(height: 12),
-                      TextField(controller: email, keyboardType: TextInputType.emailAddress, decoration: const InputDecoration(labelText: 'البريد')),
+                      TextField(
+                          controller: email,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration:
+                              const InputDecoration(labelText: 'البريد')),
                       const SizedBox(height: 12),
-                      TextField(controller: password, obscureText: true, decoration: const InputDecoration(labelText: 'كلمة المرور')),
+                      TextField(
+                          controller: password,
+                          obscureText: true,
+                          decoration:
+                              const InputDecoration(labelText: 'كلمة المرور')),
                       const SizedBox(height: 12),
-                      TextField(controller: confirm, obscureText: true, decoration: const InputDecoration(labelText: 'تأكيد كلمة المرور')),
+                      TextField(
+                          controller: confirm,
+                          obscureText: true,
+                          decoration: const InputDecoration(
+                              labelText: 'تأكيد كلمة المرور')),
                       const SizedBox(height: 18),
                       FilledButton.icon(
                         onPressed: () => runWithFeedback(

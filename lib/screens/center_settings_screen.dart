@@ -46,15 +46,27 @@ class _CenterSettingsScreenState extends State<CenterSettingsScreen> {
     final center = context.watch<AppProvider>().currentCenter;
     return AppCard(
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('إعدادات المركز', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+        Text('إعدادات المركز',
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800)),
         const SizedBox(height: 12),
-        TextField(controller: name, decoration: const InputDecoration(labelText: 'اسم المركز')),
+        TextField(
+            controller: name,
+            decoration: const InputDecoration(labelText: 'اسم المركز')),
         const SizedBox(height: 10),
-        TextField(controller: address, decoration: const InputDecoration(labelText: 'العنوان')),
+        TextField(
+            controller: address,
+            decoration: const InputDecoration(labelText: 'العنوان')),
         const SizedBox(height: 10),
-        TextField(controller: phone, decoration: const InputDecoration(labelText: 'الهاتف')),
+        TextField(
+            controller: phone,
+            decoration: const InputDecoration(labelText: 'الهاتف')),
         const SizedBox(height: 10),
-        TextField(controller: manager, decoration: const InputDecoration(labelText: 'المدير')),
+        TextField(
+            controller: manager,
+            decoration: const InputDecoration(labelText: 'المدير')),
         const SizedBox(height: 10),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -62,7 +74,8 @@ class _CenterSettingsScreenState extends State<CenterSettingsScreen> {
           title: Text(logoPath.isEmpty ? 'لا يوجد شعار' : logoPath),
           trailing: TextButton(
             onPressed: () async {
-              final result = await FilePicker.platform.pickFiles(type: FileType.image);
+              final result =
+                  await FilePicker.platform.pickFiles(type: FileType.image);
               final picked = result?.files.single.path;
               if (picked != null) setState(() => logoPath = picked);
             },
@@ -73,8 +86,18 @@ class _CenterSettingsScreenState extends State<CenterSettingsScreen> {
           onPressed: center == null
               ? null
               : () => runWithFeedback(context, () async {
-                    if (name.text.trim().isEmpty) throw StateError('اسم المركز مطلوب.');
-                    await context.read<AppProvider>().saveCenter(SanadCenter(id: center.id, name: name.text.trim(), logoPath: logoPath, address: address.text.trim(), phone: phone.text.trim(), managerName: manager.text.trim(), isActive: center.isActive, createdAt: center.createdAt));
+                    if (name.text.trim().isEmpty) {
+                      throw StateError('اسم المركز مطلوب.');
+                    }
+                    await context.read<AppProvider>().saveCenter(SanadCenter(
+                        id: center.id,
+                        name: name.text.trim(),
+                        logoPath: logoPath,
+                        address: address.text.trim(),
+                        phone: phone.text.trim(),
+                        managerName: manager.text.trim(),
+                        isActive: center.isActive,
+                        createdAt: center.createdAt));
                   }),
           icon: const Icon(Icons.save),
           label: const Text('حفظ الإعدادات'),
