@@ -18,34 +18,16 @@ class SessionsScreen extends StatefulWidget {
 class _SessionsScreenState extends State<SessionsScreen> {
   Timer? timer;
   int seconds = 0;
-  int attempts = 0;
-  int correct = 0;
-  int partial = 0;
-  int wrong = 0;
-  int successRate = 0;
-  bool autosaving = false;
-  String sessionType = 'نطق وتخاطب';
-  String targetLetter = '';
-  String letterPosition = 'أول الكلمة';
-  String errorType = 'حذف';
-  String cardTitle = 'بطاقة نطق الحرف';
-  String result = 'صحيح';
-  String planId = '';
-  String programId = '';
-  String skillId = '';
-  String draftSessionId = '';
-  String lastAutosave = '';
+  String? programId;
+  String? sectionId;
+  String? skillId;
   final activityResults = <String, String>{};
   final notes = TextEditingController();
-  final summary = TextEditingController();
-  final practiceItems = TextEditingController();
 
   @override
   void dispose() {
     timer?.cancel();
     notes.dispose();
-    summary.dispose();
-    practiceItems.dispose();
     super.dispose();
   }
 
@@ -53,24 +35,34 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final student = app.selectedStudent;
-    final selectedProgram = _selectedProgram(app);
-    final programSkills = programId.isEmpty
+    final program = _program(app);
+    final sections = program == null
+        ? <ProgramSection>[]
+        : app.programSections
+            .where((section) => section.programId == program.id)
+            .toList();
+    final sectionSkills = sectionId == null
         ? <ProgramSkill>[]
         : app.programSkills
-            .where((skill) => skill.programId == programId)
+            .where((skill) =>
+                skill.programId == program?.id && skill.sectionId == sectionId)
             .toList();
-    final skillActivities = skillId.isEmpty
+    final skill = _skill(app);
+    final activities = skill == null
         ? <ProgramActivity>[]
         : app.programActivities
-            .where((activity) => activity.skillId == skillId)
+            .where((activity) => activity.skillId == skill.id)
             .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppCard(
+        _StepCard(
+          number: 1,
+          title: 'اختيار الطالب',
           child: DropdownButtonFormField<String>(
             initialValue: student?.id,
-            decoration: const InputDecoration(labelText: 'اختيار الطالب'),
+            decoration: const InputDecoration(labelText: 'الطالب'),
             items: app.students
                 .map((item) => DropdownMenuItem(
                     value: item.id,
@@ -80,616 +72,346 @@ class _SessionsScreenState extends State<SessionsScreen> {
               final matches =
                   app.students.where((item) => item.id == value).toList();
               await app.selectStudent(matches.isEmpty ? null : matches.first);
+              setState(() {
+                activityResults.clear();
+              });
             },
           ),
         ),
         const SizedBox(height: 12),
-        AppCard(
-          child: student == null
-              ? const Text('اختر طالبًا أولًا.')
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('جلسة ${student.name}',
-                        style: const TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 10),
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('قبل البدء',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 6),
-                            Text(
-                                'آخر تقييم: ${app.evaluations.isEmpty ? 'لا يوجد' : '${app.evaluations.first.letter} - ${app.evaluations.first.score} - ${app.evaluations.first.errorType}'}'),
-                            Text(
-                                'آخر جلسة: ${app.sessions.isEmpty ? 'لا يوجد' : '${app.sessions.first.sessionType} - ${app.sessions.first.quickResult} - ${app.sessions.first.successRate}%'}'),
-                            Text('اقتراح Sanad: ${app.smartSessionSuggestion}'),
-                          ],
+        if (student != null)
+          _StepCard(
+            number: 2,
+            title: 'اختيار البرنامج',
+            child: DropdownButtonFormField<String>(
+              initialValue: programId,
+              decoration: const InputDecoration(labelText: 'البرنامج العلاجي'),
+              items: app.programs
+                  .map((item) => DropdownMenuItem(
+                      value: item.id,
+                      child: Text(item.name, overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (value) => setState(() {
+                programId = value;
+                sectionId = null;
+                skillId = null;
+                activityResults.clear();
+              }),
+            ),
+          ),
+        if (program != null) ...[
+          const SizedBox(height: 12),
+          _StepCard(
+            number: 3,
+            title: 'اختيار المرحلة',
+            child: DropdownButtonFormField<String>(
+              initialValue: sectionId,
+              decoration: const InputDecoration(labelText: 'المرحلة'),
+              items: sections
+                  .map((item) => DropdownMenuItem(
+                      value: item.id,
+                      child: Text(item.title, overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (value) => setState(() {
+                sectionId = value;
+                skillId = null;
+                activityResults.clear();
+              }),
+            ),
+          ),
+        ],
+        if (sectionId != null) ...[
+          const SizedBox(height: 12),
+          _StepCard(
+            number: 4,
+            title: 'اختيار المهارة',
+            child: DropdownButtonFormField<String>(
+              initialValue: skillId,
+              decoration: const InputDecoration(labelText: 'المهارة'),
+              items: sectionSkills
+                  .map((item) => DropdownMenuItem(
+                      value: item.id,
+                      child: Text(item.title, overflow: TextOverflow.ellipsis)))
+                  .toList(),
+              onChanged: (value) => setState(() {
+                skillId = value;
+                activityResults.clear();
+              }),
+            ),
+          ),
+        ],
+        if (activities.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _StepCard(
+            number: 5,
+            title: 'تقييم الأنشطة',
+            child: ResponsiveGrid(
+              children: activities.map((activity) {
+                final options = _options(activity);
+                return AppCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(activity.title,
+                          style: const TextStyle(fontWeight: FontWeight.w900)),
+                      if (activity.instructions.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(activity.instructions),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                        'المؤقت: ${Duration(seconds: seconds).toString().split('.').first}',
-                        style: const TextStyle(
-                            fontSize: 30, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        SizedBox(
-                            width: 260,
-                            child: TextField(
-                                decoration: const InputDecoration(
-                                    labelText: 'بطاقة التدريب'),
-                                onChanged: (value) => cardTitle = value)),
-                        SizedBox(
-                          width: 220,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: sessionType,
-                            decoration:
-                                const InputDecoration(labelText: 'نوع الجلسة'),
-                            items: const [
-                              'نطق وتخاطب',
-                              'لغة إشارة',
-                              'مهارات تعليمية',
-                              'مهارات سلوكية',
-                              'أخرى'
-                            ]
-                                .map((item) => DropdownMenuItem(
-                                    value: item, child: Text(item)))
-                                .toList(),
-                            onChanged: (value) => setState(() {
-                              sessionType = value ?? sessionType;
-                              result =
-                                  sessionType == 'لغة إشارة' ? 'أتقن' : 'صحيح';
-                            }),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 260,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: planId.isEmpty ? null : planId,
-                            decoration: const InputDecoration(
-                                labelText: 'هدف من الخطة'),
-                            items: app.plans
-                                .map((plan) => DropdownMenuItem(
-                                    value: plan.id,
-                                    child: Text(plan.goal,
-                                        overflow: TextOverflow.ellipsis)))
-                                .toList(),
-                            onChanged: (value) =>
-                                setState(() => planId = value ?? ''),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 260,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: programId.isEmpty ? null : programId,
-                            decoration: const InputDecoration(
-                                labelText: 'البرنامج العلاجي'),
-                            items: app.programs
-                                .map((program) => DropdownMenuItem(
-                                    value: program.id,
-                                    child: Text(program.name,
-                                        overflow: TextOverflow.ellipsis)))
-                                .toList(),
-                            onChanged: (value) => setState(() {
-                              programId = value ?? '';
-                              skillId = '';
-                              activityResults.clear();
-                              final program = _selectedProgram(app);
-                              if (program != null) {
-                                sessionType = program.type == 'التكامل الحسي'
-                                    ? 'مهارات سلوكية'
-                                    : program.type;
-                              }
-                            }),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 260,
-                          child: DropdownButtonFormField<String>(
-                            initialValue: skillId.isEmpty ? null : skillId,
-                            decoration:
-                                const InputDecoration(labelText: 'المهارة'),
-                            items: programSkills
-                                .map((skill) => DropdownMenuItem(
-                                    value: skill.id,
-                                    child: Text(skill.title,
-                                        overflow: TextOverflow.ellipsis)))
-                                .toList(),
-                            onChanged: (value) => setState(() {
-                              skillId = value ?? '';
-                              activityResults.clear();
-                            }),
-                          ),
-                        ),
-                        SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(value: 'صحيح', label: Text('صحيح')),
-                            ButtonSegment(value: 'جزئي', label: Text('جزئي')),
-                            ButtonSegment(value: 'خطأ', label: Text('خطأ')),
-                          ],
-                          selected: {
-                            {'صحيح', 'جزئي', 'خطأ'}.contains(result)
-                                ? result
-                                : 'صحيح'
-                          },
-                          onSelectionChanged: (value) =>
-                              setState(() => result = value.first),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (selectedProgram != null &&
-                        skillActivities.isNotEmpty) ...[
-                      Text('أنشطة البرنامج',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 8),
-                      ResponsiveGrid(
-                        children: skillActivities.map((activity) {
-                          final options = activity.evaluationType == 'sensory'
-                              ? const ['لا يؤدي', 'يؤدي بمساعدة', 'يؤدي جيدًا']
-                              : const ['صحيح', 'جزئي', 'خطأ'];
-                          return AppCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(activity.title,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w800)),
-                                if (activity.instructions.isNotEmpty)
-                                  Text(activity.instructions),
-                                const SizedBox(height: 8),
-                                SegmentedButton<String>(
-                                  segments: options
-                                      .map((option) => ButtonSegment(
-                                          value: option, label: Text(option)))
-                                      .toList(),
-                                  selected: {
-                                    activityResults[activity.id] ??
-                                        options.first
-                                  },
-                                  onSelectionChanged: (value) => setState(() {
-                                    final selectedValue = value.first;
-                                    activityResults[activity.id] =
-                                        selectedValue;
-                                    final current = practiceItems.text.trim();
-                                    if (!current.contains(activity.title)) {
-                                      practiceItems.text = current.isEmpty
-                                          ? activity.title
-                                          : '$current، ${activity.title}';
-                                    }
-                                    _recordAttempt(
-                                      selectedValue == 'يؤدي جيدًا'
-                                          ? 'صحيح'
-                                          : selectedValue == 'يؤدي بمساعدة'
-                                              ? 'جزئي'
-                                              : selectedValue,
-                                    );
-                                  }),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: app.speechTrainingBank
-                          .where((item) =>
-                              targetLetter.isEmpty ||
-                              item.letter == targetLetter)
-                          .map(
-                            (item) => InputChip(
-                              label: Text('${item.title} (${item.level})'),
-                              onPressed: () {
-                                final current = practiceItems.text.trim();
-                                practiceItems.text = current.isEmpty
-                                    ? item.title
-                                    : '$current، ${item.title}';
-                                cardTitle = item.title;
-                                if (item.letter.isNotEmpty) {
-                                  targetLetter = item.letter;
-                                }
-                                if (item.position.isNotEmpty) {
-                                  letterPosition = item.position;
-                                }
-                                setState(() {});
-                              },
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    if (sessionType == 'نطق وتخاطب') ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          SizedBox(
-                              width: 120,
-                              child: TextField(
-                                  decoration:
-                                      const InputDecoration(labelText: 'الحرف'),
-                                  onChanged: (value) => targetLetter = value)),
-                          SizedBox(
-                              width: 180,
-                              child: DropdownButtonFormField<String>(
-                                  initialValue: letterPosition,
-                                  decoration: const InputDecoration(
-                                      labelText: 'موضع الحرف'),
-                                  items: const [
-                                    'أول الكلمة',
-                                    'وسط الكلمة',
-                                    'آخر الكلمة'
-                                  ]
-                                      .map((item) => DropdownMenuItem(
-                                          value: item, child: Text(item)))
-                                      .toList(),
-                                  onChanged: (value) => setState(() =>
-                                      letterPosition =
-                                          value ?? letterPosition))),
-                          SizedBox(
-                              width: 180,
-                              child: DropdownButtonFormField<String>(
-                                  initialValue: errorType,
-                                  decoration: const InputDecoration(
-                                      labelText: 'نوع الخطأ'),
-                                  items: const [
-                                    'حذف',
-                                    'إبدال',
-                                    'تشويه',
-                                    'إضافة'
-                                  ]
-                                      .map((item) => DropdownMenuItem(
-                                          value: item, child: Text(item)))
-                                      .toList(),
-                                  onChanged: (value) => setState(
-                                      () => errorType = value ?? errorType))),
-                        ],
-                      ),
-                    ],
-                    if (sessionType == 'لغة إشارة') ...[
-                      const SizedBox(height: 12),
-                      Text('إشارات مقترحة من المكتبة',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 8),
-                      if (app.signResources.isEmpty)
-                        const Text('لا توجد إشارات في المكتبة لهذا المركز.')
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: app.signResources.map((resource) {
-                            return InputChip(
-                              avatar: Icon(resource.isFavorite
-                                  ? Icons.star
-                                  : Icons.sign_language_outlined),
-                              label:
-                                  Text('${resource.title} - ${resource.level}'),
-                              onPressed: () {
-                                final current = practiceItems.text.trim();
-                                practiceItems.text = current.isEmpty
-                                    ? resource.title
-                                    : '$current، ${resource.title}';
-                                cardTitle = resource.title;
-                                setState(() {});
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'أتقن', label: Text('أتقن')),
-                          ButtonSegment(
-                              value: 'يحتاج مساعدة',
-                              label: Text('يحتاج مساعدة')),
-                          ButtonSegment(
-                              value: 'لم يتقن', label: Text('لم يتقن')),
-                        ],
+                        segments: options
+                            .map((item) =>
+                                ButtonSegment(value: item, label: Text(item)))
+                            .toList(),
                         selected: {
-                          {'أتقن', 'يحتاج مساعدة', 'لم يتقن'}.contains(result)
-                              ? result
-                              : 'أتقن'
+                          activityResults[activity.id] ?? options.first
                         },
-                        onSelectionChanged: (value) =>
-                            setState(() => result = value.first),
+                        onSelectionChanged: (value) => setState(
+                            () => activityResults[activity.id] = value.first),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: activity.homework.isEmpty
+                              ? null
+                              : () => _sendHomework(app, activity),
+                          icon: const Icon(Icons.assignment_add),
+                          label: const Text('إرسال واجب'),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 12),
-                    TextField(
-                        controller: practiceItems,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                            labelText: 'الكلمات / الجمل / الإشارات المستهدفة')),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        SizedBox(
-                            width: 180,
-                            child: TextField(
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                    labelText: 'عدد التمارين'),
-                                onChanged: (value) =>
-                                    attempts = int.tryParse(value) ?? 0)),
-                        SizedBox(
-                            width: 180,
-                            child: TextField(
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                    labelText: 'نسبة النجاح %'),
-                                onChanged: (value) =>
-                                    successRate = int.tryParse(value) ?? 0)),
-                        FilledButton.tonal(
-                            onPressed: () => _recordAttempt('صحيح'),
-                            child: Text('صحيح: $correct')),
-                        FilledButton.tonal(
-                            onPressed: () => _recordAttempt('جزئي'),
-                            child: Text('جزئي: $partial')),
-                        FilledButton.tonal(
-                            onPressed: () => _recordAttempt('خطأ'),
-                            child: Text('خطأ: $wrong')),
-                      ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+        if (activities.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          _StepCard(
+            number: 6,
+            title: 'حفظ الجلسة والتقرير',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: notes,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: 'ملاحظة مختصرة'),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                    'مدة الجلسة: ${Duration(seconds: seconds).toString().split('.').first}'),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _startTimer,
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('بدء المؤقت'),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                        'الملخص التلقائي: $attempts تمرين، نسبة النجاح ${_computedSuccessRate()}%'),
-                    const SizedBox(height: 12),
-                    TextField(
-                        controller: notes,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                            labelText: 'ملاحظات الجلسة',
-                            border: OutlineInputBorder())),
-                    const SizedBox(height: 12),
-                    TextField(
-                        controller: summary,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                            labelText: 'ملخص نهاية الجلسة',
-                            border: OutlineInputBorder())),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        FilledButton.icon(
-                            onPressed: () => _start(app),
-                            icon: const Icon(Icons.play_arrow),
-                            label: const Text('بدء جلسة')),
-                        FilledButton.tonalIcon(
-                            onPressed: _pause,
-                            icon: const Icon(Icons.pause),
-                            label: const Text('إيقاف')),
-                        FilledButton.icon(
-                            onPressed: () => _save(app),
-                            icon: const Icon(Icons.save_outlined),
-                            label: const Text('حفظ تلقائي')),
-                        FilledButton.tonalIcon(
-                            onPressed: () => _sendHomework(app),
-                            icon: const Icon(Icons.assignment_add),
-                            label: const Text('إرسال واجب')),
-                      ],
+                    FilledButton.tonalIcon(
+                      onPressed: () => timer?.cancel(),
+                      icon: const Icon(Icons.pause),
+                      label: const Text('إيقاف'),
                     ),
-                    if (lastAutosave.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text('آخر حفظ تلقائي: $lastAutosave',
-                          style: Theme.of(context).textTheme.bodySmall),
-                    ],
+                    FilledButton.icon(
+                      onPressed: () => _saveSession(app),
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('حفظ الجلسة'),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: () => app.printReport(
+                          'تقرير جلسة', app.user?.name ?? '', ''),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('تقرير الجلسة PDF'),
+                    ),
                   ],
                 ),
-        ),
-        const SizedBox(height: 16),
-        if (app.sessions.isEmpty)
-          const EmptyState(
-              icon: Icons.event_note_outlined,
-              title: 'لا توجد جلسات',
-              message: 'بعد حفظ أول جلسة ستظهر هنا مع ملخصها ونسبة النجاح.')
-        else
-          ResponsiveGrid(
-            children: app.sessions.map((session) {
-              return AppCard(
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.record_voice_over_outlined),
-                  title: Text('${session.cardTitle} - ${session.quickResult}'),
-                  subtitle: Text('${session.startedAt}\n${session.notes}'),
-                  trailing: Text('${session.successRate}%'),
-                ),
-              );
-            }).toList(),
+              ],
+            ),
           ),
+        ],
+        const SizedBox(height: 16),
+        _PreviousSessions(app: app),
       ],
     );
   }
 
-  void _recordAttempt(String value) {
-    setState(() {
-      attempts++;
-      result = value;
-      if (value == 'صحيح') correct++;
-      if (value == 'جزئي') partial++;
-      if (value == 'خطأ') wrong++;
-      successRate = _computedSuccessRate();
-    });
-  }
-
-  int _computedSuccessRate() {
-    if (attempts == 0) return successRate.clamp(0, 100).toInt();
-    return (((correct + partial * .5) / attempts) * 100)
-        .round()
-        .clamp(0, 100)
-        .toInt();
-  }
-
-  TherapyProgram? _selectedProgram(AppProvider app) {
-    if (programId.isEmpty) return null;
+  TherapyProgram? _program(AppProvider app) {
+    if (programId == null) return null;
     for (final program in app.programs) {
       if (program.id == programId) return program;
     }
     return null;
   }
 
-  String _encodedActivityResults() => activityResults.entries
-      .map((entry) => '${entry.key}:${entry.value}')
-      .join('|');
-
-  void _start(AppProvider app) {
-    timer?.cancel();
-    if (draftSessionId.isEmpty) {
-      draftSessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
+  ProgramSkill? _skill(AppProvider app) {
+    if (skillId == null) return null;
+    for (final skill in app.programSkills) {
+      if (skill.id == skillId) return skill;
     }
-    timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => seconds++);
-      if (seconds > 0 && seconds % 30 == 0) _autosave(app);
-    });
+    return null;
   }
 
-  void _pause() {
+  List<String> _options(ProgramActivity activity) {
+    if (activity.evaluationType == 'sensory') {
+      return const ['لا يؤدي', 'يؤدي بمساعدة', 'يؤدي جيدًا'];
+    }
+    return const ['صحيح', 'جزئي', 'خطأ'];
+  }
+
+  void _startTimer() {
     timer?.cancel();
+    timer = Timer.periodic(
+        const Duration(seconds: 1), (_) => setState(() => seconds++));
   }
 
-  Future<void> _save(AppProvider app) async {
+  int _successRate(List<ProgramActivity> activities) {
+    if (activities.isEmpty) return 0;
+    var score = 0.0;
+    for (final activity in activities) {
+      final value = activityResults[activity.id] ?? _options(activity).first;
+      if (value == 'صحيح' || value == 'يؤدي جيدًا') score += 1;
+      if (value == 'جزئي' || value == 'يؤدي بمساعدة') score += .5;
+    }
+    return ((score / activities.length) * 100).round();
+  }
+
+  Future<void> _sendHomework(AppProvider app, ProgramActivity activity) {
     final student = app.selectedStudent;
-    if (student == null) return;
-    timer?.cancel();
-    await runWithFeedback(context, () async {
-      if (seconds == 0 || cardTitle.trim().isEmpty) {
-        throw StateError('ابدأ المؤقت واكتب بطاقة التدريب قبل الحفظ.');
+    if (student == null) return Future.value();
+    return runWithFeedback(context, () async {
+      await app.saveExercise(Exercise(
+        id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
+        centerId: student.centerId,
+        studentId: student.id,
+        title: activity.title,
+        instructions: activity.homework,
+        dueDate: DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        status: 'مرسل',
+      ));
+    }, success: 'تم إرسال الواجب لولي الأمر.');
+  }
+
+  Future<void> _saveSession(AppProvider app) {
+    final student = app.selectedStudent;
+    final program = _program(app);
+    final skill = _skill(app);
+    final activities = skill == null
+        ? <ProgramActivity>[]
+        : app.programActivities
+            .where((activity) => activity.skillId == skill.id)
+            .toList();
+    return runWithFeedback(context, () async {
+      if (student == null || program == null || skill == null) {
+        throw StateError('اختر الطالب والبرنامج والمرحلة والمهارة أولًا.');
       }
-      await app.saveSession(
-        TherapySession(
-          id: draftSessionId.isEmpty
-              ? 'session_${DateTime.now().millisecondsSinceEpoch}'
-              : draftSessionId,
-          centerId: student.centerId,
-          studentId: student.id,
-          planId: planId,
-          programId: programId,
-          skillId: skillId,
-          activityResults: _encodedActivityResults(),
-          sessionType: sessionType,
-          targetLetter: targetLetter,
-          letterPosition: letterPosition,
-          errorType: sessionType == 'نطق وتخاطب' ? errorType : '',
-          practiceItems: practiceItems.text.trim(),
-          attempts: attempts,
-          successRate: _computedSuccessRate(),
-          startedAt: DateTime.now().toIso8601String(),
-          durationSeconds: seconds,
-          cardTitle: cardTitle,
-          quickResult: result,
-          notes: notes.text.trim(),
-          summary: summary.text.trim(),
-        ),
-      );
+      if (activityResults.length < activities.length) {
+        throw StateError('قيّم كل الأنشطة قبل حفظ الجلسة.');
+      }
+      final firstActivity = activities.isEmpty ? null : activities.first;
+      await app.saveSession(TherapySession(
+        id: 'session_${DateTime.now().millisecondsSinceEpoch}',
+        centerId: student.centerId,
+        studentId: student.id,
+        programId: program.id,
+        skillId: skill.id,
+        activityResults: activityResults.entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .join('|'),
+        sessionType: program.type,
+        practiceItems: activities.map((activity) => activity.title).join('، '),
+        attempts: activities.length,
+        successRate: _successRate(activities),
+        startedAt: DateTime.now().toIso8601String(),
+        durationSeconds: seconds,
+        cardTitle: skill.title,
+        quickResult: firstActivity == null
+            ? 'صحيح'
+            : activityResults[firstActivity.id] ??
+                _options(firstActivity).first,
+        notes: notes.text.trim(),
+        summary:
+            'تم تنفيذ ${activities.length} نشاط بنسبة نجاح ${_successRate(activities)}%.',
+      ));
+      timer?.cancel();
       setState(() {
         seconds = 0;
-        draftSessionId = '';
-        notes.clear();
-        summary.clear();
-        practiceItems.clear();
-        attempts = 0;
-        successRate = 0;
-        correct = 0;
-        partial = 0;
-        wrong = 0;
-        programId = '';
-        skillId = '';
         activityResults.clear();
+        notes.clear();
       });
-    });
+    }, success: 'تم حفظ الجلسة.');
   }
+}
 
-  Future<void> _autosave(AppProvider app) async {
-    if (autosaving) return;
-    final student = app.selectedStudent;
-    if (student == null || seconds == 0 || draftSessionId.isEmpty) return;
-    autosaving = true;
-    try {
-      await app.saveSession(
-        TherapySession(
-          id: draftSessionId,
-          centerId: student.centerId,
-          studentId: student.id,
-          planId: planId,
-          programId: programId,
-          skillId: skillId,
-          activityResults: _encodedActivityResults(),
-          sessionType: sessionType,
-          targetLetter: targetLetter,
-          letterPosition: letterPosition,
-          errorType: sessionType == 'نطق وتخاطب' ? errorType : '',
-          practiceItems: practiceItems.text.trim(),
-          attempts: attempts,
-          successRate: _computedSuccessRate(),
-          startedAt: DateTime.now().toIso8601String(),
-          durationSeconds: seconds,
-          cardTitle: cardTitle,
-          quickResult: result,
-          notes: notes.text.trim(),
-          summary: summary.text.trim().isEmpty
-              ? 'مسودة حفظ تلقائي'
-              : summary.text.trim(),
-        ),
-        autosave: true,
+class _StepCard extends StatelessWidget {
+  const _StepCard({
+    required this.number,
+    required this.title,
+    required this.child,
+  });
+
+  final int number;
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(radius: 14, child: Text('$number')),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w900)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviousSessions extends StatelessWidget {
+  const _PreviousSessions({required this.app});
+
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
+    if (app.sessions.isEmpty) {
+      return const EmptyState(
+        icon: Icons.event_note_outlined,
+        title: 'لا توجد جلسات',
+        message: 'بعد حفظ أول جلسة ستظهر هنا.',
       );
-      if (mounted) {
-        setState(() => lastAutosave = TimeOfDay.now().format(context));
-      }
-    } finally {
-      autosaving = false;
     }
-  }
-
-  Future<void> _sendHomework(AppProvider app) async {
-    final student = app.selectedStudent;
-    if (student == null) return;
-    await runWithFeedback(context, () async {
-      final content = practiceItems.text.trim();
-      if (content.isEmpty) {
-        throw StateError('اختر كلمات أو إشارات قبل إرسال الواجب.');
-      }
-      await app.saveExercise(
-        Exercise(
-          id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
-          centerId: student.centerId,
-          studentId: student.id,
-          title: sessionType == 'لغة إشارة' ? 'واجب لغة إشارة' : 'واجب نطق',
-          instructions: 'تدريب: $content\nملاحظات: ${notes.text.trim()}',
-          dueDate:
-              DateTime.now().add(const Duration(days: 1)).toIso8601String(),
-          status: 'مرسل',
-          audioPath: '',
-          stars: successRate >= 80 ? 3 : 1,
-        ),
-      );
-    }, success: 'تم إرسال الواجب لولي الأمر.', loading: 'جار إرسال الواجب...');
+    return ResponsiveGrid(
+      children: app.sessions.map((session) {
+        return AppCard(
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.record_voice_over_outlined),
+            title: Text('${session.cardTitle} - ${session.quickResult}'),
+            subtitle: Text('${session.startedAt}\n${session.notes}'),
+            trailing: Text('${session.successRate}%'),
+          ),
+        );
+      }).toList(),
+    );
   }
 }

@@ -97,7 +97,11 @@ class PdfService {
                           fontWeight: pw.FontWeight.bold)),
                   pw.Text(center?.address ?? '',
                       style: pw.TextStyle(font: font)),
-                  pw.Text(center?.phone ?? '', style: pw.TextStyle(font: font)),
+                  pw.Directionality(
+                    textDirection: pw.TextDirection.ltr,
+                    child: pw.Text(center?.phone ?? '',
+                        style: pw.TextStyle(font: font)),
+                  ),
                 ],
               ),
               pw.Container(
@@ -157,7 +161,7 @@ class PdfService {
                   '${evaluation.letter} - ${evaluation.position} - ${evaluation.errorType} - ${evaluation.score}',
               style: pw.TextStyle(font: font))),
           pw.SizedBox(height: 24),
-          pw.Text('سجل التقارير السابقة داخل ملف الطالب: ${reports.length}',
+          pw.Text('سجل التقارير داخل ملف الطالب: ${reports.length}',
               style: pw.TextStyle(font: font)),
           pw.SizedBox(height: 24),
           pw.Row(

@@ -9,13 +9,13 @@ class SanadRepository {
 
   Future<bool> hasUsers() async => await _db.count('users') > 0;
 
-  Future<void> createSystemOwner(
-      {required String name,
-      required String email,
-      required String password}) async {
+  Future<void> createSystemOwner({
+    required String name,
+    required String email,
+    required String password,
+  }) async {
     if (await hasUsers()) {
-      throw StateError(
-          'ط·ع¾ط¸â€¦ ط·آ¥ط·آ¹ط·آ¯ط·آ§ط·آ¯ ط·آ§ط¸â€‍ط¸â€ ط·آ¸ط·آ§ط¸â€¦ ط¸â€¦ط·آ³ط·آ¨ط¸â€ڑط¸â€¹ط·آ§.');
+      throw StateError('تم إعداد النظام مسبقًا.');
     }
     await saveUser(
       AppUser(
@@ -110,7 +110,7 @@ class SanadRepository {
     if (existingEmailUser != null &&
         existingEmailUser.role != UserRole.parent) {
       throw StateError(
-          'ط·آ±ط¸â€ڑط¸â€¦ ط¸ث†ط¸â€‍ط¸ظ¹ ط·آ§ط¸â€‍ط·آ£ط¸â€¦ط·آ± ط¸â€¦ط·آ³ط·ع¾ط·آ®ط·آ¯ط¸â€¦ ط¸â€¦ط·آ³ط·آ¨ط¸â€ڑط¸â€¹ط·آ§ط·إ’ ط¸â€‍ط·آ°ط¸â€‍ط¸ئ’ ط¸â€‍ط·آ§ ط¸ظ¹ط¸â€¦ط¸ئ’ط¸â€  ط·آ¥ط¸â€ ط·آ´ط·آ§ط·طŒ ط·آ¨ط·آ±ط¸ظ¹ط·آ¯ ط¸â€¦ط¸ئ’ط·آ±ط·آ±.');
+          'رقم ولي الأمر مستخدم مسبقًا لحساب غير ولي أمر، لذلك لا يمكن إنشاء بريد مكرر.');
     }
     await _db.upsert(
       'students',
@@ -150,8 +150,7 @@ class SanadRepository {
         ? existingEmailUser
         : AppUser.fromMap(existingParentUser);
     if (existingAccount == null && student.portalPassword.isEmpty) {
-      throw StateError(
-          'ط¸ئ’ط¸â€‍ط¸â€¦ط·آ© ط¸â€¦ط·آ±ط¸ث†ط·آ± ط¸ث†ط¸â€‍ط¸ظ¹ ط·آ§ط¸â€‍ط·آ£ط¸â€¦ط·آ± ط¸â€¦ط·آ·ط¸â€‍ط¸ث†ط·آ¨ط·آ© ط·آ¹ط¸â€ ط·آ¯ ط·آ¥ط¸â€ ط·آ´ط·آ§ط·طŒ ط·آ­ط·آ³ط·آ§ط·آ¨ ط·آ¬ط·آ¯ط¸ظ¹ط·آ¯.');
+      throw StateError('كلمة مرور ولي الأمر مطلوبة عند إنشاء حساب جديد.');
     }
     if (existingAccount == null || student.portalPassword.isNotEmpty) {
       await _db.upsert(
@@ -186,33 +185,37 @@ class SanadRepository {
     }
     if (await reward(student.id) == null) {
       await _db.upsert(
-          'rewards',
-          Reward(
-                  id: 'reward_${student.id}',
-                  centerId: student.centerId,
-                  studentId: student.id,
-                  xp: 0,
-                  level: 1,
-                  badges: '',
-                  dailyStreak: 0)
-              .toMap());
+        'rewards',
+        Reward(
+          id: 'reward_${student.id}',
+          centerId: student.centerId,
+          studentId: student.id,
+          xp: 0,
+          level: 1,
+          badges: '',
+          dailyStreak: 0,
+        ).toMap(),
+      );
     }
   }
 
   Future<void> softDeleteStudent(String id) async {
     await _db.updateWhere(
-        'students',
-        {
-          'deleted_at': DateTime.now().toIso8601String(),
-          'status': 'ط¸â€¦ط·آ­ط·آ°ط¸ث†ط¸ظ¾'
-        },
-        'id = ?',
-        [id]);
+      'students',
+      {
+        'deleted_at': DateTime.now().toIso8601String(),
+        'status': 'محذوف',
+      },
+      'id = ?',
+      [id],
+    );
   }
 
   Future<List<TherapySession>> sessions(String studentId) async {
     final rows = await _db.where('sessions',
-        where: 'id = ?', whereArgs: [studentId], orderBy: 'started_at DESC');
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'started_at DESC');
     return rows.map(TherapySession.fromMap).toList();
   }
 
@@ -221,7 +224,9 @@ class SanadRepository {
 
   Future<List<Evaluation>> evaluations(String studentId) async {
     final rows = await _db.where('evaluations',
-        where: 'id = ?', whereArgs: [studentId], orderBy: 'created_at DESC');
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'created_at DESC');
     return rows.map(Evaluation.fromMap).toList();
   }
 
@@ -230,7 +235,9 @@ class SanadRepository {
 
   Future<List<TrainingPlan>> plans(String studentId) async {
     final rows = await _db.where('training_plans',
-        where: 'id = ?', whereArgs: [studentId], orderBy: 'target_date');
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'target_date');
     return rows.map(TrainingPlan.fromMap).toList();
   }
 
@@ -277,7 +284,9 @@ class SanadRepository {
 
   Future<List<Exercise>> exercises(String studentId) async {
     final rows = await _db.where('exercises',
-        where: 'id = ?', whereArgs: [studentId], orderBy: 'due_date DESC');
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'due_date DESC');
     return rows.map(Exercise.fromMap).toList();
   }
 
@@ -285,8 +294,8 @@ class SanadRepository {
       _db.upsert('exercises', exercise.toMap());
 
   Future<Reward?> reward(String studentId) async {
-    final row =
-        await _db.first('rewards', where: 'id = ?', whereArgs: [studentId]);
+    final row = await _db
+        .first('rewards', where: 'student_id = ?', whereArgs: [studentId]);
     return row == null ? null : Reward.fromMap(row);
   }
 
@@ -295,7 +304,9 @@ class SanadRepository {
 
   Future<List<ReportRecord>> reports(String studentId) async {
     final rows = await _db.where('reports',
-        where: 'id = ?', whereArgs: [studentId], orderBy: 'created_at DESC');
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'created_at DESC');
     return rows.map(ReportRecord.fromMap).toList();
   }
 
