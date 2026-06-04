@@ -57,6 +57,11 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 icon: const Icon(Icons.auto_awesome),
                 label: const Text('إنشاء البرامج الأساسية'),
               ),
+              FilledButton.tonalIcon(
+                onPressed: () => _confirmRebuildCorePrograms(context, app),
+                icon: const Icon(Icons.refresh),
+                label: const Text('إعادة إنشاء البرامج الأساسية'),
+              ),
             ],
           ),
         const SizedBox(height: 12),
@@ -471,7 +476,34 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     );
   }
 
-  Future<void> _seedCorePrograms(AppProvider app) async {
+  Future<void> _confirmRebuildCorePrograms(
+      BuildContext context, AppProvider app) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('إعادة إنشاء البرامج الأساسية'),
+        content: const Text(
+            'سيتم حذف محتوى البرامج الأساسية القديم فقط، ثم إعادة زرع العلاج النطقي والتكامل الحسي بالمحتوى الجديد. لن يتم حذف الطلاب أو الحسابات أو الجلسات.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            icon: const Icon(Icons.refresh),
+            label: const Text('إعادة الإنشاء'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _seedCorePrograms(app, rebuild: true);
+    }
+  }
+
+  Future<void> _seedCorePrograms(AppProvider app,
+      {bool rebuild = false}) async {
     await runWithFeedback(context, () async {
       final now = DateTime.now().millisecondsSinceEpoch;
       final speech = _findProgramByType(app, 'العلاج النطقي') ??
@@ -499,13 +531,24 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       if (_findProgramByType(app, 'التكامل الحسي') == null) {
         await app.saveProgram(sensory);
       }
-      if (!_hasStructuredSpeechContent(app, speech)) {
+
+      final speechNeedsRebuild =
+          rebuild || !_hasCompleteSpeechContent(app, speech);
+      final sensoryNeedsRebuild =
+          rebuild || !_hasCompleteSensoryContent(app, sensory);
+
+      if (speechNeedsRebuild) {
+        await app.deleteProgramContent(speech);
         await _seedSpeechProgram(app, speech, now);
       }
-      if (!_hasSensoryContent(app, sensory)) {
+      if (sensoryNeedsRebuild) {
+        await app.deleteProgramContent(sensory);
         await _seedSensoryProgram(app, sensory, now);
       }
-    }, success: 'تم تجهيز البرامج الأساسية بمحتوى علاجي منظم.');
+    },
+        success: rebuild
+            ? 'تمت إعادة إنشاء البرامج الأساسية بالمحتوى الجديد.'
+            : 'تم تجهيز البرامج الأساسية بمحتوى علاجي منظم.');
   }
 
   TherapyProgram? _findProgramByType(AppProvider app, String type) {
@@ -515,15 +558,39 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     return null;
   }
 
-  bool _hasStructuredSpeechContent(AppProvider app, TherapyProgram program) {
-    return app.programActivities.any((activity) =>
+  bool _hasCompleteSpeechContent(AppProvider app, TherapyProgram program) {
+    final hasStructuredLetters = app.programActivities.any((activity) =>
         activity.programId == program.id &&
         activity.instructions.contains('"kind":"speechLetter"'));
+    return hasStructuredLetters &&
+        _hasSections(app, program, const [
+          'الحروف',
+          'أعضاء النطق',
+          'التمييز السمعي',
+          'الكلمات والجمل',
+        ]);
   }
 
-  bool _hasSensoryContent(AppProvider app, TherapyProgram program) {
-    return app.programActivities
+  bool _hasCompleteSensoryContent(AppProvider app, TherapyProgram program) {
+    final hasActivities = app.programActivities
         .any((activity) => activity.programId == program.id);
+    return hasActivities &&
+        _hasSections(app, program, const [
+          'أنشطة سمعية',
+          'أنشطة بصرية',
+          'أنشطة لمسية',
+          'التوازن والحركة',
+          'التكامل البصري الحركي',
+        ]);
+  }
+
+  bool _hasSections(
+      AppProvider app, TherapyProgram program, List<String> requiredTitles) {
+    final titles = app.programSections
+        .where((section) => section.programId == program.id)
+        .map((section) => section.title)
+        .toSet();
+    return requiredTitles.every(titles.contains);
   }
 
   Future<void> _seedSpeechProgram(
@@ -864,7 +931,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       'kind': 'speechLetter',
       'letter': letter.letter,
       'vocalization': vocalization.name,
-      'letterDisplay': '${letter.letter}${vocalization.mark}',
+      'letterDisplay': _displayLetterWithVocalization(letter, vocalization),
       'position': 'كل المواضع',
       'initialWords': letter.initial,
       'middleWords': letter.middle,
@@ -872,6 +939,22 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       'sentence': letter.sentence,
       'homework': letter.homework,
     });
+  }
+
+  String _displayLetterWithVocalization(
+      _LetterContent letter, _Vocalization vocalization) {
+    if (letter.id == 'alef') {
+      return switch (vocalization.id) {
+        'fatha' => 'أَ',
+        'kasra' => 'إِ',
+        'damma' => 'أُ',
+        'alef_madd' => 'آ',
+        'yaa_madd' => 'إي',
+        'waw_madd' => 'أو',
+        _ => '${letter.letter}${vocalization.mark}',
+      };
+    }
+    return '${letter.letter}${vocalization.mark}';
   }
 }
 

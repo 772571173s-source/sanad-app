@@ -111,14 +111,67 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.home_work_outlined),
-                      title: Text(programName),
-                      subtitle: Text('النشاط: $activityName'),
-                      trailing: Chip(label: Text(exercise.status)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.home_work_outlined),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (student != null)
+                                Text(
+                                  student.name,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelLarge
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                              Text(
+                                programName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                activityName,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ],
+                          ),
+                        ),
+                        Chip(label: Text(exercise.status)),
+                      ],
                     ),
-                    Text('التعليمات: ${exercise.instructions}'),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'التعليمات',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelLarge
+                                ?.copyWith(fontWeight: FontWeight.w900),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(exercise.instructions),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text('تاريخ التسليم: ${exercise.dueDate}'),
                     if (exercise.audioPath.isNotEmpty)
                       Directionality(
@@ -133,17 +186,22 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                     if (exercise.parentNote.isNotEmpty)
                       Text('ملاحظة ولي الأمر: ${exercise.parentNote}'),
                     Text('النجوم: ${exercise.stars}'),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
+                    if (app.isParent)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: FilledButton.icon(
+                          onPressed: () => _markDone(app, exercise),
+                          icon: const Icon(Icons.check_circle_outline),
+                          label: const Text('تم الإنجاز'),
+                        ),
+                      ),
+                    if (app.isParent) const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        if (app.isParent)
-                          FilledButton.icon(
-                            onPressed: () => _markDone(app, exercise),
-                            icon: const Icon(Icons.check_circle_outline),
-                            label: const Text('تم الإنجاز'),
-                          ),
                         FilledButton.tonalIcon(
                           onPressed: () =>
                               _addParentNote(context, app, exercise),

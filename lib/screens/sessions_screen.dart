@@ -429,6 +429,21 @@ class _ActiveSessionCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.tonalIcon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('سيتم تفعيل إرفاق صوت الأخصائي قريبًا.'),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.mic_none_outlined),
+              label: const Text('إرفاق صوت للأخصائي'),
+            ),
+          ),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -508,28 +523,97 @@ class _LetterContentView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('الحرف: ${content.letterDisplay}',
-            style: Theme.of(context)
-                .textTheme
-                .headlineMedium
-                ?.copyWith(fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        _line('أول الكلمة', content.initialWords),
-        _line('وسط الكلمة', content.middleWords),
-        _line('آخر الكلمة', content.finalWords),
-        Text('الجملة: ${content.sentence}',
-            style: const TextStyle(fontWeight: FontWeight.w700)),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                content.letterDisplay,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Chip(
+                label: Text(content.vocalization),
+                backgroundColor: colorScheme.surface,
+                side: BorderSide(color: colorScheme.outlineVariant),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _wordGroup(context, 'أول الكلمة', content.initialWords),
+        _wordGroup(context, 'وسط الكلمة', content.middleWords),
+        _wordGroup(context, 'آخر الكلمة', content.finalWords),
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 6),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            border: Border.all(color: colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الجملة',
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              Text(content.sentence,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _line(String label, List<String> values) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text('$label: ${values.join(' - ')}'),
+  Widget _wordGroup(BuildContext context, String label, List<String> values) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: theme.textTheme.labelLarge
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: values
+                .map((word) => Chip(
+                      label: Text(word),
+                      visualDensity: VisualDensity.compact,
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -537,6 +621,7 @@ class _LetterContentView extends StatelessWidget {
 class _StructuredLetterContent {
   const _StructuredLetterContent({
     required this.letterDisplay,
+    required this.vocalization,
     required this.initialWords,
     required this.middleWords,
     required this.finalWords,
@@ -545,6 +630,7 @@ class _StructuredLetterContent {
   });
 
   final String letterDisplay;
+  final String vocalization;
   final List<String> initialWords;
   final List<String> middleWords;
   final List<String> finalWords;
@@ -559,6 +645,7 @@ class _StructuredLetterContent {
       }
       return _StructuredLetterContent(
         letterDisplay: json['letterDisplay'] as String? ?? '',
+        vocalization: json['vocalization'] as String? ?? '',
         initialWords: _stringList(json['initialWords']),
         middleWords: _stringList(json['middleWords']),
         finalWords: _stringList(json['finalWords']),

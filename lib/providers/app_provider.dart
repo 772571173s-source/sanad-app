@@ -616,6 +616,22 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteProgramContent(TherapyProgram program) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(program.centerId == activeCenterId,
+        'لا يمكن تعديل محتوى برنامج خارج مركزك.');
+    await _repository.deleteProgramContent(program.id);
+    await _log(
+        action: 'إعادة بناء محتوى برنامج',
+        entityType: 'program',
+        entityId: program.id,
+        centerId: program.centerId,
+        details: program.name);
+    await _loadProgramTree();
+    notifyListeners();
+  }
+
   Future<void> saveExercise(Exercise exercise) async {
     _ensure(canWriteParentArea, 'لا تملك صلاحية تعديل واجبات هذا الطالب.');
     _ensureStudentEntityAccess(exercise.studentId, exercise.centerId);

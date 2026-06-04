@@ -282,6 +282,12 @@ class SanadRepository {
   Future<void> saveProgramActivity(ProgramActivity activity) =>
       _db.upsert('program_activities', activity.toMap());
 
+  Future<void> deleteProgramContent(String programId) async {
+    await _db.deleteWhere('program_activities', 'program_id = ?', [programId]);
+    await _db.deleteWhere('program_skills', 'program_id = ?', [programId]);
+    await _db.deleteWhere('program_sections', 'program_id = ?', [programId]);
+  }
+
   Future<List<Exercise>> exercises(String studentId) async {
     final rows = await _db.where('exercises',
         where: 'student_id = ?',
