@@ -31,8 +31,11 @@ class _SessionsScreenState extends State<SessionsScreen> {
   String cardTitle = 'بطاقة نطق الحرف';
   String result = 'صحيح';
   String planId = '';
+  String programId = '';
+  String skillId = '';
   String draftSessionId = '';
   String lastAutosave = '';
+  final activityResults = <String, String>{};
   final notes = TextEditingController();
   final summary = TextEditingController();
   final practiceItems = TextEditingController();
@@ -50,6 +53,17 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final student = app.selectedStudent;
+    final selectedProgram = _selectedProgram(app);
+    final programSkills = programId.isEmpty
+        ? <ProgramSkill>[]
+        : app.programSkills
+            .where((skill) => skill.programId == programId)
+            .toList();
+    final skillActivities = skillId.isEmpty
+        ? <ProgramActivity>[]
+        : app.programActivities
+            .where((activity) => activity.skillId == skillId)
+            .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -144,6 +158,49 @@ class _SessionsScreenState extends State<SessionsScreen> {
                                 setState(() => planId = value ?? ''),
                           ),
                         ),
+                        SizedBox(
+                          width: 260,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: programId.isEmpty ? null : programId,
+                            decoration: const InputDecoration(
+                                labelText: 'البرنامج العلاجي'),
+                            items: app.programs
+                                .map((program) => DropdownMenuItem(
+                                    value: program.id,
+                                    child: Text(program.name,
+                                        overflow: TextOverflow.ellipsis)))
+                                .toList(),
+                            onChanged: (value) => setState(() {
+                              programId = value ?? '';
+                              skillId = '';
+                              activityResults.clear();
+                              final program = _selectedProgram(app);
+                              if (program != null) {
+                                sessionType = program.type == 'التكامل الحسي'
+                                    ? 'مهارات سلوكية'
+                                    : program.type;
+                              }
+                            }),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 260,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: skillId.isEmpty ? null : skillId,
+                            decoration:
+                                const InputDecoration(labelText: 'المهارة'),
+                            items: programSkills
+                                .map((skill) => DropdownMenuItem(
+                                    value: skill.id,
+                                    child: Text(skill.title,
+                                        overflow: TextOverflow.ellipsis)))
+                                .toList(),
+                            onChanged: (value) => setState(() {
+                              skillId = value ?? '';
+                              activityResults.clear();
+                            }),
+                          ),
+                        ),
                         SegmentedButton<String>(
                           segments: const [
                             ButtonSegment(value: 'صحيح', label: Text('صحيح')),
@@ -161,6 +218,64 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    if (selectedProgram != null &&
+                        skillActivities.isNotEmpty) ...[
+                      Text('أنشطة البرنامج',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 8),
+                      ResponsiveGrid(
+                        children: skillActivities.map((activity) {
+                          final options = activity.evaluationType == 'sensory'
+                              ? const ['لا يؤدي', 'يؤدي بمساعدة', 'يؤدي جيدًا']
+                              : const ['صحيح', 'جزئي', 'خطأ'];
+                          return AppCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(activity.title,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w800)),
+                                if (activity.instructions.isNotEmpty)
+                                  Text(activity.instructions),
+                                const SizedBox(height: 8),
+                                SegmentedButton<String>(
+                                  segments: options
+                                      .map((option) => ButtonSegment(
+                                          value: option, label: Text(option)))
+                                      .toList(),
+                                  selected: {
+                                    activityResults[activity.id] ??
+                                        options.first
+                                  },
+                                  onSelectionChanged: (value) => setState(() {
+                                    final selectedValue = value.first;
+                                    activityResults[activity.id] =
+                                        selectedValue;
+                                    final current = practiceItems.text.trim();
+                                    if (!current.contains(activity.title)) {
+                                      practiceItems.text = current.isEmpty
+                                          ? activity.title
+                                          : '$current، ${activity.title}';
+                                    }
+                                    _recordAttempt(
+                                      selectedValue == 'يؤدي جيدًا'
+                                          ? 'صحيح'
+                                          : selectedValue == 'يؤدي بمساعدة'
+                                              ? 'جزئي'
+                                              : selectedValue,
+                                    );
+                                  }),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -416,6 +531,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
         .toInt();
   }
 
+  TherapyProgram? _selectedProgram(AppProvider app) {
+    if (programId.isEmpty) return null;
+    for (final program in app.programs) {
+      if (program.id == programId) return program;
+    }
+    return null;
+  }
+
+  String _encodedActivityResults() => activityResults.entries
+      .map((entry) => '${entry.key}:${entry.value}')
+      .join('|');
+
   void _start(AppProvider app) {
     timer?.cancel();
     if (draftSessionId.isEmpty) {
@@ -447,6 +574,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
           centerId: student.centerId,
           studentId: student.id,
           planId: planId,
+          programId: programId,
+          skillId: skillId,
+          activityResults: _encodedActivityResults(),
           sessionType: sessionType,
           targetLetter: targetLetter,
           letterPosition: letterPosition,
@@ -461,7 +591,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
           notes: notes.text.trim(),
           summary: summary.text.trim(),
         ),
-        autosave: true,
       );
       setState(() {
         seconds = 0;
@@ -474,6 +603,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
         correct = 0;
         partial = 0;
         wrong = 0;
+        programId = '';
+        skillId = '';
+        activityResults.clear();
       });
     });
   }
@@ -490,6 +622,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
           centerId: student.centerId,
           studentId: student.id,
           planId: planId,
+          programId: programId,
+          skillId: skillId,
+          activityResults: _encodedActivityResults(),
           sessionType: sessionType,
           targetLetter: targetLetter,
           letterPosition: letterPosition,
@@ -506,6 +641,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
               ? 'مسودة حفظ تلقائي'
               : summary.text.trim(),
         ),
+        autosave: true,
       );
       if (mounted) {
         setState(() => lastAutosave = TimeOfDay.now().format(context));

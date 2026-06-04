@@ -298,8 +298,18 @@ class _StudentsScreenState extends State<StudentsScreen> {
     );
   }
 
-  String _normalizePhone(String value) =>
-      value.replaceAll(RegExp(r'[^0-9]'), '');
+  String _normalizePhone(String value) => value
+      .replaceAll('٠', '0')
+      .replaceAll('١', '1')
+      .replaceAll('٢', '2')
+      .replaceAll('٣', '3')
+      .replaceAll('٤', '4')
+      .replaceAll('٥', '5')
+      .replaceAll('٦', '6')
+      .replaceAll('٧', '7')
+      .replaceAll('٨', '8')
+      .replaceAll('٩', '9')
+      .replaceAll(RegExp(r'[^0-9]'), '');
 
   Future<void> _showCredentialsDialog(
       BuildContext context, AppProvider app, Student student) async {
@@ -307,8 +317,29 @@ class _StudentsScreenState extends State<StudentsScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('بيانات دخول ولي الأمر'),
-        content: SelectableText(
-            'البريد: ${student.portalEmail}\nكلمة المرور المؤقتة: ${student.portalPassword}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('البريد'),
+            const SizedBox(height: 4),
+            SelectableText(
+              student.portalEmail,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.left,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 12),
+            const Text('كلمة المرور المؤقتة'),
+            const SizedBox(height: 4),
+            SelectableText(
+              student.portalPassword,
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.left,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),

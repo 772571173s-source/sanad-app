@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 6;
+  static const currentVersion = 7;
 
   mobile.Database? _database;
 
@@ -137,6 +137,9 @@ class DatabaseService {
         center_id TEXT NOT NULL,
         student_id TEXT NOT NULL,
         plan_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        skill_id TEXT NOT NULL DEFAULT '',
+        activity_results TEXT NOT NULL DEFAULT '',
         session_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
         target_letter TEXT NOT NULL DEFAULT '',
         letter_position TEXT NOT NULL DEFAULT '',
@@ -238,6 +241,64 @@ class DatabaseService {
       )
     ''');
     await db.execute('''
+      CREATE TABLE therapy_programs (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE program_sections (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(program_id) REFERENCES therapy_programs(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE program_skills (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        section_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(program_id) REFERENCES therapy_programs(id),
+        FOREIGN KEY(section_id) REFERENCES program_sections(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE program_activities (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        skill_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        instructions TEXT NOT NULL DEFAULT '',
+        homework TEXT NOT NULL DEFAULT '',
+        evaluation_type TEXT NOT NULL DEFAULT 'speech',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(program_id) REFERENCES therapy_programs(id),
+        FOREIGN KEY(skill_id) REFERENCES program_skills(id)
+      )
+    ''');
+    await db.execute('''
       CREATE TABLE sign_resources (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
@@ -318,6 +379,16 @@ class DatabaseService {
         },
       });
     }
+    if (oldVersion < 7) {
+      await _ensureProgramTables(db);
+      await _addColumns(db, {
+        'sessions': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'skill_id': "TEXT NOT NULL DEFAULT ''",
+          'activity_results': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
   }
 
   Future<void> _migrateToVersion3(mobile.Database db) async {
@@ -361,6 +432,9 @@ class DatabaseService {
       'sessions': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
         'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'skill_id': "TEXT NOT NULL DEFAULT ''",
+        'activity_results': "TEXT NOT NULL DEFAULT ''",
         'session_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
         'target_letter': "TEXT NOT NULL DEFAULT ''",
         'letter_position': "TEXT NOT NULL DEFAULT ''",
@@ -440,6 +514,7 @@ class DatabaseService {
   }
 
   Future<void> _ensureMigrationTables(mobile.Database db) async {
+    await _ensureProgramTables(db);
     await _ensureTable(db, 'parents', '''
       CREATE TABLE parents (
         id TEXT PRIMARY KEY,
@@ -509,6 +584,58 @@ class DatabaseService {
         manager_signature TEXT NOT NULL DEFAULT '',
         file_path TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+  }
+
+  Future<void> _ensureProgramTables(mobile.Database db) async {
+    await _ensureTable(db, 'therapy_programs', '''
+      CREATE TABLE therapy_programs (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'program_sections', '''
+      CREATE TABLE program_sections (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'program_skills', '''
+      CREATE TABLE program_skills (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        section_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'program_activities', '''
+      CREATE TABLE program_activities (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        skill_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        instructions TEXT NOT NULL DEFAULT '',
+        homework TEXT NOT NULL DEFAULT '',
+        evaluation_type TEXT NOT NULL DEFAULT 'speech',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       )
     ''');
   }

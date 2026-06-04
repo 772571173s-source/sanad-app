@@ -19,7 +19,7 @@ After creating the owner, sign in with that account. The system owner can then c
 
 1. System owner creates the first center.
 2. System owner creates a center manager for that center.
-3. Center manager signs in, completes center settings, and creates specialists or data entry users.
+3. Center manager signs in, completes center settings, and creates specialists, data entry users, or program entry users.
 4. Data entry users add and update basic student data only.
 5. Specialists create evaluations, plans, sessions, homework, and therapy reports.
 6. Parents see only their child, homework, notes, rewards, and simplified progress.
@@ -40,10 +40,27 @@ When a student is created, Sanad creates a parent account automatically:
 Sessions support a live therapy workflow:
 
 - Pre-session context: latest evaluation, latest session, active plan goals, and a smart suggestion.
+- Program engine selection: program, skill, and activity cards can be selected inside the session.
 - Speech sessions: target letter, word position, training bank, attempts, correct/partial/wrong scoring, and error type.
+- Sensory integration activities: structured performance scoring such as cannot perform, performs with help, or performs well.
 - Sign-language sessions: choose signs from the sign library and score performance.
 - Autosave stores a draft every 30 seconds during a running session.
 - Homework can be sent directly from the session content.
+
+## Program Engine
+
+Sanad now includes a center-scoped therapy program engine:
+
+```text
+Program
+  Sections
+  Skills
+  Activities
+  Evaluation
+  Homework
+```
+
+Center managers and program entry users can create and maintain therapy programs. Specialists can use these programs during sessions. The first built-in program templates are speech therapy and sensory integration, created only when the center chooses to create them.
 
 ## Sign Language
 
@@ -69,6 +86,7 @@ The dashboard includes center-level analytics:
 | `centerManager` | One center, center settings, staff, students, reports |
 | `specialist` | Center students, evaluations, plans, sessions, homework, reports |
 | `dataEntry` | Basic student entry only |
+| `programEntry` | Center therapy programs, sections, skills, and activities |
 | `parent` | Own child only |
 
 ## Run On Windows

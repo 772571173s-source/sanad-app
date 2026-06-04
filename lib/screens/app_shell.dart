@@ -10,6 +10,7 @@ import 'evaluations_screen.dart';
 import 'exercises_parent_screen.dart';
 import 'password_screen.dart';
 import 'plans_screen.dart';
+import 'programs_screen.dart';
 import 'reports_screen.dart';
 import 'rewards_screen.dart';
 import 'sessions_screen.dart';
@@ -93,7 +94,7 @@ class _AppShellState extends State<AppShell> {
           'لوحة التحكم', Icons.dashboard_outlined, DashboardScreen()),
       if (app.canManageStudents)
         const _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
-      if (app.canManageStudents || app.isParent)
+      if (app.canViewStudents)
         const _NavItem(
             'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
       if (app.canWriteClinical)
@@ -103,6 +104,9 @@ class _AppShellState extends State<AppShell> {
             EvaluationsScreen()),
       if (app.canWriteClinical)
         const _NavItem('الخطط الدراسية', Icons.route_outlined, PlansScreen()),
+      if (app.canUsePrograms)
+        const _NavItem(
+            'البرامج العلاجية', Icons.extension_outlined, ProgramsScreen()),
       if (app.canWriteClinical && app.signLanguageEnabledForSelectedStudent)
         const _NavItem(
             'لغة الإشارة', Icons.sign_language_outlined, SignLibraryScreen()),

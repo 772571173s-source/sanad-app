@@ -221,6 +221,44 @@ class SanadRepository {
   Future<void> savePlan(TrainingPlan plan) =>
       _db.upsert('training_plans', plan.toMap());
 
+  Future<List<TherapyProgram>> programs(String centerId) async {
+    final rows = await _db.where('therapy_programs',
+        where: 'center_id = ? AND is_active = 1',
+        whereArgs: [centerId],
+        orderBy: 'type, name');
+    return rows.map(TherapyProgram.fromMap).toList();
+  }
+
+  Future<void> saveProgram(TherapyProgram program) =>
+      _db.upsert('therapy_programs', program.toMap());
+
+  Future<List<ProgramSection>> programSections(String programId) async {
+    final rows = await _db.where('program_sections',
+        where: 'program_id = ?', whereArgs: [programId], orderBy: 'sort_order');
+    return rows.map(ProgramSection.fromMap).toList();
+  }
+
+  Future<void> saveProgramSection(ProgramSection section) =>
+      _db.upsert('program_sections', section.toMap());
+
+  Future<List<ProgramSkill>> programSkills(String programId) async {
+    final rows = await _db.where('program_skills',
+        where: 'program_id = ?', whereArgs: [programId], orderBy: 'title');
+    return rows.map(ProgramSkill.fromMap).toList();
+  }
+
+  Future<void> saveProgramSkill(ProgramSkill skill) =>
+      _db.upsert('program_skills', skill.toMap());
+
+  Future<List<ProgramActivity>> programActivities(String programId) async {
+    final rows = await _db.where('program_activities',
+        where: 'program_id = ?', whereArgs: [programId], orderBy: 'title');
+    return rows.map(ProgramActivity.fromMap).toList();
+  }
+
+  Future<void> saveProgramActivity(ProgramActivity activity) =>
+      _db.upsert('program_activities', activity.toMap());
+
   Future<List<Exercise>> exercises(String studentId) async {
     final rows = await _db.where('exercises',
         where: 'student_id = ?',

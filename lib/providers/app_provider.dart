@@ -21,6 +21,10 @@ class AppProvider extends ChangeNotifier {
   List<TherapySession> sessions = [];
   List<Evaluation> evaluations = [];
   List<TrainingPlan> plans = [];
+  List<TherapyProgram> programs = [];
+  List<ProgramSection> programSections = [];
+  List<ProgramSkill> programSkills = [];
+  List<ProgramActivity> programActivities = [];
   List<Exercise> exercises = [];
   List<ReportRecord> reports = [];
   List<SignResource> signResources = [];
@@ -40,12 +44,17 @@ class AppProvider extends ChangeNotifier {
   bool get isCenterManager => user?.role == UserRole.centerManager;
   bool get isSpecialist => user?.role == UserRole.specialist;
   bool get isDataEntry => user?.role == UserRole.dataEntry;
+  bool get isProgramEntry => user?.role == UserRole.programEntry;
   bool get isParent => user?.role == UserRole.parent;
   bool get canManageCenters => isOwner;
   bool get canManageStaff => isOwner || isCenterManager;
-  bool get canManageStudents => isCenterManager || isSpecialist || isDataEntry;
-  bool get canDeleteStudents => isCenterManager || isSpecialist;
+  bool get canViewStudents =>
+      isCenterManager || isSpecialist || isDataEntry || isParent;
+  bool get canManageStudents => isCenterManager || isDataEntry;
+  bool get canDeleteStudents => isCenterManager;
   bool get canWriteClinical => isSpecialist;
+  bool get canManagePrograms => isCenterManager || isProgramEntry;
+  bool get canUsePrograms => canManagePrograms || isSpecialist;
   bool get canWriteParentArea => isParent || canWriteClinical;
   bool get canViewReports => isCenterManager || isSpecialist;
   String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
@@ -240,6 +249,10 @@ class AppProvider extends ChangeNotifier {
     sessions = [];
     evaluations = [];
     plans = [];
+    programs = [];
+    programSections = [];
+    programSkills = [];
+    programActivities = [];
     exercises = [];
     reports = [];
     signResources = [];
@@ -282,6 +295,15 @@ class AppProvider extends ChangeNotifier {
     signResources = activeCenterId.isEmpty
         ? []
         : await _repository.signResources(activeCenterId);
+    if (activeCenterId.isEmpty) {
+      programs = [];
+      programSections = [];
+      programSkills = [];
+      programActivities = [];
+    } else {
+      programs = await _repository.programs(activeCenterId);
+      await _loadProgramTree();
+    }
     auditLogs = isOwner || isCenterManager
         ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId)
         : [];
@@ -346,6 +368,17 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> _loadProgramTree() async {
+    programSections = [];
+    programSkills = [];
+    programActivities = [];
+    for (final program in programs) {
+      programSections.addAll(await _repository.programSections(program.id));
+      programSkills.addAll(await _repository.programSkills(program.id));
+      programActivities.addAll(await _repository.programActivities(program.id));
+    }
+  }
+
   Future<void> saveCenter(SanadCenter center) async {
     _ensure(
         canManageCenters || (isCenterManager && center.id == activeCenterId),
@@ -373,8 +406,10 @@ class AppProvider extends ChangeNotifier {
     }
     if (isCenterManager &&
         account.role != UserRole.specialist &&
-        account.role != UserRole.dataEntry) {
-      throw StateError('مدير المركز ينشئ أخصائي أو مدخل بيانات فقط.');
+        account.role != UserRole.dataEntry &&
+        account.role != UserRole.programEntry) {
+      throw StateError(
+          'مدير المركز ينشئ أخصائي أو مدخل بيانات أو مدخل برامج فقط.');
     }
     await _repository.saveUser(account);
     await _log(
@@ -484,6 +519,52 @@ class AppProvider extends ChangeNotifier {
         centerId: plan.centerId,
         details: '${plan.studentId} - ${plan.goal}');
     await selectStudent(selectedStudent);
+  }
+
+  Future<void> saveProgram(TherapyProgram program) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(
+        program.centerId == activeCenterId, 'لا يمكن حفظ برنامج خارج مركزك.');
+    await _repository.saveProgram(program);
+    await _log(
+        action: 'حفظ برنامج',
+        entityType: 'program',
+        entityId: program.id,
+        centerId: program.centerId,
+        details: program.name);
+    programs = await _repository.programs(activeCenterId);
+    await _loadProgramTree();
+    notifyListeners();
+  }
+
+  Future<void> saveProgramSection(ProgramSection section) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(
+        section.centerId == activeCenterId, 'لا يمكن حفظ مرحلة خارج مركزك.');
+    await _repository.saveProgramSection(section);
+    await _loadProgramTree();
+    notifyListeners();
+  }
+
+  Future<void> saveProgramSkill(ProgramSkill skill) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(skill.centerId == activeCenterId, 'لا يمكن حفظ مهارة خارج مركزك.');
+    await _repository.saveProgramSkill(skill);
+    await _loadProgramTree();
+    notifyListeners();
+  }
+
+  Future<void> saveProgramActivity(ProgramActivity activity) async {
+    _ensure(canManagePrograms,
+        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
+    _ensure(
+        activity.centerId == activeCenterId, 'لا يمكن حفظ نشاط خارج مركزك.');
+    await _repository.saveProgramActivity(activity);
+    await _loadProgramTree();
+    notifyListeners();
   }
 
   Future<void> saveExercise(Exercise exercise) async {

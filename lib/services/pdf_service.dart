@@ -26,10 +26,14 @@ class PdfService {
                 pw.SizedBox(height: 18),
                 pw.Text('الطالب: ${student.name}',
                     style: pw.TextStyle(font: font, fontSize: 16)),
-                pw.Text('البريد: ${student.portalEmail}',
-                    style: pw.TextStyle(font: font, fontSize: 16)),
-                pw.Text('كلمة المرور: ${student.portalPassword}',
-                    style: pw.TextStyle(font: font, fontSize: 16)),
+                pw.SizedBox(height: 12),
+                _credentialRow(
+                    font: font, label: 'البريد', value: student.portalEmail),
+                pw.SizedBox(height: 8),
+                _credentialRow(
+                    font: font,
+                    label: 'كلمة المرور',
+                    value: student.portalPassword),
               ],
             ),
           ),
@@ -38,6 +42,26 @@ class PdfService {
     );
     await Printing.layoutPdf(
         name: 'sanad-login-${student.id}.pdf', onLayout: (_) => pdf.save());
+  }
+
+  pw.Widget _credentialRow({
+    required pw.Font font,
+    required String label,
+    required String value,
+  }) {
+    return pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.end,
+      children: [
+        pw.Directionality(
+          textDirection: pw.TextDirection.ltr,
+          child: pw.Text(value,
+              textAlign: pw.TextAlign.left,
+              style: pw.TextStyle(font: font, fontSize: 16)),
+        ),
+        pw.SizedBox(width: 8),
+        pw.Text('$label:', style: pw.TextStyle(font: font, fontSize: 16)),
+      ],
+    );
   }
 
   Future<void> printProgressReport({

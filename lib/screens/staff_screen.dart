@@ -80,7 +80,11 @@ class StaffScreen extends StatelessWidget {
                   decoration: const InputDecoration(labelText: 'الدور'),
                   items: (app.isOwner
                           ? [UserRole.centerManager]
-                          : [UserRole.specialist, UserRole.dataEntry])
+                          : [
+                              UserRole.specialist,
+                              UserRole.dataEntry,
+                              UserRole.programEntry
+                            ])
                       .map((item) => DropdownMenuItem(
                           value: item, child: Text(item.label)))
                       .toList(),
