@@ -487,6 +487,22 @@ class AppProvider extends ChangeNotifier {
     await loadHome();
   }
 
+  Future<void> changeStaffPassword(AppUser account, String newPassword) async {
+    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    if (newPassword.length < 8) {
+      throw StateError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
+    }
+    if (!isOwner && account.centerId != activeCenterId) {
+      throw StateError('لا يمكن تعديل حساب خارج مركزك.');
+    }
+    if (isOwner && account.role != UserRole.centerManager) {
+      throw StateError(
+          'مالك النظام يغير كلمة مرور مدراء المراكز فقط من هذه الشاشة.');
+    }
+    await _repository.changeUserPassword(account.id, newPassword);
+    await loadHome();
+  }
+
   Future<void> deleteStaffUser(AppUser account) async {
     _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
     if (!isOwner && account.centerId != activeCenterId) {

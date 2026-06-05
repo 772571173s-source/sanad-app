@@ -61,6 +61,18 @@ class SanadRepository {
     );
   }
 
+  Future<void> changeUserPassword(String userId, String newPassword) async {
+    await _db.updateWhere(
+      'users',
+      {
+        'password_hash': AuthService.hashPassword(newPassword),
+        'force_password_change': 1,
+      },
+      'id = ?',
+      [userId],
+    );
+  }
+
   Future<List<SanadCenter>> centers() async {
     final rows = await _db.all('centers', orderBy: 'name');
     return rows.map(SanadCenter.fromMap).toList();
