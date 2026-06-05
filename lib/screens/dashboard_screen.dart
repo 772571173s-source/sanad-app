@@ -11,188 +11,802 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    final improvement = _improvement(app);
+    final todaySessions = _todaySessions(app);
+    final alerts = _alerts(app, todaySessions);
+
+    return AnimatedOpacity(
+      opacity: 1,
+      duration: const Duration(milliseconds: 220),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DashboardHero(
+            app: app,
+            improvement: improvement,
+            todaySessions: todaySessions.length,
+            alerts: alerts.length,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ResponsiveGrid(
+              children: _quickStats(app, improvement, todaySessions)),
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 980;
+              final timeline = _RecentActivityTimeline(app: app);
+              final attention = _AttentionCard(alerts: alerts);
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    timeline,
+                    const SizedBox(height: AppSpacing.md),
+                    attention,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(flex: 3, child: timeline),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(flex: 2, child: attention),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _improvement(AppProvider app) {
     final evaluations =
         app.centerEvaluations.isEmpty ? app.evaluations : app.centerEvaluations;
     final success = evaluations
         .where((item) => item.score == 'ناجح' || item.score == 'صحيح')
         .length;
     final partial = evaluations.where((item) => item.score == 'جزئي').length;
-    final improvement = evaluations.isEmpty
-        ? 0
-        : (((success + partial * .5) / evaluations.length) * 100).round();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ResponsiveGrid(children: _stats(app, improvement)),
-        const SizedBox(height: 16),
-        _ActivityCard(app: app),
-      ],
-    );
+    if (evaluations.isEmpty) return 0;
+    return (((success + partial * .5) / evaluations.length) * 100).round();
   }
 
-  List<Widget> _stats(AppProvider app, int improvement) {
+  List<TherapySession> _todaySessions(AppProvider app) {
+    final sessions = app.isOwner ? app.sessions : app.centerSessions;
+    return sessions.where((session) => _isToday(session.startedAt)).toList();
+  }
+
+  bool _isToday(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return false;
+    final now = DateTime.now();
+    return date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+  }
+
+  List<_AlertItem> _alerts(
+      AppProvider app, List<TherapySession> todaySessions) {
+    final items = <_AlertItem>[];
+    if (app.isOwner) {
+      final stopped = app.centers.where((center) => !center.isActive).length;
+      if (stopped > 0) {
+        items.add(_AlertItem(
+          icon: Icons.pause_circle_outline,
+          title: 'مراكز موقوفة',
+          message: '$stopped مركز يحتاج متابعة حالة الاشتراك أو الدعم.',
+          color: const Color(0xFFFEF3C7),
+        ));
+      }
+      final withoutManager = app.centers
+          .where((center) => center.managerName.trim().isEmpty)
+          .length;
+      if (withoutManager > 0) {
+        items.add(_AlertItem(
+          icon: Icons.admin_panel_settings_outlined,
+          title: 'مدراء غير مكتملين',
+          message: '$withoutManager مركز بدون مدير مرتبط بوضوح.',
+          color: const Color(0xFFE0F2FE),
+        ));
+      }
+    }
+    final exercises = app.isParent ? app.exercises : app.centerExercises;
+    final overdue = exercises.where((exercise) {
+      final due = DateTime.tryParse(exercise.dueDate);
+      return due != null &&
+          due.isBefore(DateTime.now()) &&
+          exercise.status != 'تم الإنجاز';
+    }).length;
+    if (overdue > 0) {
+      items.add(_AlertItem(
+        icon: Icons.assignment_late_outlined,
+        title: 'واجبات تحتاج متابعة',
+        message: '$overdue واجب تجاوز موعده ولم يكتمل بعد.',
+        color: const Color(0xFFFFE4E6),
+      ));
+    }
+    if (todaySessions.length >= 6) {
+      items.add(_AlertItem(
+        icon: Icons.event_available_outlined,
+        title: 'يوم علاجي مزدحم',
+        message: '${todaySessions.length} جلسات مسجلة اليوم.',
+        color: const Color(0xFFDCFCE7),
+      ));
+    }
+    return items;
+  }
+
+  List<Widget> _quickStats(
+    AppProvider app,
+    int improvement,
+    List<TherapySession> todaySessions,
+  ) {
     if (app.isOwner) {
       final managers =
           app.staff.where((user) => user.role == UserRole.centerManager).length;
-      final employees =
-          app.staff.where((user) => user.role != UserRole.parent).length;
+      final activeCenters =
+          app.centers.where((center) => center.isActive).length;
       return [
-        StatTile(
-            label: 'المراكز',
-            value: '${app.centers.length}',
-            icon: Icons.business_outlined),
-        StatTile(
-            label: 'المدراء',
-            value: '$managers',
-            icon: Icons.admin_panel_settings_outlined),
-        StatTile(
-            label: 'الموظفون', value: '$employees', icon: Icons.badge_outlined),
-        StatTile(
-            label: 'الطلاب',
-            value: '${app.totalStudentsCount}',
-            icon: Icons.groups_2_outlined),
-        StatTile(
-            label: 'الجلسات',
-            value: '${app.totalSessionsCount}',
-            icon: Icons.timer_outlined),
-        StatTile(
-            label: 'النشاط',
-            value: '${app.auditLogs.length}',
-            icon: Icons.history_outlined),
+        _PremiumStatCard(
+          label: 'المراكز النشطة',
+          value: '$activeCenters',
+          icon: Icons.business_outlined,
+          progress:
+              app.centers.isEmpty ? 0 : activeCenters / app.centers.length,
+          trend: '↑ متابعة مباشرة',
+        ),
+        _PremiumStatCard(
+          label: 'مدراء المراكز',
+          value: '$managers',
+          icon: Icons.admin_panel_settings_outlined,
+          progress: managers == 0 ? 0 : .82,
+          trend: 'مستقر',
+        ),
+        _PremiumStatCard(
+          label: 'الطلاب',
+          value: '${app.totalStudentsCount}',
+          icon: Icons.groups_2_outlined,
+          progress: .68,
+          trend: '↑ نمو',
+        ),
+        _PremiumStatCard(
+          label: 'الجلسات',
+          value: '${app.totalSessionsCount}',
+          icon: Icons.timer_outlined,
+          progress: .74,
+          trend: 'نشاط علاجي',
+        ),
+        _PremiumStatCard(
+          label: 'جلسات اليوم',
+          value: '${todaySessions.length}',
+          icon: Icons.today_outlined,
+          progress: (todaySessions.length / 10).clamp(0, 1).toDouble(),
+          trend: 'اليوم',
+        ),
+        _PremiumStatCard(
+          label: 'السجل الإداري',
+          value: '${app.auditLogs.length}',
+          icon: Icons.history_outlined,
+          progress: .55,
+          trend: 'آخر نشاط',
+        ),
       ];
     }
     if (app.isCenterManager) {
+      final employees =
+          app.staff.where((user) => user.role != UserRole.parent).length;
       return [
-        StatTile(
-            label: 'الطلاب',
-            value: '${app.students.length}',
-            icon: Icons.groups_2_outlined),
-        StatTile(
-            label: 'الموظفون',
-            value: '${app.staff.length}',
-            icon: Icons.badge_outlined),
-        StatTile(
-            label: 'الجلسات',
-            value: '${app.centerSessions.length}',
-            icon: Icons.timer_outlined),
-        StatTile(
-            label: 'النشاط اليومي',
-            value: '${app.auditLogs.length}',
-            icon: Icons.today_outlined),
+        _PremiumStatCard(
+          label: 'الطلاب',
+          value: '${app.students.length}',
+          icon: Icons.groups_2_outlined,
+          progress: .7,
+          trend: 'داخل المركز',
+        ),
+        _PremiumStatCard(
+          label: 'الموظفون',
+          value: '$employees',
+          icon: Icons.badge_outlined,
+          progress: .62,
+          trend: 'فريق العمل',
+        ),
+        _PremiumStatCard(
+          label: 'جلسات اليوم',
+          value: '${todaySessions.length}',
+          icon: Icons.today_outlined,
+          progress: (todaySessions.length / 8).clamp(0, 1).toDouble(),
+          trend: 'جدول اليوم',
+        ),
+        _PremiumStatCard(
+          label: 'نسبة التحسن',
+          value: '$improvement%',
+          icon: Icons.trending_up,
+          progress: improvement / 100,
+          trend: improvement >= 60 ? '↑ جيد' : 'يحتاج متابعة',
+        ),
       ];
     }
     if (app.isSpecialist) {
       return [
-        StatTile(
-            label: 'الطلاب',
-            value: '${app.students.length}',
-            icon: Icons.groups_2_outlined),
-        StatTile(
-            label: 'جلسات اليوم',
-            value: '${app.centerSessions.length}',
-            icon: Icons.timer_outlined),
-        StatTile(
-            label: 'الواجبات',
-            value: '${app.centerExercises.length}',
-            icon: Icons.assignment_outlined),
-        StatTile(
-            label: 'نسبة التحسن',
-            value: '$improvement%',
-            icon: Icons.trending_up),
+        _PremiumStatCard(
+          label: 'الطلاب',
+          value: '${app.students.length}',
+          icon: Icons.groups_2_outlined,
+          progress: .68,
+          trend: 'ملفات متاحة',
+        ),
+        _PremiumStatCard(
+          label: 'جلسات اليوم',
+          value: '${todaySessions.length}',
+          icon: Icons.timer_outlined,
+          progress: (todaySessions.length / 6).clamp(0, 1).toDouble(),
+          trend: 'خطة اليوم',
+        ),
+        _PremiumStatCard(
+          label: 'الواجبات',
+          value: '${app.centerExercises.length}',
+          icon: Icons.assignment_outlined,
+          progress: .58,
+          trend: 'متابعة منزلية',
+        ),
+        _PremiumStatCard(
+          label: 'نسبة التحسن',
+          value: '$improvement%',
+          icon: Icons.trending_up,
+          progress: improvement / 100,
+          trend: improvement >= 60 ? '↑ تقدم' : 'قيد البناء',
+        ),
       ];
     }
     if (app.isDataEntry) {
       return [
-        StatTile(
-            label: 'الطلاب',
-            value: '${app.students.length}',
-            icon: Icons.groups_2_outlined),
-        StatTile(
-            label: 'أولياء الأمور',
-            value: '${app.students.map((s) => s.parentPhone).toSet().length}',
-            icon: Icons.family_restroom_outlined),
-        StatTile(
-            label: 'المركز',
-            value: app.currentCenter?.name ?? '-',
-            icon: Icons.business_outlined),
+        _PremiumStatCard(
+          label: 'الطلاب',
+          value: '${app.students.length}',
+          icon: Icons.groups_2_outlined,
+          progress: .62,
+          trend: 'بيانات المركز',
+        ),
+        _PremiumStatCard(
+          label: 'أولياء الأمور',
+          value:
+              '${app.students.map((student) => student.parentPhone).toSet().length}',
+          icon: Icons.family_restroom_outlined,
+          progress: .52,
+          trend: 'حسابات مرتبطة',
+        ),
+        _PremiumStatCard(
+          label: 'المركز',
+          value: app.currentCenter?.name ?? '-',
+          icon: Icons.business_outlined,
+          progress: .8,
+          trend: 'نطاق العمل',
+        ),
       ];
     }
     if (app.isProgramEntry) {
       return [
-        StatTile(
-            label: 'البرامج',
-            value: '${app.programs.length}',
-            icon: Icons.extension_outlined),
-        StatTile(
-            label: 'المهارات',
-            value: '${app.programSkills.length}',
-            icon: Icons.psychology_outlined),
-        StatTile(
-            label: 'الأنشطة',
-            value: '${app.programActivities.length}',
-            icon: Icons.local_activity_outlined),
+        _PremiumStatCard(
+          label: 'البرامج',
+          value: '${app.programs.length}',
+          icon: Icons.extension_outlined,
+          progress: .76,
+          trend: 'محتوى علاجي',
+        ),
+        _PremiumStatCard(
+          label: 'المهارات',
+          value: '${app.programSkills.length}',
+          icon: Icons.psychology_outlined,
+          progress: .66,
+          trend: 'قابلة للجلسات',
+        ),
+        _PremiumStatCard(
+          label: 'الأنشطة',
+          value: '${app.programActivities.length}',
+          icon: Icons.local_activity_outlined,
+          progress: .72,
+          trend: 'مكتبة البرنامج',
+        ),
       ];
     }
     return [
-      StatTile(
-          label: 'الأطفال',
-          value: '${app.students.length}',
-          icon: Icons.child_care_outlined),
-      StatTile(
-          label: 'الواجبات',
-          value: '${app.exercises.length}',
-          icon: Icons.assignment_outlined),
-      StatTile(
-          label: 'المكافآت',
-          value: '${app.reward?.xp ?? 0} XP',
-          icon: Icons.emoji_events_outlined),
+      _PremiumStatCard(
+        label: 'الأطفال',
+        value: '${app.students.length}',
+        icon: Icons.child_care_outlined,
+        progress: app.students.isEmpty ? 0 : 1,
+        trend: 'داخل الحساب',
+      ),
+      _PremiumStatCard(
+        label: 'الواجبات الحالية',
+        value:
+            '${app.exercises.where((item) => item.status != 'تم الإنجاز').length}',
+        icon: Icons.assignment_outlined,
+        progress: .55,
+        trend: 'مطلوب تنفيذها',
+      ),
+      _PremiumStatCard(
+        label: 'المكافآت',
+        value: '${app.reward?.xp ?? 0} XP',
+        icon: Icons.emoji_events_outlined,
+        progress: ((app.reward?.xp ?? 0) % 100) / 100,
+        trend: 'تقدم منزلي',
+      ),
     ];
   }
 }
 
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({required this.app});
+class _DashboardHero extends StatelessWidget {
+  const _DashboardHero({
+    required this.app,
+    required this.improvement,
+    required this.todaySessions,
+    required this.alerts,
+  });
+
+  final AppProvider app;
+  final int improvement;
+  final int todaySessions;
+  final int alerts;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final activeCenters = app.centers.where((center) => center.isActive).length;
+    return Container(
+      padding: const EdgeInsets.all(26),
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: .16),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final summary = Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              _HeroMetric(
+                label: app.isOwner ? 'مراكز نشطة' : 'جلسات اليوم',
+                value: app.isOwner ? '$activeCenters' : '$todaySessions',
+                icon: app.isOwner ? Icons.business : Icons.timer_outlined,
+              ),
+              _HeroMetric(
+                label: 'نسبة التحسن',
+                value: '$improvement%',
+                icon: Icons.trending_up,
+              ),
+              _HeroMetric(
+                label: 'تنبيهات',
+                value: '$alerts',
+                icon: Icons.notifications_active_outlined,
+              ),
+            ],
+          );
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _title(app),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                _summary(app, todaySessions, alerts),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.white.withValues(alpha: .86),
+                      height: 1.5,
+                    ),
+              ),
+            ],
+          );
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                copy,
+                const SizedBox(height: AppSpacing.md),
+                summary,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: AppSpacing.lg),
+              summary,
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _title(AppProvider app) {
+    if (app.isOwner) return 'ملخص سند التنفيذي';
+    if (app.isCenterManager) return 'نبض المركز اليوم';
+    if (app.isSpecialist) return 'مسار جلساتك العلاجية';
+    if (app.isParent) return 'متابعة الطفل في المنزل';
+    if (app.isProgramEntry) return 'مكتبة البرامج العلاجية';
+    return 'لوحة اليوم';
+  }
+
+  String _summary(AppProvider app, int todaySessions, int alerts) {
+    if (app.isOwner) {
+      return 'نظرة سريعة على المراكز والحسابات والنشاط الإداري في سند.';
+    }
+    if (app.isParent) {
+      return 'تابع الواجبات الحالية والتقدم والمكافآت من مكان واحد.';
+    }
+    return 'لديك $todaySessions جلسات مسجلة اليوم و$alerts تنبيهات تحتاج انتباه.';
+  }
+}
+
+class _HeroMetric extends StatelessWidget {
+  const _HeroMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: Colors.white.withValues(alpha: .18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: .82)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumStatCard extends StatefulWidget {
+  const _PremiumStatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.progress,
+    required this.trend,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final double progress;
+  final String trend;
+
+  @override
+  State<_PremiumStatCard> createState() => _PremiumStatCardState();
+}
+
+class _PremiumStatCardState extends State<_PremiumStatCard> {
+  bool hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovered = true),
+      onExit: (_) => setState(() => hovered = false),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 150),
+        scale: hovered ? 1.01 : 1,
+        child: AppCard(
+          highlight: hovered,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: SanadUiColors.accentGreen,
+                      borderRadius: BorderRadius.circular(AppRadii.control),
+                    ),
+                    child: Icon(widget.icon, color: SanadUiColors.primary),
+                  ),
+                  const Spacer(),
+                  AppPill(label: widget.trend, icon: Icons.show_chart),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(widget.label, style: Theme.of(context).textTheme.bodyMedium),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                widget.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 7,
+                  value: widget.progress.clamp(0, 1),
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RecentActivityTimeline extends StatelessWidget {
+  const _RecentActivityTimeline({required this.app});
 
   final AppProvider app;
 
   @override
   Widget build(BuildContext context) {
-    final student = app.selectedStudent;
-    return AppCard(
+    final items = _items(app);
+    if (items.isEmpty) {
+      return const EmptyState(
+        icon: Icons.history_outlined,
+        title: 'لا يوجد نشاط حديث',
+        message: 'ستظهر هنا العمليات المهمة مثل الجلسات والواجبات والتقارير.',
+      );
+    }
+    return TherapyCard(
+      icon: Icons.timeline_outlined,
+      title: 'النشاط الأخير',
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('النشاط',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          if (app.isOwner)
-            Text('آخر عمليات مسجلة: ${app.auditLogs.length}')
-          else if (student == null)
-            const Text('اختر طالبًا أو أضف بيانات للبدء.')
-          else
-            Row(
-              children: [
-                StudentAvatar(student: student, radius: 32),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(student.name,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w800)),
-                      Text('${student.diagnosis} - ${student.status}'),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          for (var i = 0; i < items.length; i++)
+            _TimelineRow(item: items[i], last: i == items.length - 1),
         ],
       ),
     );
   }
+
+  List<_ActivityItem> _items(AppProvider app) {
+    final logs = app.auditLogs.take(6).map((log) {
+      return _ActivityItem(
+        icon: Icons.manage_history_outlined,
+        title: log.action,
+        subtitle: log.details.isEmpty ? log.userName : log.details,
+        time: _shortDate(log.createdAt),
+      );
+    }).toList();
+    if (logs.isNotEmpty) return logs;
+
+    final sessions = (app.isOwner ? app.sessions : app.centerSessions).take(6);
+    final sessionItems = sessions.map((session) {
+      return _ActivityItem(
+        icon: Icons.timer_outlined,
+        title: 'جلسة علاجية',
+        subtitle:
+            session.cardTitle.isEmpty ? session.sessionType : session.cardTitle,
+        time: _shortDate(session.startedAt),
+      );
+    }).toList();
+    if (sessionItems.isNotEmpty) return sessionItems;
+
+    final exercises =
+        (app.isParent ? app.exercises : app.centerExercises).take(6);
+    return exercises.map((exercise) {
+      return _ActivityItem(
+        icon: Icons.assignment_outlined,
+        title: exercise.title,
+        subtitle: exercise.status,
+        time: _shortDate(exercise.dueDate),
+      );
+    }).toList();
+  }
+
+  String _shortDate(String value) {
+    final date = DateTime.tryParse(value);
+    if (date == null) return value.isEmpty ? '-' : value;
+    return '${date.year}/${date.month}/${date.day}';
+  }
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({required this.item, required this.last});
+
+  final _ActivityItem item;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: SanadUiColors.accentBlue,
+                borderRadius: BorderRadius.circular(AppRadii.control),
+              ),
+              child: Icon(item.icon, size: 20, color: SanadUiColors.primary),
+            ),
+            if (!last)
+              Container(
+                width: 2,
+                height: 34,
+                color: colorScheme.outlineVariant,
+              ),
+          ],
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    Text(
+                      item.time,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  item.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AttentionCard extends StatelessWidget {
+  const _AttentionCard({required this.alerts});
+
+  final List<_AlertItem> alerts;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alerts.isEmpty) {
+      return const EmptyState(
+        icon: Icons.verified_outlined,
+        title: 'كل شيء مستقر',
+        message: 'لا توجد تنبيهات مهمة الآن. النظام يعطيك مساحة هادئة للعمل.',
+      );
+    }
+    return TherapyCard(
+      icon: Icons.notifications_active_outlined,
+      title: 'تحتاج انتباه',
+      child: Column(
+        children: [
+          for (final alert in alerts) ...[
+            _AlertTile(alert: alert),
+            if (alert != alerts.last) const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AlertTile extends StatelessWidget {
+  const _AlertTile({required this.alert});
+
+  final _AlertItem alert;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: alert.color,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        children: [
+          Icon(alert.icon, color: SanadUiColors.primary),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  alert.title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 3),
+                Text(alert.message),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityItem {
+  const _ActivityItem({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.time,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String time;
+}
+
+class _AlertItem {
+  const _AlertItem({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final Color color;
 }
