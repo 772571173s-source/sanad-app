@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../widgets/app_widgets.dart';
 import 'centers_screen.dart';
 import 'dashboard_screen.dart';
 import 'data_entry_screen.dart';
@@ -24,10 +25,15 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int index = 0;
+  bool lastSupportMode = false;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
+    if (lastSupportMode != app.isSupportMode) {
+      index = 0;
+      lastSupportMode = app.isSupportMode;
+    }
     final items = _items(app);
     if (index >= items.length) {
       index = 0;
@@ -52,6 +58,16 @@ class _AppShellState extends State<AppShell> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _Header(title: selected.title),
+                    if (app.isSupportMode) ...[
+                      const SizedBox(height: 12),
+                      _SupportModeBanner(
+                        centerName: app.currentCenter?.name ?? '',
+                        onExit: () async {
+                          await app.exitSupportMode();
+                          setState(() => index = 0);
+                        },
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     selected.screen,
                   ],
@@ -91,6 +107,26 @@ class _AppShellState extends State<AppShell> {
   }
 
   List<_NavItem> _items(AppProvider app) {
+    if (app.isSupportMode) {
+      return [
+        const _NavItem(
+            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
+          'الطلاب',
+          Icons.groups_2_outlined,
+          StudentsScreen(
+            onOpenProfile: () => setState(() => index = 2),
+          ),
+        ),
+        const _NavItem(
+            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
+        const _NavItem(
+            'الموظفون', Icons.manage_accounts_outlined, StaffScreen()),
+        const _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
+        const _NavItem(
+            'الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      ];
+    }
     if (app.isOwner) {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
@@ -166,6 +202,29 @@ class _AppShellState extends State<AppShell> {
     return const [
       _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
     ];
+  }
+}
+
+class _SupportModeBanner extends StatelessWidget {
+  const _SupportModeBanner({required this.centerName, required this.onExit});
+
+  final String centerName;
+  final VoidCallback onExit;
+
+  @override
+  Widget build(BuildContext context) {
+    return TherapyCard(
+      icon: Icons.support_agent,
+      title: 'أنت الآن تساعد مركز: ${centerName.isEmpty ? '-' : centerName}',
+      trailing: FilledButton.tonalIcon(
+        onPressed: onExit,
+        icon: const Icon(Icons.keyboard_return),
+        label: const Text('العودة إلى إدارة سند'),
+      ),
+      child: const Text(
+        'تعمل الآن داخل بيئة المركز بصلاحيات مدير المركز، مع بقاء حسابك كمالك سند.',
+      ),
+    );
   }
 }
 

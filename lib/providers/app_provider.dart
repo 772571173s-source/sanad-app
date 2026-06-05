@@ -14,6 +14,7 @@ class AppProvider extends ChangeNotifier {
 
   AppUser? user;
   SanadCenter? currentCenter;
+  SanadCenter? supportModeCenter;
   List<SanadCenter> centers = [];
   List<AppUser> staff = [];
   List<Student> students = [];
@@ -46,8 +47,11 @@ class AppProvider extends ChangeNotifier {
   Map<String, int> centerSessionCounts = {};
   Map<String, String> centerLastActivities = {};
 
-  bool get isOwner => user?.role == UserRole.sanadOwner;
-  bool get isCenterManager => user?.role == UserRole.centerManager;
+  bool get isSanadOwnerAccount => user?.role == UserRole.sanadOwner;
+  bool get isSupportMode => isSanadOwnerAccount && supportModeCenter != null;
+  bool get isOwner => isSanadOwnerAccount && !isSupportMode;
+  bool get isCenterManager =>
+      user?.role == UserRole.centerManager || isSupportMode;
   bool get isSpecialist => user?.role == UserRole.specialist;
   bool get isDataEntry => user?.role == UserRole.dataEntry;
   bool get isProgramEntry => user?.role == UserRole.programEntry;
@@ -252,6 +256,7 @@ class AppProvider extends ChangeNotifier {
   void logout() {
     user = null;
     currentCenter = null;
+    supportModeCenter = null;
     centers = [];
     centerStudentCounts = {};
     centerSpecialistCounts = {};
@@ -291,8 +296,19 @@ class AppProvider extends ChangeNotifier {
     totalSessionsCount = isOwner ? await _repository.totalSessions() : 0;
     centers = isOwner
         ? allCenters
-        : allCenters.where((center) => center.id == current.centerId).toList();
-    if (isOwner) {
+        : isSupportMode && supportModeCenter != null
+            ? allCenters
+                .where((center) => center.id == supportModeCenter!.id)
+                .toList()
+            : allCenters
+                .where((center) => center.id == current.centerId)
+                .toList();
+    if (isSupportMode && supportModeCenter != null) {
+      final matches =
+          allCenters.where((center) => center.id == supportModeCenter!.id);
+      currentCenter = matches.isEmpty ? supportModeCenter : matches.first;
+      supportModeCenter = currentCenter;
+    } else if (isOwner) {
       final selectedCenter = currentCenter;
       currentCenter = selectedCenter == null ||
               centers.any((center) => center.id == selectedCenter.id)
@@ -336,6 +352,37 @@ class AppProvider extends ChangeNotifier {
         ? currentSelection
         : null;
     await selectStudent(selectedStudent);
+  }
+
+  Future<void> enterSupportMode(SanadCenter center) async {
+    _ensure(isSanadOwnerAccount, 'وضع المساعدة خاص بمالك سند فقط.');
+    supportModeCenter = center;
+    currentCenter = center;
+    selectedStudent = null;
+    await _log(
+      action: 'دخل مالك سند وضع مساعدة مركز',
+      entityType: 'center',
+      entityId: center.id,
+      centerId: center.id,
+      details: center.name,
+    );
+    await loadHome();
+  }
+
+  Future<void> exitSupportMode() async {
+    final center = supportModeCenter;
+    if (center == null) return;
+    await _log(
+      action: 'خرج مالك سند من وضع مساعدة مركز',
+      entityType: 'center',
+      entityId: center.id,
+      centerId: center.id,
+      details: center.name,
+    );
+    supportModeCenter = null;
+    currentCenter = null;
+    selectedStudent = null;
+    await loadHome();
   }
 
   Future<void> switchCenter(SanadCenter center) async {
@@ -982,7 +1029,8 @@ class AppProvider extends ChangeNotifier {
 
   void _ensureStudentAccess(Student student) {
     final current = _requireUser();
-    if (current.role == UserRole.sanadOwner) return;
+    if (current.role == UserRole.sanadOwner && !isSupportMode) return;
+    if (isSupportMode && student.centerId == activeCenterId) return;
     if (current.role == UserRole.parent &&
         (current.studentId == student.id ||
             students.any((item) => item.id == student.id))) {
