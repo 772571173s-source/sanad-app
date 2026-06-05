@@ -5,6 +5,13 @@ import 'package:printing/printing.dart';
 import '../models/app_models.dart';
 
 class PdfService {
+  static const _primary = PdfColor.fromInt(0xFF0F766E);
+  static const _background = PdfColor.fromInt(0xFFF8FAF7);
+  static const _text = PdfColor.fromInt(0xFF1F2937);
+  static const _accentBlue = PdfColor.fromInt(0xFFE0F2FE);
+  static const _accentGreen = PdfColor.fromInt(0xFFDCFCE7);
+  static const _border = PdfColor.fromInt(0xFFE2E8F0);
+
   Future<void> printStudentCredentials(Student student) async {
     final font = await PdfGoogleFonts.notoNaskhArabicRegular();
     final pdf = pw.Document();
@@ -232,8 +239,8 @@ class PdfService {
     return pw.Container(
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
-        color: PdfColors.teal50,
-        border: pw.Border.all(color: PdfColors.teal200),
+        color: _background,
+        border: pw.Border.all(color: _border),
         borderRadius: pw.BorderRadius.circular(10),
       ),
       child: pw.Row(
@@ -243,13 +250,16 @@ class PdfService {
             height: 78,
             alignment: pw.Alignment.center,
             decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              border: pw.Border.all(color: PdfColors.teal),
+              color: _accentGreen,
+              border: pw.Border.all(color: _primary),
               borderRadius: pw.BorderRadius.circular(8),
             ),
             child: pw.Text('سند',
                 style: pw.TextStyle(
-                    font: font, fontSize: 22, fontWeight: pw.FontWeight.bold)),
+                    font: font,
+                    fontSize: 22,
+                    color: _primary,
+                    fontWeight: pw.FontWeight.bold)),
           ),
           pw.SizedBox(width: 12),
           pw.Expanded(
@@ -260,10 +270,11 @@ class PdfService {
                     style: pw.TextStyle(
                         font: font,
                         fontSize: 21,
+                        color: _text,
                         fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
                 pw.Text(center?.address ?? 'العنوان غير محدد',
-                    style: pw.TextStyle(font: font, color: PdfColors.grey800)),
+                    style: pw.TextStyle(font: font, color: _text)),
                 pw.Directionality(
                   textDirection: pw.TextDirection.ltr,
                   child: pw.Text(center?.phone ?? '',
@@ -284,7 +295,7 @@ class PdfService {
     return pw.Container(
       padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: pw.BoxDecoration(
-        color: PdfColors.grey100,
+        color: _accentBlue,
         borderRadius: pw.BorderRadius.circular(6),
       ),
       child: pw.Text(title,
@@ -298,7 +309,7 @@ class PdfService {
       width: double.infinity,
       padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey300),
+        border: pw.Border.all(color: _border),
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Column(
@@ -338,7 +349,7 @@ class PdfService {
       child: pw.Container(
         padding: const pw.EdgeInsets.all(10),
         decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: PdfColors.grey300),
+          border: pw.Border.all(color: _border),
           borderRadius: pw.BorderRadius.circular(8),
         ),
         child: pw.Column(
@@ -356,7 +367,7 @@ class PdfService {
 
   pw.Widget _sessionsTable(pw.Font font, List<TherapySession> sessions) {
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey300, width: .7),
+      border: pw.TableBorder.all(color: _border, width: .7),
       columnWidths: const {
         0: pw.FlexColumnWidth(1.3),
         1: pw.FlexColumnWidth(2),
@@ -365,7 +376,7 @@ class PdfService {
       },
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          decoration: const pw.BoxDecoration(color: _accentBlue),
           children: [
             _cell(font, 'التاريخ', bold: true),
             _cell(font, 'المهارة', bold: true),
@@ -386,14 +397,14 @@ class PdfService {
   pw.Widget _activitiesTable(pw.Font font, List<ProgramActivity> activities,
       Map<String, String> results) {
     return pw.Table(
-      border: pw.TableBorder.all(color: PdfColors.grey300, width: .7),
+      border: pw.TableBorder.all(color: _border, width: .7),
       columnWidths: const {
         0: pw.FlexColumnWidth(3),
         1: pw.FlexColumnWidth(1.4),
       },
       children: [
         pw.TableRow(
-          decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+          decoration: const pw.BoxDecoration(color: _accentBlue),
           children: [
             _cell(font, 'النشاط', bold: true),
             _cell(font, 'التقييم', bold: true),

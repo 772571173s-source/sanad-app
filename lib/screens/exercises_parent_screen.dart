@@ -31,6 +31,11 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final student = app.selectedStudent;
+    final visibleExercises = app.isParent
+        ? app.exercises
+            .where((exercise) => exercise.status != 'تم الإنجاز')
+            .toList()
+        : app.exercises;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -60,7 +65,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
             child: ListTile(
               leading: const Icon(Icons.child_care_outlined),
               title: Text(student.name),
-              subtitle: Text('الواجبات الحالية: ${app.exercises.length}'),
+              subtitle: Text('الواجبات الحالية: ${visibleExercises.length}'),
             ),
           ),
         if (!app.isParent)
@@ -95,15 +100,15 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                   ),
           ),
         const SizedBox(height: 16),
-        if (app.exercises.isEmpty)
+        if (visibleExercises.isEmpty)
           const EmptyState(
             icon: Icons.assignment_outlined,
-            title: 'لا توجد واجبات بعد',
-            message: 'ستظهر هنا الواجبات المرسلة من الأخصائي بشكل مبسط.',
+            title: 'لا توجد واجبات حالية',
+            message: 'عند إرسال واجب جديد من الأخصائي سيظهر هنا للتنفيذ.',
           )
         else
           ResponsiveGrid(
-            children: app.exercises
+            children: visibleExercises
                 .map((exercise) => _HomeworkCard(
                       app: app,
                       exercise: exercise,

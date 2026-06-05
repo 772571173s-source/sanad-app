@@ -16,6 +16,16 @@ class AppRadii {
   static const control = 8.0;
 }
 
+class SanadUiColors {
+  static const primary = Color(0xFF0F766E);
+  static const secondary = Color(0xFF38BDF8);
+  static const surface = Color(0xFFFFFFFF);
+  static const text = Color(0xFF1F2937);
+  static const accentBlue = Color(0xFFE0F2FE);
+  static const accentGreen = Color(0xFFDCFCE7);
+  static const accentAmber = Color(0xFFFEF3C7);
+}
+
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -40,7 +50,13 @@ class AppCard extends StatelessWidget {
           color: highlight ? colorScheme.primary : colorScheme.outlineVariant,
         ),
       ),
-      child: Padding(padding: EdgeInsets.all(padding), child: child),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        child: Padding(padding: EdgeInsets.all(padding), child: child),
+      ),
     );
   }
 }
@@ -108,13 +124,12 @@ class AppPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? colorScheme.primaryContainer : colorScheme.surface,
+        color: selected ? SanadUiColors.accentGreen : SanadUiColors.accentBlue,
         border: Border.all(
-          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+          color: selected ? SanadUiColors.primary : Colors.transparent,
         ),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
@@ -125,7 +140,13 @@ class AppPill extends StatelessWidget {
             Icon(icon, size: 18),
             const SizedBox(width: 6),
           ],
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Text(
+            label,
+            style: const TextStyle(
+              color: SanadUiColors.text,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -154,12 +175,12 @@ class StatTile extends StatelessWidget {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: SanadUiColors.accentGreen,
               borderRadius: BorderRadius.circular(AppRadii.control),
             ),
             child: Icon(
               icon,
-              color: Theme.of(context).colorScheme.onPrimaryContainer,
+              color: SanadUiColors.primary,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -259,13 +280,13 @@ class EmptyState extends StatelessWidget {
               height: 64,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: SanadUiColors.accentBlue,
                 borderRadius: BorderRadius.circular(AppRadii.card),
               ),
               child: Icon(
                 icon,
                 size: 34,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                color: SanadUiColors.primary,
               ),
             ),
             const SizedBox(height: AppSpacing.md),

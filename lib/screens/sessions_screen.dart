@@ -176,7 +176,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
             onNext: activityIndex >= activities.length - 1
                 ? null
                 : () => setState(() => activityIndex++),
-            onSendHomework: () => _sendHomework(app, activities[activityIndex]),
             onSendSessionHomework: () => _sendSessionHomework(app, activities),
             onSave: () => _saveSession(app, activities),
             onPrintReport: () => _printSessionReport(app, activities),
@@ -239,30 +238,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (value == 'جزئي' || value == 'بمساعدة') score += .5;
     }
     return ((score / activities.length) * 100).round();
-  }
-
-  Future<void> _sendHomework(AppProvider app, ProgramActivity activity) {
-    final student = app.selectedStudent;
-    final program = _program(app);
-    final content = _StructuredActivityContent.tryParse(activity);
-    final homework = content?.homework ?? activity.homework;
-    if (student == null || homework.isEmpty) return Future.value();
-    return runWithFeedback(context, () async {
-      await app.saveExercise(Exercise(
-        id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
-        centerId: student.centerId,
-        studentId: student.id,
-        title: '${program?.name ?? 'برنامج علاجي'} - ${activity.title}',
-        instructions: homework,
-        dueDate: DateTime.now()
-            .add(const Duration(days: 1))
-            .toIso8601String()
-            .split('T')
-            .first,
-        status: 'مرسل',
-      ));
-      setState(() => homeworkSentCount++);
-    }, success: 'تم إرسال الواجب لولي الأمر.');
   }
 
   bool _hasHomework(List<ProgramActivity> activities) {
@@ -600,7 +575,6 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.onEvaluate,
     required this.onPrevious,
     required this.onNext,
-    required this.onSendHomework,
     required this.onSendSessionHomework,
     required this.onSave,
     required this.onPrintReport,
@@ -621,7 +595,6 @@ class _ActiveSessionCard extends StatelessWidget {
   final ValueChanged<String> onEvaluate;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
-  final VoidCallback onSendHomework;
   final VoidCallback onSendSessionHomework;
   final VoidCallback onSave;
   final VoidCallback onPrintReport;
@@ -746,14 +719,9 @@ class _ActiveSessionCard extends StatelessWidget {
                 label: const Text('النشاط التالي'),
               ),
               FilledButton.tonalIcon(
-                onPressed: homework.isEmpty ? null : onSendHomework,
-                icon: const Icon(Icons.assignment_add),
-                label: const Text('إرسال واجب'),
-              ),
-              FilledButton.tonalIcon(
                 onPressed: hasSessionHomework ? onSendSessionHomework : null,
                 icon: const Icon(Icons.playlist_add_check),
-                label: const Text('واجب الجلسة'),
+                label: const Text('إرسال واجب الجلسة'),
               ),
               FilledButton.icon(
                 onPressed: hasEvaluations ? onSave : null,
