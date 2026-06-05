@@ -20,6 +20,9 @@ class StudentProfileScreen extends StatelessWidget {
         message: 'سيظهر ملف الطالب العلاجي بعد اختياره من شاشة الطلاب.',
       );
     }
+    if (app.isParent) {
+      return _ParentStudentProfile(app: app, student: student);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -36,6 +39,126 @@ class StudentProfileScreen extends StatelessWidget {
         _Timeline(app: app),
       ],
     );
+  }
+}
+
+class _ParentStudentProfile extends StatelessWidget {
+  const _ParentStudentProfile({required this.app, required this.student});
+
+  final AppProvider app;
+  final Student student;
+
+  @override
+  Widget build(BuildContext context) {
+    final completedHomework =
+        app.exercises.where((item) => item.status == 'تم الإنجاز').length;
+    final reward = app.reward;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  StudentAvatar(student: student, radius: 42),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          student.name,
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.w900),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text('متابعة منزلية مبسطة لولي الأمر'),
+                      ],
+                    ),
+                  ),
+                  Chip(label: Text(student.status)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _InfoTile('العمر', '${student.age}'),
+                  _InfoTile('التشخيص', student.diagnosis),
+                  _InfoTile('الواجبات المنجزة', '$completedHomework'),
+                  _InfoTile('الجلسات المكتملة', '${app.sessions.length}'),
+                  if (reward != null) _InfoTile('المستوى', '${reward.level}'),
+                  if (reward != null) _InfoTile('النقاط', '${reward.xp}'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader(
+                  context, 'الواجبات الحالية', Icons.assignment_outlined),
+              const SizedBox(height: 10),
+              if (app.exercises.isEmpty)
+                const Text('لا توجد واجبات حالية.')
+              else
+                ...app.exercises.take(5).map((exercise) => _ParentHomeworkTile(
+                      exercise: exercise,
+                    )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader(
+                  context, 'الجلسات المكتملة', Icons.history_edu_outlined),
+              const SizedBox(height: 10),
+              if (app.sessions.isEmpty)
+                const Text('لا توجد جلسات مكتملة بعد.')
+              else
+                ...app.sessions.take(8).map((session) => _ParentSessionCard(
+                      session: session,
+                      parentNote: _noteForSession(app.exercises, session),
+                    )),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _sectionHeader(context, 'الملاحظات والملفات', Icons.mic_none),
+              const SizedBox(height: 10),
+              const Text(
+                'يمكنك إرسال ملاحظة للأخصائي من بطاقة الواجب. رفع الصوت والفيديو مجهز لاحقًا.',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _noteForSession(List<Exercise> exercises, TherapySession session) {
+    for (final exercise in exercises) {
+      if (exercise.title.contains(session.cardTitle) &&
+          exercise.parentNote.isNotEmpty) {
+        return exercise.parentNote;
+      }
+    }
+    return '';
   }
 }
 
@@ -113,19 +236,15 @@ class _QuickActions extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('الإجراءات السريعة',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
+          _sectionHeader(context, 'الإجراءات السريعة', Icons.bolt_outlined),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _action(context, Icons.play_circle_outline, 'بدء جلسة جديدة',
+              _action(context, Icons.play_circle_outline, 'بدء جلسة',
                   'افتح شاشة الجلسات واختر أنشطة الطالب.'),
-              _action(context, Icons.history, 'عرض الجلسات السابقة',
+              _action(context, Icons.history, 'الجلسات السابقة',
                   'الجلسات السابقة ظاهرة أسفل الملف.'),
               _reportButton(context, 'تقرير جلسة'),
               _reportButton(context, 'تقرير أسبوعي'),
@@ -133,10 +252,10 @@ class _QuickActions extends StatelessWidget {
               _reportButton(context, 'تقرير ثلاثة أشهر'),
               _reportButton(context, 'تقرير سنة'),
               _reportButton(context, 'تقرير شامل'),
-              _action(context, Icons.edit_outlined, 'تعديل بيانات الطالب',
+              _action(context, Icons.edit_outlined, 'تعديل البيانات',
                   'التعديل يتم من شاشة الطلاب أو الإدخال.'),
-              _action(context, Icons.phone_in_talk_outlined,
-                  'التواصل مع ولي الأمر', student.parentPhone),
+              _action(context, Icons.phone_in_talk_outlined, 'التواصل',
+                  student.parentPhone),
             ],
           ),
         ],
@@ -168,8 +287,9 @@ class _QuickActions extends StatelessWidget {
 
   Future<void> _chooseSessionReport(BuildContext context) async {
     if (app.sessions.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('لا توجد جلسات للطالب.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('لا توجد جلسات للطالب.')),
+      );
       return;
     }
     await showDialog<void>(
@@ -214,7 +334,8 @@ class _QuickActions extends StatelessWidget {
     final from = switch (type) {
       'تقرير أسبوعي' => now.subtract(const Duration(days: 7)),
       'تقرير شهري' => DateTime(now.year, now.month, 1),
-      'تقرير سنوي' => DateTime(now.year, 1, 1),
+      'تقرير سنة' => DateTime(now.year, 1, 1),
+      'تقرير ثلاثة أشهر' => DateTime(now.year, now.month - 2, 1),
       _ => DateTime(1900),
     };
     return app.sessions.where((session) {
@@ -245,11 +366,7 @@ class _PreviousSessions extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('الجلسات السابقة',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
+          _sectionHeader(context, 'الجلسات السابقة', Icons.timeline_outlined),
           const SizedBox(height: 10),
           if (app.sessions.isEmpty)
             const Text('لا توجد جلسات بعد.')
@@ -268,9 +385,10 @@ class _SessionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activities = _activityTags(session.practiceItems);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(8),
@@ -290,14 +408,37 @@ class _SessionTile extends StatelessWidget {
               Chip(label: Text('${session.successRate}%')),
             ],
           ),
-          const SizedBox(height: 6),
-          Text('التاريخ: ${session.startedAt.split('T').first}'),
-          Text('البرنامج: ${session.sessionType}'),
-          Text('الأنشطة: ${session.practiceItems}'),
-          Text('التقييم السريع: ${session.quickResult}'),
-          if (session.summary.isNotEmpty) Text('الملخص: ${session.summary}'),
-          if (session.notes.isNotEmpty)
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(label: Text(session.startedAt.split('T').first)),
+              Chip(label: Text(session.sessionType)),
+              Chip(label: Text(session.quickResult)),
+            ],
+          ),
+          if (activities.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final activity in activities.take(4))
+                  Chip(label: Text(activity)),
+                if (activities.length > 4)
+                  Chip(label: Text('+${activities.length - 4}')),
+              ],
+            ),
+          ],
+          if (session.summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(session.summary),
+          ],
+          if (session.notes.isNotEmpty) ...[
+            const SizedBox(height: 6),
             Text('ملاحظة الأخصائي: ${session.notes}'),
+          ],
         ],
       ),
     );
@@ -315,11 +456,7 @@ class _ReportsFromProfile extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('التقارير',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
+          _sectionHeader(context, 'التقارير', Icons.picture_as_pdf_outlined),
           const SizedBox(height: 10),
           if (app.reports.isEmpty)
             const Text('لا توجد تقارير محفوظة بعد.')
@@ -348,11 +485,8 @@ class _HomeworkSummary extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('الواجبات وملاحظات ولي الأمر',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
+          _sectionHeader(context, 'الواجبات وملاحظات ولي الأمر',
+              Icons.assignment_turned_in_outlined),
           const SizedBox(height: 10),
           if (app.exercises.isEmpty)
             const Text('لا توجد واجبات بعد.')
@@ -363,7 +497,7 @@ class _HomeworkSummary extends StatelessWidget {
                   title: Text(exercise.title),
                   subtitle: Text(
                       '${exercise.status}${exercise.parentNote.isEmpty ? '' : '\nملاحظة: ${exercise.parentNote}'}'),
-                  trailing: Text('⭐ ${exercise.stars}'),
+                  trailing: Text('★ ${exercise.stars}'),
                 )),
         ],
       ),
@@ -383,11 +517,7 @@ class _Timeline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('الخط الزمني',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w900)),
+          _sectionHeader(context, 'الخط الزمني', Icons.auto_graph_outlined),
           const SizedBox(height: 10),
           if (items.isEmpty)
             const Text('سيظهر هنا سجل الجلسات والتقييمات والواجبات والتقارير.')
@@ -440,6 +570,79 @@ class _Timeline extends StatelessWidget {
   }
 }
 
+class _ParentHomeworkTile extends StatelessWidget {
+  const _ParentHomeworkTile({required this.exercise});
+
+  final Exercise exercise;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.assignment_outlined),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(exercise.title,
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Text('الحالة: ${exercise.status}'),
+              ],
+            ),
+          ),
+          Text('★ ${exercise.stars}'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParentSessionCard extends StatelessWidget {
+  const _ParentSessionCard({required this.session, required this.parentNote});
+
+  final TherapySession session;
+  final String parentNote;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(session.cardTitle,
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
+              ),
+              Chip(label: Text('نجاح ${session.successRate}%')),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text('التاريخ: ${session.startedAt.split('T').first}'),
+          Text('البرنامج: ${session.sessionType}'),
+          if (parentNote.isNotEmpty) Text('ملاحظتك: $parentNote'),
+        ],
+      ),
+    );
+  }
+}
+
 class _InfoTile extends StatelessWidget {
   const _InfoTile(this.label, this.value, {this.ltr = false});
 
@@ -476,4 +679,30 @@ class _TimelineItem {
   final String title;
   final String subtitle;
   final String date;
+}
+
+Widget _sectionHeader(BuildContext context, String title, IconData icon) {
+  return Row(
+    children: [
+      Icon(icon),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text(
+          title,
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(fontWeight: FontWeight.w900),
+        ),
+      ),
+    ],
+  );
+}
+
+List<String> _activityTags(String value) {
+  return value
+      .split(RegExp(r'[،,\n]+'))
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty && !item.trimLeft().startsWith('{'))
+      .toList();
 }
