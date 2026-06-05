@@ -8,12 +8,13 @@ class AppSpacing {
   static const xs = 6.0;
   static const sm = 10.0;
   static const md = 16.0;
+  static const xl = 20.0;
   static const lg = 24.0;
 }
 
 class AppRadii {
-  static const card = 8.0;
-  static const control = 8.0;
+  static const card = 24.0;
+  static const control = 16.0;
 }
 
 class SanadUiColors {
@@ -30,7 +31,7 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = AppSpacing.md,
+    this.padding = AppSpacing.lg,
     this.highlight = false,
   });
 
@@ -42,7 +43,7 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: highlight ? 1 : 0,
+      elevation: highlight ? 2 : 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.card),

@@ -120,8 +120,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
-    final ok =
-        await context.read<AppProvider>().login(email.text, password.text);
-    if (!ok && mounted) setState(() => error = 'بيانات الدخول غير صحيحة.');
+    try {
+      final ok =
+          await context.read<AppProvider>().login(email.text, password.text);
+      if (!ok && mounted) setState(() => error = 'بيانات الدخول غير صحيحة.');
+    } catch (exception) {
+      if (!mounted) return;
+      setState(
+          () => error = exception.toString().replaceFirst('Bad state: ', ''));
+    }
   }
 }

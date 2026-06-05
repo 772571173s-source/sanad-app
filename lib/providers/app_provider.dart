@@ -41,6 +41,10 @@ class AppProvider extends ChangeNotifier {
   String? startupError;
   int totalStudentsCount = 0;
   int totalSessionsCount = 0;
+  Map<String, int> centerStudentCounts = {};
+  Map<String, int> centerSpecialistCounts = {};
+  Map<String, int> centerSessionCounts = {};
+  Map<String, String> centerLastActivities = {};
 
   bool get isOwner => user?.role == UserRole.sanadOwner;
   bool get isCenterManager => user?.role == UserRole.centerManager;
@@ -249,6 +253,10 @@ class AppProvider extends ChangeNotifier {
     user = null;
     currentCenter = null;
     centers = [];
+    centerStudentCounts = {};
+    centerSpecialistCounts = {};
+    centerSessionCounts = {};
+    centerLastActivities = {};
     staff = [];
     students = [];
     selectedStudent = null;
@@ -300,6 +308,7 @@ class AppProvider extends ChangeNotifier {
     staff = canManageStaff
         ? await _repository.users(centerId: isOwner ? null : activeCenterId)
         : [];
+    await _loadCenterCardsMetrics();
     signResources = activeCenterId.isEmpty
         ? []
         : await _repository.signResources(activeCenterId);
@@ -373,6 +382,24 @@ class AppProvider extends ChangeNotifier {
       centerSessions.addAll(await _repository.sessions(student.id));
       centerEvaluations.addAll(await _repository.evaluations(student.id));
       centerExercises.addAll(await _repository.exercises(student.id));
+    }
+  }
+
+  Future<void> _loadCenterCardsMetrics() async {
+    centerStudentCounts = {};
+    centerSpecialistCounts = {};
+    centerSessionCounts = {};
+    centerLastActivities = {};
+    if (!isOwner) return;
+    for (final center in centers) {
+      centerStudentCounts[center.id] =
+          await _repository.centerStudentCount(center.id);
+      centerSpecialistCounts[center.id] =
+          await _repository.centerSpecialistCount(center.id);
+      centerSessionCounts[center.id] =
+          await _repository.centerSessionCount(center.id);
+      centerLastActivities[center.id] =
+          await _repository.centerLastActivity(center.id);
     }
   }
 

@@ -36,9 +36,17 @@ class SanadRepository {
         where: 'email = ? AND is_active = 1', whereArgs: [email]);
     if (row == null) return null;
     final user = AppUser.fromMap(row);
-    return AuthService.verifyPassword(password, user.passwordHash)
-        ? user
-        : null;
+    if (!AuthService.verifyPassword(password, user.passwordHash)) return null;
+    if (user.role != UserRole.sanadOwner && user.centerId.isNotEmpty) {
+      final centerRow = await _db
+          .first('centers', where: 'id = ?', whereArgs: [user.centerId]);
+      final center = centerRow == null ? null : SanadCenter.fromMap(centerRow);
+      if (center == null || !center.isActive) {
+        throw StateError(
+            'تم إيقاف خدمات هذا المركز مؤقتًا.\nيرجى التواصل مع خدمة العملاء أو إدارة سند.');
+      }
+    }
+    return user;
   }
 
   Future<void> changePassword(AppUser user, String newPassword) async {
@@ -67,6 +75,26 @@ class SanadRepository {
       _db.countWhere('students', 'deleted_at = ?', ['']);
 
   Future<int> totalSessions() => _db.count('sessions');
+
+  Future<int> centerStudentCount(String centerId) => _db.countWhere(
+      'students', 'center_id = ? AND deleted_at = ?', [centerId, '']);
+
+  Future<int> centerSpecialistCount(String centerId) => _db.countWhere(
+      'users',
+      'center_id = ? AND role = ? AND is_active = 1',
+      [centerId, UserRole.specialist.name]);
+
+  Future<int> centerSessionCount(String centerId) =>
+      _db.countWhere('sessions', 'center_id = ?', [centerId]);
+
+  Future<String> centerLastActivity(String centerId) async {
+    final rows = await _db.where('audit_logs',
+        where: 'center_id = ?',
+        whereArgs: [centerId],
+        orderBy: 'created_at DESC');
+    if (rows.isEmpty) return '';
+    return (rows.first['created_at'] ?? '') as String;
+  }
 
   Future<List<AppUser>> users({String? centerId}) async {
     final rows = centerId == null

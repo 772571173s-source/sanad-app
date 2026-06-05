@@ -15,79 +15,45 @@ class CentersScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
+        TherapyCard(
+          title: 'المراكز',
+          icon: Icons.business_outlined,
+          trailing: FilledButton.icon(
             onPressed: () => _showCenterForm(context),
             icon: const Icon(Icons.add_business),
             label: const Text('إضافة مركز'),
           ),
+          child: const Text(
+            'إدارة المراكز، حالة التشغيل، والبيانات التشغيلية المختصرة لكل مركز.',
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: AppSpacing.md),
         if (app.centers.isEmpty)
-          const EmptyState(
+          EmptyState(
             icon: Icons.business_outlined,
             title: 'لا توجد مراكز',
-            message: 'أضف أول مركز ثم أنشئ مدير المركز من شاشة الموظفين.',
+            message: 'أضف أول مركز ثم أنشئ مدير المركز من شاشة المدراء.',
+            action: FilledButton.icon(
+              onPressed: () => _showCenterForm(context),
+              icon: const Icon(Icons.add_business),
+              label: const Text('إضافة مركز'),
+            ),
           )
         else
           ResponsiveGrid(
-            children: app.centers.map((center) {
-              return AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Expanded(
-                        child: Text(center.name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w800, fontSize: 18)),
-                      ),
-                      Chip(label: Text(center.isActive ? 'نشط' : 'متوقف')),
-                    ]),
-                    const SizedBox(height: 8),
-                    Text(
-                        'المدير: ${center.managerName.isEmpty ? '-' : center.managerName}'),
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                            'الهاتف: ${center.phone.isEmpty ? '-' : center.phone}'),
-                      ),
-                    ),
-                    Text(
-                        'العنوان: ${center.address.isEmpty ? '-' : center.address}'),
-                    const SizedBox(height: 10),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      FilledButton.tonalIcon(
-                        onPressed: () => app.switchCenter(center),
-                        icon: const Icon(Icons.visibility_outlined),
-                        label: const Text('وضع مساعدة'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () =>
-                            _showCenterForm(context, center: center),
-                        icon: const Icon(Icons.edit),
-                        label: const Text('تعديل'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _toggle(context, center),
-                        icon: Icon(center.isActive
-                            ? Icons.pause_circle_outline
-                            : Icons.play_circle_outline),
-                        label: Text(center.isActive ? 'إيقاف' : 'تفعيل'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: () => _delete(context, center),
-                        icon: const Icon(Icons.delete_outline),
-                        label: const Text('حذف'),
-                      ),
-                    ]),
-                  ],
-                ),
-              );
-            }).toList(),
+            children: app.centers
+                .map((center) => _CenterDashboardCard(
+                      center: center,
+                      studentsCount: app.centerStudentCounts[center.id] ?? 0,
+                      specialistsCount:
+                          app.centerSpecialistCounts[center.id] ?? 0,
+                      sessionsCount: app.centerSessionCounts[center.id] ?? 0,
+                      lastActivity: app.centerLastActivities[center.id] ?? '',
+                      onEdit: () => _showCenterForm(context, center: center),
+                      onToggle: () => _toggle(context, center),
+                      onDelete: () => _delete(context, center),
+                    ))
+                .toList(),
           ),
       ],
     );
@@ -107,7 +73,9 @@ class CentersScreen extends StatelessWidget {
             createdAt: center.createdAt,
             updatedAt: DateTime.now().toIso8601String(),
           )),
-      success: center.isActive ? 'تم إيقاف المركز.' : 'تم تفعيل المركز.',
+      success: center.isActive
+          ? 'تم إيقاف المركز وتعطيل دخول حساباته.'
+          : 'تم تفعيل المركز.',
     );
   }
 
@@ -156,19 +124,19 @@ class CentersScreen extends StatelessWidget {
                 controller: name,
                 decoration: const InputDecoration(labelText: 'اسم المركز'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: address,
                 decoration: const InputDecoration(labelText: 'العنوان'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: phone,
                 keyboardType: TextInputType.phone,
                 textDirection: TextDirection.ltr,
                 decoration: const InputDecoration(labelText: 'الهاتف'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: AppSpacing.sm),
               TextField(
                 controller: manager,
                 decoration: const InputDecoration(labelText: 'المدير'),
@@ -201,6 +169,177 @@ class CentersScreen extends StatelessWidget {
             }),
             child: const Text('حفظ'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CenterDashboardCard extends StatefulWidget {
+  const _CenterDashboardCard({
+    required this.center,
+    required this.studentsCount,
+    required this.specialistsCount,
+    required this.sessionsCount,
+    required this.lastActivity,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  final SanadCenter center;
+  final int studentsCount;
+  final int specialistsCount;
+  final int sessionsCount;
+  final String lastActivity;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  State<_CenterDashboardCard> createState() => _CenterDashboardCardState();
+}
+
+class _CenterDashboardCardState extends State<_CenterDashboardCard> {
+  bool hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final center = widget.center;
+    final active = center.isActive;
+    return MouseRegion(
+      onEnter: (_) => setState(() => hovering = true),
+      onExit: (_) => setState(() => hovering = false),
+      child: AnimatedScale(
+        scale: hovering ? 1.01 : 1,
+        duration: const Duration(milliseconds: 160),
+        child: TherapyCard(
+          title: center.name,
+          icon: Icons.apartment_outlined,
+          trailing: AppPill(
+            label: active ? 'نشط' : 'موقوف',
+            icon: active ? Icons.check_circle_outline : Icons.block,
+            selected: active,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          center.managerName.isEmpty
+                              ? 'لم يتم تحديد مدير'
+                              : 'المدير: ${center.managerName}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          center.address.isEmpty
+                              ? 'العنوان غير محدد'
+                              : center.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  _MiniStat(
+                      icon: Icons.groups_2_outlined,
+                      label: 'الطلاب',
+                      value: '${widget.studentsCount}'),
+                  _MiniStat(
+                      icon: Icons.psychology_outlined,
+                      label: 'الأخصائيون',
+                      value: '${widget.specialistsCount}'),
+                  _MiniStat(
+                      icon: Icons.timer_outlined,
+                      label: 'الجلسات',
+                      value: '${widget.sessionsCount}'),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  const AppPill(
+                      label: 'الاشتراك: فعال', icon: Icons.verified_outlined),
+                  AppPill(
+                    label:
+                        'آخر نشاط: ${widget.lastActivity.isEmpty ? 'لا يوجد' : widget.lastActivity.split('T').first}',
+                    icon: Icons.history_outlined,
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  FilledButton.tonalIcon(
+                    onPressed: widget.onEdit,
+                    icon: const Icon(Icons.edit),
+                    label: const Text('تعديل'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: widget.onToggle,
+                    icon: Icon(active
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline),
+                    label: Text(active ? 'إيقاف' : 'تفعيل'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: widget.onDelete,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('حذف'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat(
+      {required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 118,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 8),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),
     );
