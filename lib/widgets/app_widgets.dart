@@ -4,30 +4,141 @@ import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 
+class AppSpacing {
+  static const xs = 6.0;
+  static const sm = 10.0;
+  static const md = 16.0;
+  static const lg = 24.0;
+}
+
+class AppRadii {
+  static const card = 8.0;
+  static const control = 8.0;
+}
+
 class AppCard extends StatelessWidget {
-  const AppCard({super.key, required this.child, this.padding = 16});
+  const AppCard({
+    super.key,
+    required this.child,
+    this.padding = AppSpacing.md,
+    this.highlight = false,
+  });
 
   final Widget child;
   final double padding;
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 0,
+      elevation: highlight ? 1 : 0,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Theme.of(context).dividerColor)),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        side: BorderSide(
+          color: highlight ? colorScheme.primary : colorScheme.outlineVariant,
+        ),
+      ),
       child: Padding(padding: EdgeInsets.all(padding), child: child),
     );
   }
 }
 
+class TherapyCard extends StatelessWidget {
+  const TherapyCard({
+    super.key,
+    required this.child,
+    this.title,
+    this.icon,
+    this.trailing,
+  });
+
+  final Widget child;
+  final String? title;
+  final IconData? icon;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      highlight: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null) ...[
+            Row(
+              children: [
+                if (icon != null) ...[
+                  Icon(icon, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Expanded(
+                  child: Text(
+                    title!,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                if (trailing != null) trailing!,
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class AppPill extends StatelessWidget {
+  const AppPill({
+    super.key,
+    required this.label,
+    this.icon,
+    this.selected = false,
+  });
+
+  final String label;
+  final IconData? icon;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? colorScheme.primaryContainer : colorScheme.surface,
+        border: Border.all(
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 18),
+            const SizedBox(width: 6),
+          ],
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
 class StatTile extends StatelessWidget {
-  const StatTile(
-      {super.key,
-      required this.label,
-      required this.value,
-      required this.icon});
+  const StatTile({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
 
   final String label;
   final String value;
@@ -38,18 +149,32 @@ class StatTile extends StatelessWidget {
     return AppCard(
       child: Row(
         children: [
-          Icon(icon, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(width: 12),
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadii.control),
+            ),
+            child: Icon(
+              icon,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, style: Theme.of(context).textTheme.bodySmall),
-                Text(value,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w800)),
+                Text(
+                  value,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w900),
+                ),
               ],
             ),
           ),
@@ -73,10 +198,11 @@ class ResponsiveGrid extends StatelessWidget {
             : constraints.maxWidth > 720
                 ? 2
                 : 1;
-        final width = (constraints.maxWidth - (12 * (columns - 1))) / columns;
+        final width =
+            (constraints.maxWidth - (AppSpacing.md * (columns - 1))) / columns;
         return Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
           children: children
               .map((child) => SizedBox(width: width, child: child))
               .toList(),
@@ -124,24 +250,41 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppCard(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 44, color: Theme.of(context).colorScheme.primary),
-            const SizedBox(height: 10),
-            Text(title,
-                textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 6),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium),
+            Container(
+              width: 64,
+              height: 64,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(AppRadii.card),
+              ),
+              child: Icon(
+                icon,
+                size: 34,
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             if (action != null) ...[
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.md),
               action!,
             ],
           ],

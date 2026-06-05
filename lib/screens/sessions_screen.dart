@@ -67,7 +67,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       children: [
         if (!sessionStarted) ...[
           _SetupCard(
-            title: 'اختيار سريع للجلسة',
+            title: 'تجهيز الجلسة',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -111,7 +111,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 ),
                 const SizedBox(height: 10),
                 if (program == null)
-                  const Text('اختر الطالب والبرنامج أولًا.')
+                  const EmptyState(
+                    icon: Icons.tune_outlined,
+                    title: 'اختر الطالب والبرنامج',
+                    message:
+                        'بعد الاختيار ستظهر مكتبة الأنشطة المناسبة للجلسة.',
+                  )
                 else
                   _ActivityLibraryPicker(
                     sections: sections,
@@ -626,7 +631,14 @@ class _ActiveSessionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final content = _StructuredActivityContent.tryParse(activity);
     final homework = content?.homework ?? activity.homework;
-    return AppCard(
+    final progress = total == 0 ? 0.0 : (index + 1) / total;
+    return TherapyCard(
+      title: 'النشاط الحالي',
+      icon: Icons.play_circle_outline,
+      trailing: AppPill(
+        label: Duration(seconds: elapsedSeconds).toString().split('.').first,
+        icon: Icons.timer_outlined,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -639,25 +651,24 @@ class _ActiveSessionCard extends StatelessWidget {
                         .titleMedium
                         ?.copyWith(fontWeight: FontWeight.w900)),
               ),
-              Text(Duration(seconds: elapsedSeconds)
-                  .toString()
-                  .split('.')
-                  .first),
+              AppPill(label: 'نجاح $successRate%'),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.sm),
+          LinearProgressIndicator(value: progress),
+          const SizedBox(height: AppSpacing.md),
           Text(activity.title,
               style: Theme.of(context)
                   .textTheme
                   .headlineSmall
                   ?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           if (content == null)
-            Text(activity.instructions)
+            _PlainActivity(instructions: activity.instructions)
           else
             _ActivityContentView(content: content),
           if (homework.isNotEmpty) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.md),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
               title: const Text('الواجب المقترح'),
@@ -669,7 +680,7 @@ class _ActiveSessionCard extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton.tonalIcon(
@@ -684,14 +695,23 @@ class _ActiveSessionCard extends StatelessWidget {
               label: const Text('إرفاق صوت للأخصائي'),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'التقييم',
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: options.map((option) {
               final selected = selectedValue == option;
               return SizedBox(
-                height: 54,
+                height: 56,
+                width: 132,
                 child: selected
                     ? FilledButton(
                         onPressed: () => onEvaluate(option),
@@ -704,16 +724,16 @@ class _ActiveSessionCard extends StatelessWidget {
               );
             }).toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             controller: notes,
             maxLines: 2,
             decoration: const InputDecoration(labelText: 'ملاحظة الأخصائي'),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
               FilledButton.tonalIcon(
                 onPressed: onPrevious,
@@ -752,16 +772,42 @@ class _ActiveSessionCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.md),
           Wrap(
-            spacing: 8,
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
-              Chip(label: Text('الأنشطة: $total')),
-              Chip(label: Text('نسبة النجاح: $successRate%')),
-              Chip(label: Text('واجبات مرسلة: $homeworkSentCount')),
+              AppPill(label: 'الأنشطة: $total', icon: Icons.layers_outlined),
+              AppPill(
+                  label: 'واجبات مرسلة: $homeworkSentCount',
+                  icon: Icons.assignment_turned_in_outlined),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PlainActivity extends StatelessWidget {
+  const _PlainActivity({required this.instructions});
+
+  final String instructions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Text(
+        instructions.trim().isEmpty
+            ? 'نشاط علاجي بدون تعليمات إضافية.'
+            : instructions,
+        style: Theme.of(context).textTheme.titleMedium,
       ),
     );
   }
@@ -780,7 +826,7 @@ class _ActivityContentView extends StatelessWidget {
       return _Panel(
         title: 'كلمات حرف ${content.letter}',
         subtitle: content.position,
-        child: _chips(content.words),
+        child: _wordCards(context, content.words),
       );
     }
     if (content.kind == 'speechSentence') {
@@ -792,26 +838,37 @@ class _ActivityContentView extends StatelessWidget {
           children: content.sentences
               .map((sentence) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(sentence,
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700)),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(AppRadii.card),
+                      ),
+                      child: Text(
+                        sentence,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
+                      ),
+                    ),
                   ))
               .toList(),
         ),
       );
     }
     if (content.kind != 'speechLetter') {
-      return Text(content.instructions);
+      return _PlainActivity(instructions: content.instructions);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(28),
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(AppRadii.card),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -819,9 +876,11 @@ class _ActivityContentView extends StatelessWidget {
               Text(
                 content.letterDisplay,
                 textAlign: TextAlign.center,
-                style: theme.textTheme.displaySmall?.copyWith(
+                style: theme.textTheme.displayLarge?.copyWith(
+                  fontSize: 84,
                   color: colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w900,
+                  height: 1,
                 ),
               ),
               const SizedBox(height: 8),
@@ -842,14 +901,27 @@ class _ActivityContentView extends StatelessWidget {
     );
   }
 
-  Widget _chips(List<String> values) {
+  Widget _wordCards(BuildContext context, List<String> values) {
+    final theme = Theme.of(context);
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
       children: values
-          .map((value) => Chip(
-                label: Text(value),
-                visualDensity: VisualDensity.compact,
+          .map((value) => Container(
+                constraints: const BoxConstraints(minWidth: 104),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                ),
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w900),
+                ),
               ))
           .toList(),
     );

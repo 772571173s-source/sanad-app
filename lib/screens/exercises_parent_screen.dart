@@ -204,6 +204,9 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
         child: StatefulBuilder(
           builder: (dialogContext, setDialogState) {
             final current = activities[index];
+            final remaining = activities.length - index - 1;
+            final progress =
+                activities.isEmpty ? 0.0 : (index + 1) / activities.length;
             return AlertDialog(
               title: Text(_cleanTitle(exercise.title)),
               contentPadding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
@@ -226,6 +229,15 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                           const Spacer(),
                           Chip(label: Text(current.typeLabel)),
                         ],
+                      ),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(value: progress),
+                      const SizedBox(height: 8),
+                      Text(
+                        remaining == 0
+                            ? 'هذا آخر نشاط في الواجب.'
+                            : 'المتبقي: $remaining نشاط',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 14),
                       _HomeworkActivityView(step: current),
@@ -543,7 +555,7 @@ class _HomeworkActivityView extends StatelessWidget {
               step.letterDisplay.isEmpty ? step.letter : step.letterDisplay,
               textAlign: TextAlign.center,
               style: theme.textTheme.displayLarge?.copyWith(
-                fontSize: 92,
+                fontSize: 112,
                 fontWeight: FontWeight.w900,
                 color: theme.colorScheme.primary,
                 height: 1,
@@ -581,7 +593,7 @@ class _HomeworkActivityView extends StatelessWidget {
           runSpacing: 12,
           children: step.words
               .map((word) => Container(
-                    constraints: const BoxConstraints(minWidth: 96),
+                    width: 124,
                     padding: const EdgeInsets.symmetric(
                         horizontal: 18, vertical: 14),
                     decoration: BoxDecoration(

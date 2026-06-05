@@ -26,6 +26,7 @@ class SanadApp extends StatelessWidget {
       child: Consumer<AppProvider>(
         builder: (context, app, _) {
           const seed = Color(0xFF19706C);
+          final radius = BorderRadius.circular(8);
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'Sanad',
@@ -33,8 +34,27 @@ class SanadApp extends StatelessWidget {
             theme: ThemeData(
               useMaterial3: true,
               colorScheme: ColorScheme.fromSeed(seedColor: seed),
-              inputDecorationTheme:
-                  const InputDecorationTheme(border: OutlineInputBorder()),
+              scaffoldBackgroundColor: const Color(0xFFF7FAF9),
+              visualDensity: VisualDensity.standard,
+              inputDecorationTheme: InputDecorationTheme(
+                border: OutlineInputBorder(borderRadius: radius),
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              filledButtonTheme: FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              chipTheme: ChipThemeData(
+                shape: RoundedRectangleBorder(borderRadius: radius),
+                side: BorderSide(color: Colors.teal.shade100),
+              ),
+              dialogTheme: DialogThemeData(
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
               cardTheme: const CardThemeData(margin: EdgeInsets.zero),
             ),
             darkTheme: ThemeData(
@@ -42,8 +62,24 @@ class SanadApp extends StatelessWidget {
               brightness: Brightness.dark,
               colorScheme: ColorScheme.fromSeed(
                   seedColor: seed, brightness: Brightness.dark),
-              inputDecorationTheme:
-                  const InputDecorationTheme(border: OutlineInputBorder()),
+              visualDensity: VisualDensity.standard,
+              inputDecorationTheme: InputDecorationTheme(
+                border: OutlineInputBorder(borderRadius: radius),
+                filled: true,
+              ),
+              filledButtonTheme: FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              chipTheme: ChipThemeData(
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
+              dialogTheme: DialogThemeData(
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
               cardTheme: const CardThemeData(margin: EdgeInsets.zero),
             ),
             home: _HomeGate(app: app),

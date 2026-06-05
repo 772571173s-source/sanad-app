@@ -28,6 +28,8 @@ class StudentProfileScreen extends StatelessWidget {
       children: [
         _StudentOverview(app: app, student: student),
         const SizedBox(height: 16),
+        _ProfileSummary(app: app),
+        const SizedBox(height: 16),
         _QuickActions(app: app, student: student),
         const SizedBox(height: 16),
         _PreviousSessions(app: app),
@@ -355,6 +357,51 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
+class _ProfileSummary extends StatelessWidget {
+  const _ProfileSummary({required this.app});
+
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
+    final sessions = app.sessions;
+    final average = sessions.isEmpty
+        ? 0
+        : (sessions.fold<int>(0, (sum, item) => sum + item.successRate) /
+                sessions.length)
+            .round();
+    final lastSession = sessions.isEmpty
+        ? 'لا توجد'
+        : sessions.first.startedAt.split('T').first;
+    final completedHomework =
+        app.exercises.where((item) => item.status == 'تم الإنجاز').length;
+    return ResponsiveGrid(
+      children: [
+        StatTile(
+          label: 'عدد الجلسات',
+          value: '${sessions.length}',
+          icon: Icons.event_note_outlined,
+        ),
+        StatTile(
+          label: 'متوسط التحسن',
+          value: '$average%',
+          icon: Icons.trending_up_outlined,
+        ),
+        StatTile(
+          label: 'آخر جلسة',
+          value: lastSession,
+          icon: Icons.history_outlined,
+        ),
+        StatTile(
+          label: 'واجبات مكتملة',
+          value: '$completedHomework',
+          icon: Icons.assignment_turned_in_outlined,
+        ),
+      ],
+    );
+  }
+}
+
 class _PreviousSessions extends StatelessWidget {
   const _PreviousSessions({required this.app});
 
@@ -520,15 +567,13 @@ class _Timeline extends StatelessWidget {
           _sectionHeader(context, 'الخط الزمني', Icons.auto_graph_outlined),
           const SizedBox(height: 10),
           if (items.isEmpty)
-            const Text('سيظهر هنا سجل الجلسات والتقييمات والواجبات والتقارير.')
+            const EmptyState(
+              icon: Icons.timeline_outlined,
+              title: 'لا يوجد سجل علاجي بعد',
+              message: 'سيظهر هنا سجل الجلسات والتقييمات والواجبات والتقارير.',
+            )
           else
-            ...items.map((item) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(item.icon),
-                  title: Text(item.title),
-                  subtitle: Text(item.subtitle),
-                  trailing: Text(item.date.split('T').first),
-                )),
+            ...items.map((item) => _TimelineRow(item: item)),
         ],
       ),
     );
@@ -567,6 +612,67 @@ class _Timeline extends StatelessWidget {
     }
     items.sort((a, b) => b.date.compareTo(a.date));
     return items;
+  }
+}
+
+class _TimelineRow extends StatelessWidget {
+  const _TimelineRow({required this.item});
+
+  final _TimelineItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(item.icon,
+                  size: 20, color: colorScheme.onPrimaryContainer),
+            ),
+            Container(width: 2, height: 42, color: colorScheme.outlineVariant),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border.all(color: colorScheme.outlineVariant),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.title,
+                        style: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    AppPill(label: item.date.split('T').first),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(item.subtitle),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
