@@ -161,6 +161,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             successRate: _successRate(activities),
             homeworkSentCount: homeworkSentCount,
             hasSessionHomework: _hasHomework(activities),
+            hasEvaluations: activityResults.isNotEmpty,
             notes: notes,
             onEvaluate: (value) => setState(
                 () => activityResults[activities[activityIndex].id] = value),
@@ -310,6 +311,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final skill = firstActivity == null
         ? null
         : _findSkill(app.programSkills, firstActivity.skillId);
+    final skillTitle = _skillTitlesForActivities(app, activities);
     return runWithFeedback(context, () async {
       if (student == null || program == null || skill == null) {
         throw StateError('اختر الطالب والبرنامج والأنشطة أولًا.');
@@ -339,7 +341,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         successRate: _successRate(activities),
         startedAt: DateTime.now().toIso8601String(),
         durationSeconds: seconds,
-        cardTitle: skill.title,
+        cardTitle: skillTitle,
         quickResult: firstActivity == null
             ? activityResults.values.first
             : activityResults[firstActivity.id] ?? activityResults.values.first,
@@ -363,10 +365,6 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Future<void> _printSessionReport(
       AppProvider app, List<ProgramActivity> activities) {
     final program = _program(app);
-    final firstActivity = activities.isEmpty ? null : activities.first;
-    final skill = firstActivity == null
-        ? null
-        : _findSkill(app.programSkills, firstActivity.skillId);
     return runWithFeedback(
       context,
       () => app.printSessionReport(
@@ -377,7 +375,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         homeworkSentCount: homeworkSentCount,
         notes: notes.text.trim(),
         programName: program?.name ?? 'برنامج علاجي',
-        skillTitle: skill?.title ?? 'مهارة علاجية',
+        skillTitle: _skillTitlesForActivities(app, activities),
       ),
       loading: 'جار إنشاء تقرير الجلسة...',
       success: 'تم إنشاء تقرير الجلسة.',
@@ -389,6 +387,16 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (skill.id == id) return skill;
     }
     return null;
+  }
+
+  String _skillTitlesForActivities(
+      AppProvider app, List<ProgramActivity> activities) {
+    final names = <String>{};
+    for (final activity in activities) {
+      final skill = _findSkill(app.programSkills, activity.skillId);
+      if (skill != null) names.add(skill.title);
+    }
+    return names.isEmpty ? 'مهارة علاجية' : names.join('، ');
   }
 
   int _compareActivities(ProgramActivity a, ProgramActivity b) {
@@ -562,6 +570,7 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.successRate,
     required this.homeworkSentCount,
     required this.hasSessionHomework,
+    required this.hasEvaluations,
     required this.notes,
     required this.onEvaluate,
     required this.onPrevious,
@@ -582,6 +591,7 @@ class _ActiveSessionCard extends StatelessWidget {
   final int successRate;
   final int homeworkSentCount;
   final bool hasSessionHomework;
+  final bool hasEvaluations;
   final TextEditingController notes;
   final ValueChanged<String> onEvaluate;
   final VoidCallback? onPrevious;
@@ -706,12 +716,12 @@ class _ActiveSessionCard extends StatelessWidget {
                 label: const Text('واجب الجلسة'),
               ),
               FilledButton.icon(
-                onPressed: onSave,
+                onPressed: hasEvaluations ? onSave : null,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('حفظ الجلسة'),
               ),
               FilledButton.tonalIcon(
-                onPressed: onPrintReport,
+                onPressed: hasEvaluations ? onPrintReport : null,
                 icon: const Icon(Icons.picture_as_pdf_outlined),
                 label: const Text('تقرير PDF'),
               ),
