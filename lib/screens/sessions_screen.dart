@@ -160,6 +160,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
             elapsedSeconds: seconds,
             successRate: _successRate(activities),
             homeworkSentCount: homeworkSentCount,
+            hasSessionHomework: _hasHomework(activities),
             notes: notes,
             onEvaluate: (value) => setState(
                 () => activityResults[activities[activityIndex].id] = value),
@@ -170,6 +171,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 ? null
                 : () => setState(() => activityIndex++),
             onSendHomework: () => _sendHomework(app, activities[activityIndex]),
+            onSendSessionHomework: () => _sendSessionHomework(app, activities),
             onSave: () => _saveSession(app, activities),
             onPrintReport: () => _printSessionReport(app, activities),
             onStop: () => setState(() {
@@ -255,6 +257,50 @@ class _SessionsScreenState extends State<SessionsScreen> {
       ));
       setState(() => homeworkSentCount++);
     }, success: 'تم إرسال الواجب لولي الأمر.');
+  }
+
+  bool _hasHomework(List<ProgramActivity> activities) {
+    return activities.any((activity) {
+      final content = _StructuredActivityContent.tryParse(activity);
+      return (content?.homework ?? activity.homework).trim().isNotEmpty;
+    });
+  }
+
+  Future<void> _sendSessionHomework(
+      AppProvider app, List<ProgramActivity> activities) {
+    final student = app.selectedStudent;
+    final program = _program(app);
+    final items = activities
+        .map((activity) {
+          final content = _StructuredActivityContent.tryParse(activity);
+          final homework = content?.homework ?? activity.homework;
+          if (homework.trim().isEmpty) return '';
+          return '${activity.title}: $homework';
+        })
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (student == null || items.isEmpty) return Future.value();
+    return runWithFeedback(context, () async {
+      await app.saveExercise(Exercise(
+        id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
+        centerId: student.centerId,
+        studentId: student.id,
+        title:
+            '${program?.name ?? 'برنامج علاجي'} - واجب جلسة (${items.length} أنشطة)',
+        instructions: items
+            .asMap()
+            .entries
+            .map((entry) => '${entry.key + 1}. ${entry.value}')
+            .join('\n'),
+        dueDate: DateTime.now()
+            .add(const Duration(days: 1))
+            .toIso8601String()
+            .split('T')
+            .first,
+        status: 'مرسل',
+      ));
+      setState(() => homeworkSentCount++);
+    }, success: 'تم إرسال واجب الجلسة لولي الأمر.');
   }
 
   Future<void> _saveSession(AppProvider app, List<ProgramActivity> activities) {
@@ -515,11 +561,13 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.elapsedSeconds,
     required this.successRate,
     required this.homeworkSentCount,
+    required this.hasSessionHomework,
     required this.notes,
     required this.onEvaluate,
     required this.onPrevious,
     required this.onNext,
     required this.onSendHomework,
+    required this.onSendSessionHomework,
     required this.onSave,
     required this.onPrintReport,
     required this.onStop,
@@ -533,11 +581,13 @@ class _ActiveSessionCard extends StatelessWidget {
   final int elapsedSeconds;
   final int successRate;
   final int homeworkSentCount;
+  final bool hasSessionHomework;
   final TextEditingController notes;
   final ValueChanged<String> onEvaluate;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback onSendHomework;
+  final VoidCallback onSendSessionHomework;
   final VoidCallback onSave;
   final VoidCallback onPrintReport;
   final VoidCallback onStop;
@@ -649,6 +699,11 @@ class _ActiveSessionCard extends StatelessWidget {
                 onPressed: homework.isEmpty ? null : onSendHomework,
                 icon: const Icon(Icons.assignment_add),
                 label: const Text('إرسال واجب'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: hasSessionHomework ? onSendSessionHomework : null,
+                icon: const Icon(Icons.playlist_add_check),
+                label: const Text('واجب الجلسة'),
               ),
               FilledButton.icon(
                 onPressed: onSave,
