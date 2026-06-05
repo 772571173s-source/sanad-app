@@ -778,6 +778,46 @@ class AppProvider extends ChangeNotifier {
     await selectStudent(student);
   }
 
+  Future<void> printReportForSessions({
+    required String type,
+    required List<TherapySession> selectedSessions,
+    required String specialistSignature,
+    required String managerSignature,
+  }) async {
+    _ensure(canViewReports, 'التقارير الرسمية يصدرها المركز فقط.');
+    final student = selectedStudent;
+    if (student == null) return;
+    final report = ReportRecord(
+      id: 'report_${DateTime.now().millisecondsSinceEpoch}',
+      centerId: student.centerId,
+      studentId: student.id,
+      type: type,
+      createdAt: DateTime.now().toIso8601String(),
+      improvementRate: _sessionImprovement(selectedSessions),
+      specialistSignature: specialistSignature,
+      managerSignature: managerSignature,
+    );
+    await _repository.saveReport(report);
+    await _log(
+        action: 'طباعة تقرير',
+        entityType: 'report',
+        entityId: report.id,
+        centerId: report.centerId,
+        details: '${report.studentId} - $type');
+    await _pdfService.printProgressReport(
+      center: currentCenter,
+      student: student,
+      sessions: selectedSessions,
+      evaluations: evaluations,
+      plans: plans,
+      reports: reports,
+      type: type,
+      specialistSignature: specialistSignature,
+      managerSignature: managerSignature,
+    );
+    await selectStudent(student);
+  }
+
   Future<void> printSessionReport({
     required List<ProgramActivity> activities,
     required Map<String, String> results,
@@ -843,6 +883,13 @@ class AppProvider extends ChangeNotifier {
       return 'يوصى بتدريب موضع اللسان والشفاه أمام مرآة مع تغذية راجعة فورية.';
     }
     return 'يوصى بتكرار الهدف داخل جمل وظيفية قصيرة.';
+  }
+
+  int _sessionImprovement(List<TherapySession> selectedSessions) {
+    if (selectedSessions.isEmpty) return _improvementRate;
+    final total = selectedSessions.fold<int>(
+        0, (sum, session) => sum + session.successRate);
+    return (total / selectedSessions.length).round();
   }
 
   int get _improvementRate {

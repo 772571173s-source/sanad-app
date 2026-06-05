@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -341,17 +343,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                           .titleMedium
                           ?.copyWith(fontWeight: FontWeight.w900)),
                   const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                          color: Theme.of(context).colorScheme.outlineVariant),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(current,
-                        style: Theme.of(context).textTheme.titleMedium),
-                  ),
+                  _HomeworkActivityView(step: current),
                   const SizedBox(height: 12),
                   SegmentedButton<String>(
                     segments: const [
@@ -406,13 +398,32 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
     );
   }
 
-  List<String> _homeworkActivities(String instructions) {
+  List<_HomeworkStep> _homeworkActivities(String instructions) {
+    try {
+      final json = jsonDecode(instructions);
+      if (json is Map<String, dynamic> &&
+          json['kind'] == 'sessionHomework' &&
+          json['activities'] is List) {
+        return (json['activities'] as List)
+            .whereType<Map>()
+            .map((item) => _HomeworkStep.fromJson(
+                item.map((key, value) => MapEntry('$key', value))))
+            .toList();
+      }
+    } catch (_) {}
     final lines = instructions
         .split('\n')
         .map((line) => line.trim().replaceFirst(RegExp(r'^\d+\.\s*'), ''))
         .where((line) => line.isNotEmpty)
         .toList();
-    return lines.isEmpty ? [instructions] : lines;
+    return (lines.isEmpty ? [instructions] : lines)
+        .map((line) => _HomeworkStep(
+              title: 'نشاط منزلي',
+              kind: 'other',
+              instructions: line,
+              homework: line,
+            ))
+        .toList();
   }
 
   Future<void> _approve(AppProvider app, Exercise exercise) {
@@ -444,5 +455,152 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
       createdAt: exercise.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     );
+  }
+}
+
+class _HomeworkActivityView extends StatelessWidget {
+  const _HomeworkActivityView({required this.step});
+
+  final _HomeworkStep step;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (step.kind == 'speechLetter') {
+      return _homeworkPanel(
+        context,
+        child: Column(
+          children: [
+            Text(
+              step.letterDisplay.isEmpty ? step.letter : step.letterDisplay,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.displayLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            if (step.vocalization.isNotEmpty)
+              Chip(label: Text(step.vocalization)),
+            const SizedBox(height: 12),
+            Text(step.homework, textAlign: TextAlign.center),
+          ],
+        ),
+      );
+    }
+    if (step.kind == 'speechWord') {
+      return _homeworkPanel(
+        context,
+        title: '${step.letter} - ${step.position}',
+        child: Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: step.words
+              .map((word) => Chip(
+                    label: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      child: Text(word,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800)),
+                    ),
+                  ))
+              .toList(),
+        ),
+      );
+    }
+    if (step.kind == 'speechSentence') {
+      return _homeworkPanel(
+        context,
+        title: 'الجمل',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: step.sentences
+              .map((sentence) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(sentence,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                  ))
+              .toList(),
+        ),
+      );
+    }
+    return _homeworkPanel(
+      context,
+      title: step.title,
+      child: Text(step.homework.isEmpty ? step.instructions : step.homework,
+          style: theme.textTheme.titleMedium),
+    );
+  }
+
+  Widget _homeworkPanel(BuildContext context,
+      {String? title, required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title?.isNotEmpty == true) ...[
+            Text(title!,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 12),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeworkStep {
+  const _HomeworkStep({
+    required this.title,
+    required this.kind,
+    this.homework = '',
+    this.instructions = '',
+    this.letter = '',
+    this.letterDisplay = '',
+    this.vocalization = '',
+    this.position = '',
+    this.words = const [],
+    this.sentences = const [],
+  });
+
+  final String title;
+  final String kind;
+  final String homework;
+  final String instructions;
+  final String letter;
+  final String letterDisplay;
+  final String vocalization;
+  final String position;
+  final List<String> words;
+  final List<String> sentences;
+
+  factory _HomeworkStep.fromJson(Map<String, Object?> json) => _HomeworkStep(
+        title: json['title'] as String? ?? 'نشاط منزلي',
+        kind: json['kind'] as String? ?? 'other',
+        homework: json['homework'] as String? ?? '',
+        instructions: json['instructions'] as String? ?? '',
+        letter: json['letter'] as String? ?? '',
+        letterDisplay: json['letterDisplay'] as String? ?? '',
+        vocalization: json['vocalization'] as String? ?? '',
+        position: json['position'] as String? ?? '',
+        words: _list(json['words']),
+        sentences: _list(json['sentences']),
+      );
+
+  static List<String> _list(Object? value) {
+    if (value is List) return value.map((item) => '$item').toList();
+    return const [];
   }
 }

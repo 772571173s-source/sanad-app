@@ -76,7 +76,9 @@ class PdfService {
     required String managerSignature,
   }) async {
     final font = await PdfGoogleFonts.notoNaskhArabicRegular();
-    final improvement = _improvementRate(evaluations);
+    final improvement = evaluations.isEmpty
+        ? _sessionAverage(sessions)
+        : _improvementRate(evaluations);
     final pdf = pw.Document();
     pdf.addPage(
       pw.MultiPage(
@@ -84,85 +86,74 @@ class PdfService {
         textDirection: pw.TextDirection.rtl,
         theme: pw.ThemeData.withFont(base: font),
         build: (_) => [
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text(center?.name ?? 'مركز سند',
-                      style: pw.TextStyle(
-                          font: font,
-                          fontSize: 22,
-                          fontWeight: pw.FontWeight.bold)),
-                  pw.Text(center?.address ?? '',
-                      style: pw.TextStyle(font: font)),
-                  pw.Directionality(
-                    textDirection: pw.TextDirection.ltr,
-                    child: pw.Text(center?.phone ?? '',
-                        style: pw.TextStyle(font: font)),
-                  ),
-                ],
-              ),
-              pw.Container(
-                width: 78,
-                height: 78,
-                alignment: pw.Alignment.center,
-                decoration: pw.BoxDecoration(
-                    border: pw.Border.all(color: PdfColors.teal),
-                    borderRadius: pw.BorderRadius.circular(8)),
-                child: pw.Text('سند',
-                    style: pw.TextStyle(
-                        font: font,
-                        fontSize: 20,
-                        fontWeight: pw.FontWeight.bold)),
-              ),
-            ],
-          ),
-          pw.Divider(),
-          pw.Text('تقرير سند - $type',
-              style: pw.TextStyle(
-                  font: font, fontSize: 26, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 12),
-          pw.Text('الطالب: ${student.name}', style: pw.TextStyle(font: font)),
-          pw.Text('العمر: ${student.age}', style: pw.TextStyle(font: font)),
-          pw.Text('التشخيص: ${student.diagnosis}',
-              style: pw.TextStyle(font: font)),
-          pw.Text('نسبة التحسن: $improvement%',
-              style: pw.TextStyle(
-                  font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 16),
-          pw.Text('الخطة التدريبية',
-              style: pw.TextStyle(
-                  font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          _reportHeader(
+              font, center, DateTime.now().toIso8601String().split('T').first),
+          pw.SizedBox(height: 14),
+          _sectionTitle(font, 'تقرير سند - $type'),
+          pw.SizedBox(height: 10),
+          _infoBox(font, [
+            'الطالب: ${student.name}',
+            'العمر: ${student.age}',
+            'التشخيص: ${student.diagnosis}',
+            'ولي الأمر: ${student.parentName}',
+            'رقم ولي الأمر: ${student.parentPhone}',
+            'نسبة التقدم داخل الفترة: $improvement%',
+          ]),
+          pw.SizedBox(height: 14),
+          _sectionTitle(font, 'الجلسات داخل التقرير'),
+          if (sessions.isEmpty)
+            pw.Text('لا توجد جلسات مسجلة داخل الفترة.',
+                style: pw.TextStyle(font: font))
+          else
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.3),
+                1: pw.FlexColumnWidth(2),
+                2: pw.FlexColumnWidth(3),
+                3: pw.FlexColumnWidth(1),
+              },
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                  children: [
+                    _cell(font, 'التاريخ', bold: true),
+                    _cell(font, 'المهارة', bold: true),
+                    _cell(font, 'الأنشطة', bold: true),
+                    _cell(font, 'النجاح', bold: true),
+                  ],
+                ),
+                ...sessions.map((session) => pw.TableRow(children: [
+                      _cell(font, session.startedAt.split('T').first),
+                      _cell(font, session.cardTitle),
+                      _cell(font, session.practiceItems),
+                      _cell(font, '${session.successRate}%'),
+                    ])),
+              ],
+            ),
+          pw.SizedBox(height: 14),
+          _sectionTitle(font, 'الخطة التدريبية'),
           if (plans.isEmpty)
             pw.Text('لا توجد أهداف مسجلة.', style: pw.TextStyle(font: font)),
           ...plans.map((plan) => pw.Bullet(
               text: '${plan.goal} - تقدم ${plan.progress}%',
               style: pw.TextStyle(font: font))),
-          pw.SizedBox(height: 16),
-          pw.Text('الجلسات',
-              style: pw.TextStyle(
-                  font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          if (sessions.isEmpty)
-            pw.Text('لا توجد جلسات مسجلة.', style: pw.TextStyle(font: font)),
-          ...sessions.take(12).map((session) => pw.Bullet(
-              text:
-                  '${session.startedAt} - ${session.sessionType} - ${session.cardTitle} - ${session.quickResult} - نجاح ${session.successRate}% - ${session.practiceItems}',
-              style: pw.TextStyle(font: font))),
-          pw.SizedBox(height: 16),
-          pw.Text('تقييم نطق الحروف',
-              style: pw.TextStyle(
-                  font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 14),
+          _sectionTitle(font, 'تقييم نطق الحروف'),
           if (evaluations.isEmpty)
             pw.Text('لا توجد تقييمات مسجلة.', style: pw.TextStyle(font: font)),
           ...evaluations.take(18).map((evaluation) => pw.Bullet(
               text:
                   '${evaluation.letter} - ${evaluation.position} - ${evaluation.errorType} - ${evaluation.score}',
               style: pw.TextStyle(font: font))),
-          pw.SizedBox(height: 24),
-          pw.Text('سجل التقارير داخل ملف الطالب: ${reports.length}',
-              style: pw.TextStyle(font: font)),
+          pw.SizedBox(height: 14),
+          _sectionTitle(font, 'التوصيات والخطة القادمة'),
+          _infoBox(font, [
+            sessions.isEmpty
+                ? 'يوصى ببدء جلسات منتظمة لتكوين خط أساس واضح.'
+                : 'يوصى بالاستمرار على الأنشطة الأعلى نجاحًا، وإعادة تدريب الأنشطة الأقل أداءً بخطوات أقصر.',
+            'عدد التقارير السابقة داخل ملف الطالب: ${reports.length}',
+          ]),
           pw.SizedBox(height: 24),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -365,5 +356,12 @@ class PdfService {
         .length;
     final partial = evaluations.where((item) => item.score == 'جزئي').length;
     return (((good + partial * .5) / evaluations.length) * 100).round();
+  }
+
+  int _sessionAverage(List<TherapySession> sessions) {
+    if (sessions.isEmpty) return 0;
+    final total =
+        sessions.fold<int>(0, (sum, session) => sum + session.successRate);
+    return (total / sessions.length).round();
   }
 }

@@ -288,11 +288,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         studentId: student.id,
         title:
             '${program?.name ?? 'برنامج علاجي'} - واجب جلسة (${items.length} أنشطة)',
-        instructions: items
-            .asMap()
-            .entries
-            .map((entry) => '${entry.key + 1}. ${entry.value}')
-            .join('\n'),
+        instructions: _sessionHomeworkInstructions(activities),
         dueDate: DateTime.now()
             .add(const Duration(days: 1))
             .toIso8601String()
@@ -302,6 +298,30 @@ class _SessionsScreenState extends State<SessionsScreen> {
       ));
       setState(() => homeworkSentCount++);
     }, success: 'تم إرسال واجب الجلسة لولي الأمر.');
+  }
+
+  String _sessionHomeworkInstructions(List<ProgramActivity> activities) {
+    final payload = activities
+        .map((activity) {
+          final content = _StructuredActivityContent.tryParse(activity);
+          final homework = content?.homework ?? activity.homework;
+          if (homework.trim().isEmpty) return null;
+          return {
+            'title': activity.title,
+            'homework': homework,
+            'kind': content?.kind ?? 'other',
+            'letter': content?.letter ?? '',
+            'letterDisplay': content?.letterDisplay ?? '',
+            'vocalization': content?.vocalization ?? '',
+            'position': content?.position ?? '',
+            'words': content?.words ?? const <String>[],
+            'sentences': content?.sentences ?? const <String>[],
+            'instructions': content?.instructions ?? activity.instructions,
+          };
+        })
+        .whereType<Map<String, Object>>()
+        .toList();
+    return jsonEncode({'kind': 'sessionHomework', 'activities': payload});
   }
 
   Future<void> _saveSession(AppProvider app, List<ProgramActivity> activities) {

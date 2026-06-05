@@ -147,20 +147,80 @@ class _QuickActions extends StatelessWidget {
   Widget _reportButton(BuildContext context, String type) {
     return FilledButton.tonalIcon(
       onPressed: app.canViewReports
-          ? () => runWithFeedback(
-                context,
-                () => app.printReport(
-                  type,
-                  app.user?.name ?? 'الأخصائي',
-                  app.currentCenter?.managerName ?? '',
-                ),
-                loading: 'جار إنشاء التقرير...',
-                success: 'تم إنشاء التقرير.',
-              )
+          ? () => type == 'تقرير جلسة'
+              ? _chooseSessionReport(context)
+              : runWithFeedback(
+                  context,
+                  () => app.printReportForSessions(
+                    type: type,
+                    selectedSessions: _sessionsForType(type),
+                    specialistSignature: app.user?.name ?? 'الأخصائي',
+                    managerSignature: app.currentCenter?.managerName ?? '',
+                  ),
+                  loading: 'جار إنشاء التقرير...',
+                  success: 'تم إنشاء التقرير.',
+                )
           : null,
       icon: const Icon(Icons.picture_as_pdf_outlined),
       label: Text(type),
     );
+  }
+
+  Future<void> _chooseSessionReport(BuildContext context) async {
+    if (app.sessions.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('لا توجد جلسات للطالب.')));
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('اختر جلسة للتقرير'),
+        content: SizedBox(
+          width: 560,
+          child: ListView(
+            shrinkWrap: true,
+            children: app.sessions.map((session) {
+              return ListTile(
+                title: Text(session.cardTitle),
+                subtitle: Text(
+                    '${session.startedAt.split('T').first} - نجاح ${session.successRate}%'),
+                trailing: const Icon(Icons.picture_as_pdf_outlined),
+                onTap: () async {
+                  await runWithFeedback(
+                    context,
+                    () => app.printReportForSessions(
+                      type: 'تقرير جلسة',
+                      selectedSessions: [session],
+                      specialistSignature: app.user?.name ?? 'الأخصائي',
+                      managerSignature: app.currentCenter?.managerName ?? '',
+                    ),
+                    loading: 'جار إنشاء التقرير...',
+                    success: 'تم إنشاء التقرير.',
+                  );
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<TherapySession> _sessionsForType(String type) {
+    if (type == 'تقرير شامل') return app.sessions;
+    final now = DateTime.now();
+    final from = switch (type) {
+      'تقرير أسبوعي' => now.subtract(const Duration(days: 7)),
+      'تقرير شهري' => DateTime(now.year, now.month, 1),
+      'تقرير سنوي' => DateTime(now.year, 1, 1),
+      _ => DateTime(1900),
+    };
+    return app.sessions.where((session) {
+      final date = DateTime.tryParse(session.startedAt);
+      return date != null && !date.isBefore(from);
+    }).toList();
   }
 
   Widget _action(
