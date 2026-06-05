@@ -26,6 +26,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
   final selectedActivityIds = <String>{};
   final activityResults = <String, String>{};
   final notes = TextEditingController();
+  _SessionSummary? lastSummary;
 
   @override
   void dispose() {
@@ -105,6 +106,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                             activityIndex = 0;
                             selectedActivityIds.clear();
                             activityResults.clear();
+                            lastSummary = null;
                           }),
                 ),
                 const SizedBox(height: 10),
@@ -125,6 +127,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                           activityResults.remove(activityId);
                         }
                         activityIndex = 0;
+                        lastSummary = null;
                       });
                     },
                   ),
@@ -142,6 +145,10 @@ class _SessionsScreenState extends State<SessionsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          if (lastSummary != null) ...[
+            _SessionSummaryCard(summary: lastSummary!),
+            const SizedBox(height: 16),
+          ],
           _PreviousSessions(app: app),
         ] else ...[
           _ActiveSessionCard(
@@ -263,6 +270,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (activityResults.isEmpty) {
         throw StateError('قيّم نشاطًا واحدًا على الأقل قبل حفظ الجلسة.');
       }
+      final savedSummary = _SessionSummary(
+        activitiesCount: activities.length,
+        evaluatedCount: activityResults.length,
+        successRate: _successRate(activities),
+        homeworkSentCount: homeworkSentCount,
+        notes: notes.text.trim(),
+      );
       await app.saveSession(TherapySession(
         id: 'session_${DateTime.now().millisecondsSinceEpoch}',
         centerId: student.centerId,
@@ -293,6 +307,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
         activityIndex = 0;
         activityResults.clear();
         homeworkSentCount = 0;
+        lastSummary = savedSummary;
         notes.clear();
       });
     }, success: 'تم حفظ الجلسة.');
@@ -406,6 +421,59 @@ class _SetupCard extends StatelessWidget {
                   ?.copyWith(fontWeight: FontWeight.w900)),
           const SizedBox(height: 12),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SessionSummary {
+  const _SessionSummary({
+    required this.activitiesCount,
+    required this.evaluatedCount,
+    required this.successRate,
+    required this.homeworkSentCount,
+    required this.notes,
+  });
+
+  final int activitiesCount;
+  final int evaluatedCount;
+  final int successRate;
+  final int homeworkSentCount;
+  final String notes;
+}
+
+class _SessionSummaryCard extends StatelessWidget {
+  const _SessionSummaryCard({required this.summary});
+
+  final _SessionSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ملخص آخر جلسة',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(label: Text('الأنشطة: ${summary.activitiesCount}')),
+              Chip(label: Text('المقيّم: ${summary.evaluatedCount}')),
+              Chip(label: Text('نسبة النجاح: ${summary.successRate}%')),
+              Chip(label: Text('الواجبات: ${summary.homeworkSentCount}')),
+            ],
+          ),
+          if (summary.notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text('ملاحظة الأخصائي: ${summary.notes}'),
+          ],
         ],
       ),
     );
