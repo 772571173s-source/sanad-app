@@ -14,11 +14,7 @@ class StudentProfileScreen extends StatelessWidget {
     final app = context.watch<AppProvider>();
     final student = app.selectedStudent;
     if (student == null) {
-      return const EmptyState(
-        icon: Icons.folder_shared_outlined,
-        title: 'اختر طالبًا أولًا',
-        message: 'سيظهر ملف الطالب العلاجي بعد اختياره من شاشة الطلاب.',
-      );
+      return const _StudentSelectionPrompt();
     }
     if (app.isParent) {
       return _ParentStudentProfile(app: app, student: student);
@@ -39,6 +35,94 @@ class StudentProfileScreen extends StatelessWidget {
         _HomeworkSummary(app: app),
         const SizedBox(height: 16),
         _Timeline(app: app),
+      ],
+    );
+  }
+}
+
+class _StudentSelectionPrompt extends StatefulWidget {
+  const _StudentSelectionPrompt();
+
+  @override
+  State<_StudentSelectionPrompt> createState() =>
+      _StudentSelectionPromptState();
+}
+
+class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppProvider>();
+    final students = app.students.where((student) {
+      if (query.trim().isEmpty) return true;
+      return student.name.contains(query) || student.diagnosis.contains(query);
+    }).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        EmptyState(
+          icon: Icons.folder_shared_outlined,
+          title: 'اختر طالبًا لعرض ملفه',
+          message:
+              'لا يتم فتح أي ملف تلقائيًا. اختر الطالب من القائمة أو ابحث عنه.',
+          action: SizedBox(
+            width: 360,
+            child: TextField(
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                hintText: 'بحث سريع عن طالب',
+              ),
+              onChanged: (value) => setState(() => query = value),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (students.isEmpty)
+          const EmptyState(
+            icon: Icons.search_off_outlined,
+            title: 'لا توجد نتائج',
+            message: 'جرّب كتابة اسم أو تشخيص مختلف.',
+          )
+        else
+          ResponsiveGrid(
+            children: students
+                .map((student) => TherapyCard(
+                      title: student.name,
+                      icon: Icons.child_care_outlined,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              StudentAvatar(student: student, radius: 32),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(student.diagnosis),
+                                    const SizedBox(height: 4),
+                                    AppPill(label: student.status),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () => app.selectStudent(student),
+                              icon: const Icon(Icons.folder_shared_outlined),
+                              label: const Text('فتح الملف'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ))
+                .toList(),
+          ),
       ],
     );
   }

@@ -325,7 +325,7 @@ class AppProvider extends ChangeNotifier {
     selectedStudent = currentSelection != null &&
             students.any((student) => student.id == currentSelection.id)
         ? currentSelection
-        : (students.isEmpty ? null : students.first);
+        : null;
     await selectStudent(selectedStudent);
   }
 

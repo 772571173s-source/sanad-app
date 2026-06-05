@@ -9,7 +9,10 @@ import '../widgets/app_widgets.dart';
 import '../widgets/feedback.dart';
 
 class StudentsScreen extends StatefulWidget {
-  const StudentsScreen({super.key});
+  const StudentsScreen({super.key, this.onOpenProfile, this.onStartSession});
+
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onStartSession;
 
   @override
   State<StudentsScreen> createState() => _StudentsScreenState();
@@ -55,10 +58,11 @@ class _StudentsScreenState extends State<StudentsScreen> {
                 onChanged: (value) => setState(() => status = value ?? status),
               ),
             ),
-            FilledButton.icon(
-                onPressed: () => _showStudentForm(context),
-                icon: const Icon(Icons.person_add_alt),
-                label: const Text('إضافة طالب')),
+            if (app.canManageStudents)
+              FilledButton.icon(
+                  onPressed: () => _showStudentForm(context),
+                  icon: const Icon(Icons.person_add_alt),
+                  label: const Text('إضافة طالب')),
           ],
         ),
         const SizedBox(height: 16),
@@ -102,11 +106,28 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             onPressed: () => app.selectStudent(student),
                             icon: const Icon(Icons.check),
                             label: const Text('اختيار')),
-                        FilledButton.tonalIcon(
-                            onPressed: () =>
-                                _showStudentForm(context, student: student),
-                            icon: const Icon(Icons.edit),
-                            label: const Text('تعديل')),
+                        FilledButton.icon(
+                            onPressed: () async {
+                              await app.selectStudent(student);
+                              widget.onOpenProfile?.call();
+                            },
+                            icon: const Icon(Icons.folder_shared_outlined),
+                            label: const Text('فتح الملف')),
+                        if (app.canWriteClinical &&
+                            widget.onStartSession != null)
+                          FilledButton.tonalIcon(
+                              onPressed: () async {
+                                await app.selectStudent(student);
+                                widget.onStartSession?.call();
+                              },
+                              icon: const Icon(Icons.play_circle_outline),
+                              label: const Text('بدء جلسة')),
+                        if (app.canManageStudents)
+                          FilledButton.tonalIcon(
+                              onPressed: () =>
+                                  _showStudentForm(context, student: student),
+                              icon: const Icon(Icons.edit),
+                              label: const Text('تعديل')),
                         if (app.canDeleteStudents)
                           IconButton(
                               onPressed: () => app.deleteStudent(student.id),

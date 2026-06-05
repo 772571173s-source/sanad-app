@@ -5,10 +5,9 @@ import '../providers/app_provider.dart';
 import 'centers_screen.dart';
 import 'dashboard_screen.dart';
 import 'data_entry_screen.dart';
-import 'exercises_parent_screen.dart';
 import 'owner_support_screen.dart';
+import 'parent_dashboard_screen.dart';
 import 'programs_screen.dart';
-import 'rewards_screen.dart';
 import 'sessions_screen.dart';
 import 'settings_hub_screen.dart';
 import 'staff_screen.dart';
@@ -102,22 +101,44 @@ class _AppShellState extends State<AppShell> {
       ];
     }
     if (app.isCenterManager) {
-      return const [
-        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem('الموظفون', Icons.manage_accounts_outlined, StaffScreen()),
-        _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+      return [
+        const _NavItem(
+            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
+          'الطلاب',
+          Icons.groups_2_outlined,
+          StudentsScreen(
+            onOpenProfile: () => setState(() => index = 2),
+          ),
+        ),
+        const _NavItem(
+            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
+        const _NavItem(
+            'الموظفون', Icons.manage_accounts_outlined, StaffScreen()),
+        const _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
+        const _NavItem(
+            'الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
     if (app.isSpecialist) {
-      return const [
-        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+      return [
+        const _NavItem(
+            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
+          'الطلاب',
+          Icons.groups_2_outlined,
+          StudentsScreen(
+            onOpenProfile: () => setState(() => index = 3),
+            onStartSession: () => setState(() => index = 4),
+          ),
+        ),
+        const _NavItem(
             'البرامج العلاجية', Icons.extension_outlined, ProgramsScreen()),
-        _NavItem(
+        const _NavItem(
             'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
-        _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
+        const _NavItem(
+            'الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
     if (app.isDataEntry) {
@@ -137,12 +158,8 @@ class _AppShellState extends State<AppShell> {
     }
     if (app.isParent) {
       return const [
-        _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem(
-            'ملف الطالب', Icons.folder_shared_outlined, StudentProfileScreen()),
-        _NavItem('واجهة الأهل', Icons.family_restroom_outlined,
-            ExercisesParentScreen()),
-        _NavItem('المكافآت', Icons.emoji_events_outlined, RewardsScreen()),
+        _NavItem('لوحة ولي الأمر', Icons.family_restroom_outlined,
+            ParentDashboardScreen()),
         _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
