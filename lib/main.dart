@@ -9,6 +9,7 @@ import 'screens/login_screen.dart';
 import 'screens/startup_error_screen.dart';
 import 'services/database_service.dart';
 import 'services/pdf_service.dart';
+import 'widgets/app_widgets.dart';
 
 class SanadPalette {
   static const primary = Color(0xFF0F766E);
@@ -22,6 +23,45 @@ class SanadPalette {
   static const accentBlue = Color(0xFFE0F2FE);
   static const accentGreen = Color(0xFFDCFCE7);
   static const accentAmber = Color(0xFFFEF3C7);
+}
+
+TextTheme _sanadTextTheme(TextTheme base, Color text, Color muted) {
+  TextStyle apply(TextStyle? style, FontWeight weight, double height) {
+    return (style ?? const TextStyle()).copyWith(
+      color: text,
+      fontWeight: weight,
+      height: height,
+      letterSpacing: 0,
+    );
+  }
+
+  return base.copyWith(
+    displayLarge: apply(base.displayLarge, FontWeight.w900, 1.16),
+    displayMedium: apply(base.displayMedium, FontWeight.w900, 1.18),
+    displaySmall: apply(base.displaySmall, FontWeight.w900, 1.2),
+    headlineLarge: apply(base.headlineLarge, FontWeight.w900, 1.22),
+    headlineMedium: apply(base.headlineMedium, FontWeight.w900, 1.24),
+    headlineSmall: apply(base.headlineSmall, FontWeight.w900, 1.26),
+    titleLarge: apply(base.titleLarge, FontWeight.w900, 1.28),
+    titleMedium: apply(base.titleMedium, FontWeight.w800, 1.34),
+    titleSmall: apply(base.titleSmall, FontWeight.w800, 1.36),
+    bodyLarge: apply(base.bodyLarge, FontWeight.w500, 1.55),
+    bodyMedium: apply(base.bodyMedium, FontWeight.w500, 1.5),
+    bodySmall: (base.bodySmall ?? const TextStyle()).copyWith(
+      color: muted,
+      fontWeight: FontWeight.w500,
+      height: 1.45,
+      letterSpacing: 0,
+    ),
+    labelLarge: apply(base.labelLarge, FontWeight.w800, 1.25),
+    labelMedium: apply(base.labelMedium, FontWeight.w800, 1.25),
+    labelSmall: (base.labelSmall ?? const TextStyle()).copyWith(
+      color: muted,
+      fontWeight: FontWeight.w700,
+      height: 1.25,
+      letterSpacing: 0,
+    ),
+  );
 }
 
 void main() {
@@ -39,7 +79,7 @@ class SanadApp extends StatelessWidget {
           AppProvider(SanadRepository(DatabaseService.instance), PdfService()),
       child: Consumer<AppProvider>(
         builder: (context, app, _) {
-          final radius = BorderRadius.circular(8);
+          final radius = BorderRadius.circular(AppRadii.control);
           const lightScheme = ColorScheme(
             brightness: Brightness.light,
             primary: SanadPalette.primary,
@@ -70,6 +110,36 @@ class SanadApp extends StatelessWidget {
             onInverseSurface: Colors.white,
             inversePrimary: Color(0xFF5EEAD4),
           );
+          const darkScheme = ColorScheme(
+            brightness: Brightness.dark,
+            primary: Color(0xFF5EEAD4),
+            onPrimary: Color(0xFF062F2B),
+            primaryContainer: Color(0xFF134E4A),
+            onPrimaryContainer: Color(0xFFCCFBF1),
+            secondary: Color(0xFF7DD3FC),
+            onSecondary: Color(0xFF082F49),
+            secondaryContainer: Color(0xFF0C4A6E),
+            onSecondaryContainer: Color(0xFFE0F2FE),
+            tertiary: Color(0xFFFBBF24),
+            onTertiary: Color(0xFF451A03),
+            tertiaryContainer: Color(0xFF78350F),
+            onTertiaryContainer: Color(0xFFFEF3C7),
+            error: Color(0xFFFCA5A5),
+            onError: Color(0xFF450A0A),
+            errorContainer: Color(0xFF7F1D1D),
+            onErrorContainer: Color(0xFFFEE2E2),
+            surface: Color(0xFF111827),
+            onSurface: Color(0xFFF8FAFC),
+            surfaceContainerHighest: Color(0xFF1F2937),
+            onSurfaceVariant: Color(0xFFCBD5E1),
+            outline: Color(0xFF64748B),
+            outlineVariant: Color(0xFF334155),
+            shadow: Color(0x66000000),
+            scrim: Color(0xCC000000),
+            inverseSurface: Color(0xFFF8FAFC),
+            onInverseSurface: Color(0xFF111827),
+            inversePrimary: SanadPalette.primary,
+          );
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'Sanad',
@@ -80,10 +150,11 @@ class SanadApp extends StatelessWidget {
               scaffoldBackgroundColor: SanadPalette.background,
               visualDensity: VisualDensity.standard,
               fontFamily: 'Arial',
-              textTheme: ThemeData.light().textTheme.apply(
-                    bodyColor: SanadPalette.text,
-                    displayColor: SanadPalette.text,
-                  ),
+              textTheme: _sanadTextTheme(
+                ThemeData.light().textTheme,
+                SanadPalette.text,
+                const Color(0xFF475569),
+              ),
               inputDecorationTheme: InputDecorationTheme(
                 border: OutlineInputBorder(borderRadius: radius),
                 enabledBorder: OutlineInputBorder(
@@ -104,7 +175,28 @@ class SanadApp extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 44),
                   shape: RoundedRectangleBorder(borderRadius: radius),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w900, height: 1.2),
+                ),
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w800, height: 1.2),
+                ),
+              ),
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w800, height: 1.2),
                 ),
               ),
               chipTheme: ChipThemeData(
@@ -122,33 +214,83 @@ class SanadApp extends StatelessWidget {
               cardTheme: CardThemeData(
                 margin: EdgeInsets.zero,
                 color: SanadPalette.surface,
-                shadowColor: Colors.black.withValues(alpha: .05),
+                shadowColor: Colors.black.withValues(alpha: .04),
               ),
             ),
             darkTheme: ThemeData(
               useMaterial3: true,
-              brightness: Brightness.dark,
-              colorScheme: ColorScheme.fromSeed(
-                  seedColor: SanadPalette.primary, brightness: Brightness.dark),
+              colorScheme: darkScheme,
+              scaffoldBackgroundColor: const Color(0xFF0F172A),
               visualDensity: VisualDensity.standard,
+              fontFamily: 'Arial',
+              textTheme: _sanadTextTheme(
+                ThemeData.dark().textTheme,
+                const Color(0xFFF8FAFC),
+                const Color(0xFFCBD5E1),
+              ),
               inputDecorationTheme: InputDecorationTheme(
                 border: OutlineInputBorder(borderRadius: radius),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: radius,
+                  borderSide: const BorderSide(color: Color(0xFF334155)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: radius,
+                  borderSide:
+                      const BorderSide(color: Color(0xFF5EEAD4), width: 1.4),
+                ),
                 filled: true,
+                fillColor: const Color(0xFF111827),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
               filledButtonTheme: FilledButtonThemeData(
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 44),
                   shape: RoundedRectangleBorder(borderRadius: radius),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w900, height: 1.2),
+                ),
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w800, height: 1.2),
+                ),
+              ),
+              textButtonTheme: TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  shape: RoundedRectangleBorder(borderRadius: radius),
+                  textStyle:
+                      const TextStyle(fontWeight: FontWeight.w800, height: 1.2),
                 ),
               ),
               chipTheme: ChipThemeData(
                 shape: RoundedRectangleBorder(borderRadius: radius),
+                backgroundColor: const Color(0xFF0C4A6E),
+                selectedColor: const Color(0xFF134E4A),
+                side: const BorderSide(color: Color(0xFF334155)),
+                labelStyle: const TextStyle(
+                  color: Color(0xFFF8FAFC),
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               dialogTheme: DialogThemeData(
                 shape: RoundedRectangleBorder(borderRadius: radius),
+                backgroundColor: const Color(0xFF111827),
               ),
-              cardTheme: const CardThemeData(margin: EdgeInsets.zero),
+              cardTheme: CardThemeData(
+                margin: EdgeInsets.zero,
+                color: const Color(0xFF111827),
+                shadowColor: Colors.black.withValues(alpha: .12),
+              ),
             ),
             home: _HomeGate(app: app),
           );

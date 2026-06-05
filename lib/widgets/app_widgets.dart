@@ -27,6 +27,37 @@ class SanadUiColors {
   static const accentAmber = Color(0xFFFEF3C7);
 }
 
+class SanadText {
+  static TextStyle? title(BuildContext context) =>
+      Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            height: 1.25,
+            letterSpacing: 0,
+          );
+
+  static TextStyle? subtitle(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.35,
+            letterSpacing: 0,
+          );
+
+  static TextStyle? secondary(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+            height: 1.45,
+            letterSpacing: 0,
+          );
+
+  static TextStyle? muted(BuildContext context) =>
+      Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            height: 1.45,
+            letterSpacing: 0,
+          );
+}
+
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -43,12 +74,14 @@ class AppCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: highlight ? 2 : 0,
+      elevation: highlight ? 1 : 0,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.card),
         side: BorderSide(
-          color: highlight ? colorScheme.primary : colorScheme.outlineVariant,
+          color: highlight
+              ? colorScheme.primary.withValues(alpha: .32)
+              : colorScheme.outlineVariant,
         ),
       ),
       child: DecoratedBox(
@@ -93,10 +126,7 @@ class TherapyCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title!,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w900),
+                    style: SanadText.subtitle(context),
                   ),
                 ),
                 if (trailing != null) trailing!,
@@ -125,12 +155,21 @@ class AppPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final background = selected
+        ? colorScheme.primaryContainer
+        : colorScheme.secondaryContainer;
+    final foreground = selected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSecondaryContainer;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? SanadUiColors.accentGreen : SanadUiColors.accentBlue,
+        color: background,
         border: Border.all(
-          color: selected ? SanadUiColors.primary : Colors.transparent,
+          color: selected
+              ? colorScheme.primary.withValues(alpha: .45)
+              : colorScheme.outlineVariant,
         ),
         borderRadius: BorderRadius.circular(AppRadii.control),
       ),
@@ -138,14 +177,15 @@ class AppPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 18),
+            Icon(icon, size: 18, color: foreground),
             const SizedBox(width: 6),
           ],
           Text(
             label,
-            style: const TextStyle(
-              color: SanadUiColors.text,
+            style: TextStyle(
+              color: foreground,
               fontWeight: FontWeight.w800,
+              height: 1.2,
             ),
           ),
         ],
@@ -189,7 +229,7 @@ class StatTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: Theme.of(context).textTheme.bodySmall),
+                Text(label, style: SanadText.muted(context)),
                 Text(
                   value,
                   style: Theme.of(context)
@@ -232,6 +272,85 @@ class ResponsiveGrid extends StatelessWidget {
       },
     );
   }
+}
+
+class RoleAvatar extends StatelessWidget {
+  const RoleAvatar({
+    super.key,
+    required this.role,
+    required this.name,
+    this.radius = 22,
+  });
+
+  final UserRole? role;
+  final String name;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _roleData(role);
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        color: data.background,
+        borderRadius: BorderRadius.circular(radius * .8),
+        border: Border.all(color: colorScheme.surface.withValues(alpha: .65)),
+      ),
+      child: Icon(data.icon, color: data.foreground, size: radius),
+    );
+  }
+
+  _RoleAvatarData _roleData(UserRole? role) {
+    switch (role) {
+      case UserRole.sanadOwner:
+        return const _RoleAvatarData(
+          Icons.workspace_premium_outlined,
+          Color(0xFFFEF3C7),
+          Color(0xFF92400E),
+        );
+      case UserRole.centerManager:
+        return const _RoleAvatarData(
+          Icons.business_center_outlined,
+          Color(0xFFE0F2FE),
+          Color(0xFF0369A1),
+        );
+      case UserRole.specialist:
+        return const _RoleAvatarData(
+          Icons.healing_outlined,
+          Color(0xFFDCFCE7),
+          Color(0xFF047857),
+        );
+      case UserRole.parent:
+        return const _RoleAvatarData(
+          Icons.favorite_border,
+          Color(0xFFFFE4E6),
+          Color(0xFFBE123C),
+        );
+      case UserRole.dataEntry:
+      case UserRole.programEntry:
+        return const _RoleAvatarData(
+          Icons.badge_outlined,
+          Color(0xFFEDE9FE),
+          Color(0xFF6D28D9),
+        );
+      case null:
+        return const _RoleAvatarData(
+          Icons.person_outline,
+          SanadUiColors.accentBlue,
+          SanadUiColors.primary,
+        );
+    }
+  }
+}
+
+class _RoleAvatarData {
+  const _RoleAvatarData(this.icon, this.background, this.foreground);
+
+  final IconData icon;
+  final Color background;
+  final Color foreground;
 }
 
 class StudentAvatar extends StatelessWidget {
@@ -294,16 +413,13 @@ class EmptyState extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w900),
+              style: SanadText.subtitle(context),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: SanadText.secondary(context),
             ),
             if (action != null) ...[
               const SizedBox(height: AppSpacing.md),

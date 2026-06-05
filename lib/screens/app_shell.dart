@@ -61,11 +61,7 @@ class _AppShellState extends State<AppShell> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _Header(
-                      title: selected.title,
-                      onOpenSettings: () =>
-                          setState(() => index = items.length - 1),
-                    ),
+                    _Header(title: selected.title),
                     if (app.isSupportMode) ...[
                       const SizedBox(height: 12),
                       _SupportModeBanner(
@@ -263,10 +259,9 @@ class _SupportModeBanner extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.title, required this.onOpenSettings});
+  const _Header({required this.title});
 
   final String title;
-  final VoidCallback onOpenSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -308,35 +303,21 @@ class _Header extends StatelessWidget {
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           onSelected: (value) {
-            if (value == 'settings') {
-              onOpenSettings();
-            } else if (value == 'profile') {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('سيتم تجهيز الملف الشخصي في مرحلة لاحقة.'),
-                ),
-              );
-            } else if (value == 'logout') {
+            if (value == 'logout') {
               app.logout();
             }
           },
-          itemBuilder: (context) => const [
+          itemBuilder: (context) => [
             PopupMenuItem(
-              value: 'profile',
-              child: _ProfileMenuItem(
-                icon: Icons.person_outline,
-                label: 'الملف الشخصي',
+              enabled: false,
+              child: _AccountMenuHeader(
+                name: name,
+                roleLabel: roleLabel,
+                role: user?.role,
               ),
             ),
-            PopupMenuItem(
-              value: 'settings',
-              child: _ProfileMenuItem(
-                icon: Icons.settings_outlined,
-                label: 'الإعدادات',
-              ),
-            ),
-            PopupMenuDivider(),
-            PopupMenuItem(
+            const PopupMenuDivider(),
+            const PopupMenuItem(
               value: 'logout',
               child: _ProfileMenuItem(
                 icon: Icons.logout,
@@ -355,30 +336,21 @@ class _Header extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: colorScheme.primaryContainer,
-                  child: Text(
-                    name.characters.first,
-                    style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
+                RoleAvatar(role: user?.role, name: name, radius: 21),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       name,
-                      style: const TextStyle(fontWeight: FontWeight.w900),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            height: 1.2,
+                          ),
                     ),
                     Text(
                       roleLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
+                      style: SanadText.muted(context),
                     ),
                   ],
                 ),
@@ -434,6 +406,48 @@ class _Header extends StatelessWidget {
   }
 }
 
+class _AccountMenuHeader extends StatelessWidget {
+  const _AccountMenuHeader({
+    required this.name,
+    required this.roleLabel,
+    required this.role,
+  });
+
+  final String name;
+  final String roleLabel;
+  final UserRole? role;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        RoleAvatar(role: role, name: name, radius: 22),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.25,
+                    ),
+              ),
+              Text(
+                roleLabel,
+                style: SanadText.muted(context),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfileMenuItem extends StatelessWidget {
   const _ProfileMenuItem({
     required this.icon,
@@ -477,10 +491,7 @@ class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Theme.of(context)
-          .colorScheme
-          .surfaceContainerHighest
-          .withValues(alpha: .55),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -568,7 +579,7 @@ class _SidebarTileState extends State<_SidebarTile> {
           color: active
               ? colorScheme.primaryContainer
               : hovered
-                  ? colorScheme.surface.withValues(alpha: .8)
+                  ? colorScheme.surfaceContainerHigh
                   : Colors.transparent,
           borderRadius: BorderRadius.circular(AppRadii.control),
           border: Border.all(
