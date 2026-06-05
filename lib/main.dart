@@ -170,6 +170,11 @@ class SanadApp extends StatelessWidget {
                 fillColor: SanadPalette.surface,
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                labelStyle: const TextStyle(
+                  color: Color(0xFF475569),
+                  fontWeight: FontWeight.w700,
+                ),
+                hintStyle: const TextStyle(color: Color(0xFF64748B)),
               ),
               filledButtonTheme: FilledButtonThemeData(
                 style: FilledButton.styleFrom(
@@ -211,6 +216,16 @@ class SanadApp extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: radius),
                 backgroundColor: SanadPalette.surface,
               ),
+              snackBarTheme: SnackBarThemeData(
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: SanadPalette.text,
+                contentTextStyle: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  height: 1.4,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: radius),
+              ),
               cardTheme: CardThemeData(
                 margin: EdgeInsets.zero,
                 color: SanadPalette.surface,
@@ -243,6 +258,11 @@ class SanadApp extends StatelessWidget {
                 fillColor: const Color(0xFF111827),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                labelStyle: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontWeight: FontWeight.w700,
+                ),
+                hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
               ),
               filledButtonTheme: FilledButtonThemeData(
                 style: FilledButton.styleFrom(
@@ -285,6 +305,16 @@ class SanadApp extends StatelessWidget {
               dialogTheme: DialogThemeData(
                 shape: RoundedRectangleBorder(borderRadius: radius),
                 backgroundColor: const Color(0xFF111827),
+              ),
+              snackBarTheme: SnackBarThemeData(
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: const Color(0xFFE2E8F0),
+                contentTextStyle: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontWeight: FontWeight.w800,
+                  height: 1.4,
+                ),
+                shape: RoundedRectangleBorder(borderRadius: radius),
               ),
               cardTheme: CardThemeData(
                 margin: EdgeInsets.zero,

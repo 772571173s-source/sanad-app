@@ -58,6 +58,146 @@ class SanadText {
           );
 }
 
+enum SemanticAlertKind { info, warning, success, error }
+
+class SemanticAlertTone {
+  const SemanticAlertTone({
+    required this.background,
+    required this.border,
+    required this.foreground,
+    required this.icon,
+  });
+
+  final Color background;
+  final Color border;
+  final Color foreground;
+  final Color icon;
+}
+
+SemanticAlertTone sanadAlertTone(
+  BuildContext context,
+  SemanticAlertKind kind,
+) {
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  switch (kind) {
+    case SemanticAlertKind.info:
+      return dark
+          ? const SemanticAlertTone(
+              background: Color(0xFF082F49),
+              border: Color(0xFF0369A1),
+              foreground: Color(0xFFE0F2FE),
+              icon: Color(0xFF7DD3FC),
+            )
+          : const SemanticAlertTone(
+              background: Color(0xFFE0F2FE),
+              border: Color(0xFF7DD3FC),
+              foreground: Color(0xFF0F172A),
+              icon: Color(0xFF0369A1),
+            );
+    case SemanticAlertKind.warning:
+      return dark
+          ? const SemanticAlertTone(
+              background: Color(0xFF451A03),
+              border: Color(0xFFB45309),
+              foreground: Color(0xFFFEF3C7),
+              icon: Color(0xFFFBBF24),
+            )
+          : const SemanticAlertTone(
+              background: Color(0xFFFEF3C7),
+              border: Color(0xFFF59E0B),
+              foreground: Color(0xFF1F2937),
+              icon: Color(0xFFB45309),
+            );
+    case SemanticAlertKind.success:
+      return dark
+          ? const SemanticAlertTone(
+              background: Color(0xFF052E16),
+              border: Color(0xFF15803D),
+              foreground: Color(0xFFDCFCE7),
+              icon: Color(0xFF86EFAC),
+            )
+          : const SemanticAlertTone(
+              background: Color(0xFFDCFCE7),
+              border: Color(0xFF22C55E),
+              foreground: Color(0xFF14532D),
+              icon: Color(0xFF15803D),
+            );
+    case SemanticAlertKind.error:
+      return dark
+          ? const SemanticAlertTone(
+              background: Color(0xFF450A0A),
+              border: Color(0xFFB91C1C),
+              foreground: Color(0xFFFEE2E2),
+              icon: Color(0xFFFCA5A5),
+            )
+          : const SemanticAlertTone(
+              background: Color(0xFFFEE2E2),
+              border: Color(0xFFEF4444),
+              foreground: Color(0xFF7F1D1D),
+              icon: Color(0xFFDC2626),
+            );
+  }
+}
+
+class SemanticAlertCard extends StatelessWidget {
+  const SemanticAlertCard({
+    super.key,
+    required this.kind,
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final SemanticAlertKind kind;
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = sanadAlertTone(context, kind);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: tone.background,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: tone.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: tone.icon),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: tone.foreground,
+                    fontWeight: FontWeight.w900,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(
+                    color: tone.foreground,
+                    fontWeight: FontWeight.w600,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
@@ -208,6 +348,7 @@ class StatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = sanadAlertTone(context, SemanticAlertKind.success);
     return AppCard(
       child: Row(
         children: [
@@ -216,12 +357,13 @@ class StatTile extends StatelessWidget {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: SanadUiColors.accentGreen,
+              color: tone.background,
               borderRadius: BorderRadius.circular(AppRadii.control),
+              border: Border.all(color: tone.border),
             ),
             child: Icon(
               icon,
-              color: SanadUiColors.primary,
+              color: tone.icon,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
@@ -288,7 +430,7 @@ class RoleAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final data = _roleData(role);
+    final data = _roleData(context, role);
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       width: radius * 2,
@@ -302,46 +444,34 @@ class RoleAvatar extends StatelessWidget {
     );
   }
 
-  _RoleAvatarData _roleData(UserRole? role) {
+  _RoleAvatarData _roleData(BuildContext context, UserRole? role) {
     switch (role) {
       case UserRole.sanadOwner:
-        return const _RoleAvatarData(
-          Icons.workspace_premium_outlined,
-          Color(0xFFFEF3C7),
-          Color(0xFF92400E),
-        );
+        return _avatarData(context, SemanticAlertKind.warning,
+            Icons.workspace_premium_outlined);
       case UserRole.centerManager:
-        return const _RoleAvatarData(
-          Icons.business_center_outlined,
-          Color(0xFFE0F2FE),
-          Color(0xFF0369A1),
-        );
+        return _avatarData(
+            context, SemanticAlertKind.info, Icons.business_center_outlined);
       case UserRole.specialist:
-        return const _RoleAvatarData(
-          Icons.healing_outlined,
-          Color(0xFFDCFCE7),
-          Color(0xFF047857),
-        );
+        return _avatarData(
+            context, SemanticAlertKind.success, Icons.healing_outlined);
       case UserRole.parent:
-        return const _RoleAvatarData(
-          Icons.favorite_border,
-          Color(0xFFFFE4E6),
-          Color(0xFFBE123C),
-        );
+        return _avatarData(
+            context, SemanticAlertKind.error, Icons.favorite_border);
       case UserRole.dataEntry:
       case UserRole.programEntry:
-        return const _RoleAvatarData(
-          Icons.badge_outlined,
-          Color(0xFFEDE9FE),
-          Color(0xFF6D28D9),
-        );
+        return _avatarData(
+            context, SemanticAlertKind.info, Icons.badge_outlined);
       case null:
-        return const _RoleAvatarData(
-          Icons.person_outline,
-          SanadUiColors.accentBlue,
-          SanadUiColors.primary,
-        );
+        return _avatarData(
+            context, SemanticAlertKind.info, Icons.person_outline);
     }
+  }
+
+  _RoleAvatarData _avatarData(
+      BuildContext context, SemanticAlertKind kind, IconData icon) {
+    final tone = sanadAlertTone(context, kind);
+    return _RoleAvatarData(icon, tone.background, tone.icon);
   }
 }
 
@@ -389,6 +519,7 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tone = sanadAlertTone(context, SemanticAlertKind.info);
     return AppCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
@@ -400,13 +531,14 @@ class EmptyState extends StatelessWidget {
               height: 64,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: SanadUiColors.accentBlue,
+                color: tone.background,
                 borderRadius: BorderRadius.circular(AppRadii.card),
+                border: Border.all(color: tone.border),
               ),
               child: Icon(
                 icon,
                 size: 34,
-                color: SanadUiColors.primary,
+                color: tone.icon,
               ),
             ),
             const SizedBox(height: AppSpacing.md),

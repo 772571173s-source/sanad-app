@@ -96,7 +96,7 @@ class DashboardScreen extends StatelessWidget {
           icon: Icons.pause_circle_outline,
           title: 'مراكز موقوفة',
           message: '$stopped مركز يحتاج متابعة حالة الاشتراك أو الدعم.',
-          color: const Color(0xFFFEF3C7),
+          kind: SemanticAlertKind.warning,
         ));
       }
       final withoutManager = app.centers
@@ -107,7 +107,7 @@ class DashboardScreen extends StatelessWidget {
           icon: Icons.admin_panel_settings_outlined,
           title: 'مدراء غير مكتملين',
           message: '$withoutManager مركز بدون مدير مرتبط بوضوح.',
-          color: const Color(0xFFE0F2FE),
+          kind: SemanticAlertKind.info,
         ));
       }
     }
@@ -123,7 +123,7 @@ class DashboardScreen extends StatelessWidget {
         icon: Icons.assignment_late_outlined,
         title: 'واجبات تحتاج متابعة',
         message: '$overdue واجب تجاوز موعده ولم يكتمل بعد.',
-        color: const Color(0xFFFFE4E6),
+        kind: SemanticAlertKind.error,
       ));
     }
     if (todaySessions.length >= 6) {
@@ -131,7 +131,7 @@ class DashboardScreen extends StatelessWidget {
         icon: Icons.event_available_outlined,
         title: 'يوم علاجي مزدحم',
         message: '${todaySessions.length} جلسات مسجلة اليوم.',
-        color: const Color(0xFFDCFCE7),
+        kind: SemanticAlertKind.success,
       ));
     }
     return items;
@@ -521,6 +521,7 @@ class _PremiumStatCardState extends State<_PremiumStatCard> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tone = sanadAlertTone(context, SemanticAlertKind.success);
     return MouseRegion(
       onEnter: (_) => setState(() => hovered = true),
       onExit: (_) => setState(() => hovered = false),
@@ -539,10 +540,11 @@ class _PremiumStatCardState extends State<_PremiumStatCard> {
                     height: 48,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: SanadUiColors.accentGreen,
+                      color: tone.background,
                       borderRadius: BorderRadius.circular(AppRadii.control),
+                      border: Border.all(color: tone.border),
                     ),
-                    child: Icon(widget.icon, color: SanadUiColors.primary),
+                    child: Icon(widget.icon, color: tone.icon),
                   ),
                   const Spacer(),
                   AppPill(label: widget.trend, icon: Icons.show_chart),
@@ -654,6 +656,7 @@ class _TimelineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tone = sanadAlertTone(context, SemanticAlertKind.info);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -664,10 +667,11 @@ class _TimelineRow extends StatelessWidget {
               height: 38,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: SanadUiColors.accentBlue,
+                color: tone.background,
                 borderRadius: BorderRadius.circular(AppRadii.control),
+                border: Border.all(color: tone.border),
               ),
-              child: Icon(item.icon, size: 20, color: SanadUiColors.primary),
+              child: Icon(item.icon, size: 20, color: tone.icon),
             ),
             if (!last)
               Container(
@@ -754,31 +758,11 @@ class _AlertTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: alert.color,
-        borderRadius: BorderRadius.circular(AppRadii.control),
-      ),
-      child: Row(
-        children: [
-          Icon(alert.icon, color: SanadUiColors.primary),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  alert.title,
-                  style: const TextStyle(fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 3),
-                Text(alert.message),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return SemanticAlertCard(
+      kind: alert.kind,
+      icon: alert.icon,
+      title: alert.title,
+      message: alert.message,
     );
   }
 }
@@ -802,11 +786,11 @@ class _AlertItem {
     required this.icon,
     required this.title,
     required this.message,
-    required this.color,
+    required this.kind,
   });
 
   final IconData icon;
   final String title;
   final String message;
-  final Color color;
+  final SemanticAlertKind kind;
 }
