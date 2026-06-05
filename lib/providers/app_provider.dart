@@ -778,6 +778,57 @@ class AppProvider extends ChangeNotifier {
     await selectStudent(student);
   }
 
+  Future<void> printSessionReport({
+    required List<ProgramActivity> activities,
+    required Map<String, String> results,
+    required int successRate,
+    required int durationSeconds,
+    required int homeworkSentCount,
+    required String notes,
+    required String programName,
+    required String skillTitle,
+  }) async {
+    _ensure(canWriteClinical, 'تقرير الجلسة يصدره الأخصائي فقط.');
+    final student = selectedStudent;
+    if (student == null) return;
+    if (activities.isEmpty || results.isEmpty) {
+      throw StateError('قيّم نشاطًا واحدًا على الأقل قبل إنشاء التقرير.');
+    }
+    final report = ReportRecord(
+      id: 'report_session_${DateTime.now().millisecondsSinceEpoch}',
+      centerId: student.centerId,
+      studentId: student.id,
+      type: 'تقرير جلسة',
+      createdAt: DateTime.now().toIso8601String(),
+      improvementRate: successRate,
+      specialistSignature: user?.name ?? '',
+      managerSignature: currentCenter?.managerName ?? '',
+    );
+    await _repository.saveReport(report);
+    await _log(
+        action: 'طباعة تقرير جلسة',
+        entityType: 'report',
+        entityId: report.id,
+        centerId: report.centerId,
+        details: '${report.studentId} - $programName');
+    await _pdfService.printSessionReport(
+      center: currentCenter,
+      student: student,
+      specialistName: user?.name ?? 'الأخصائي',
+      programName: programName,
+      skillTitle: skillTitle,
+      activities: activities,
+      results: results,
+      successRate: successRate,
+      durationSeconds: durationSeconds,
+      homeworkSentCount: homeworkSentCount,
+      notes: notes,
+      specialistSignature: user?.name ?? '',
+      managerSignature: currentCenter?.managerName ?? '',
+    );
+    await selectStudent(student);
+  }
+
   String recommendationFor({required String errorType, required int severity}) {
     if (severity >= 4) {
       return 'يوصى بتكثيف التدريب السمعي والبصري وتقسيم الهدف إلى خطوات قصيرة.';

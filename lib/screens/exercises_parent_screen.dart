@@ -186,6 +186,21 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                     if (exercise.parentNote.isNotEmpty)
                       Text('ملاحظة ولي الأمر: ${exercise.parentNote}'),
                     Text('النجوم: ${exercise.stars}'),
+                    const SizedBox(height: 10),
+                    const Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          avatar: Icon(Icons.volume_up_outlined, size: 18),
+                          label: Text('تشغيل الصوت لاحقًا'),
+                        ),
+                        Chip(
+                          avatar: Icon(Icons.video_call_outlined, size: 18),
+                          label: Text('رفع فيديو لاحقًا'),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 12),
                     if (app.isParent)
                       SizedBox(

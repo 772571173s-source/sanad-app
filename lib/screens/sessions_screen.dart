@@ -171,6 +171,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                 : () => setState(() => activityIndex++),
             onSendHomework: () => _sendHomework(app, activities[activityIndex]),
             onSave: () => _saveSession(app, activities),
+            onPrintReport: () => _printSessionReport(app, activities),
             onStop: () => setState(() {
               sessionStarted = false;
               timer?.cancel();
@@ -311,6 +312,30 @@ class _SessionsScreenState extends State<SessionsScreen> {
         notes.clear();
       });
     }, success: 'تم حفظ الجلسة.');
+  }
+
+  Future<void> _printSessionReport(
+      AppProvider app, List<ProgramActivity> activities) {
+    final program = _program(app);
+    final firstActivity = activities.isEmpty ? null : activities.first;
+    final skill = firstActivity == null
+        ? null
+        : _findSkill(app.programSkills, firstActivity.skillId);
+    return runWithFeedback(
+      context,
+      () => app.printSessionReport(
+        activities: activities,
+        results: activityResults,
+        successRate: _successRate(activities),
+        durationSeconds: seconds,
+        homeworkSentCount: homeworkSentCount,
+        notes: notes.text.trim(),
+        programName: program?.name ?? 'برنامج علاجي',
+        skillTitle: skill?.title ?? 'مهارة علاجية',
+      ),
+      loading: 'جار إنشاء تقرير الجلسة...',
+      success: 'تم إنشاء تقرير الجلسة.',
+    );
   }
 
   ProgramSkill? _findSkill(List<ProgramSkill> skills, String id) {
@@ -496,6 +521,7 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.onNext,
     required this.onSendHomework,
     required this.onSave,
+    required this.onPrintReport,
     required this.onStop,
   });
 
@@ -513,6 +539,7 @@ class _ActiveSessionCard extends StatelessWidget {
   final VoidCallback? onNext;
   final VoidCallback onSendHomework;
   final VoidCallback onSave;
+  final VoidCallback onPrintReport;
   final VoidCallback onStop;
 
   @override
@@ -627,6 +654,11 @@ class _ActiveSessionCard extends StatelessWidget {
                 onPressed: onSave,
                 icon: const Icon(Icons.save_outlined),
                 label: const Text('حفظ الجلسة'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: onPrintReport,
+                icon: const Icon(Icons.picture_as_pdf_outlined),
+                label: const Text('تقرير PDF'),
               ),
               TextButton.icon(
                 onPressed: onStop,
