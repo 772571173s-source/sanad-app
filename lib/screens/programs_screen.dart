@@ -17,6 +17,8 @@ class ProgramsScreen extends StatefulWidget {
 
 class _ProgramsScreenState extends State<ProgramsScreen> {
   String? selectedProgramId;
+  String? selectedSectionId;
+  String? selectedSkillId;
 
   @override
   Widget build(BuildContext context) {
@@ -38,178 +40,99 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
         : app.programActivities
             .where((activity) => activity.programId == selectedProgram.id)
             .toList();
+    final selectedSection = _selectedSection(sections);
+    final sectionSkills = selectedSection == null
+        ? <ProgramSkill>[]
+        : skills
+            .where((skill) => skill.sectionId == selectedSection.id)
+            .toList()
+      ..sort((a, b) => a.title.compareTo(b.title));
+    final selectedSkill = _selectedSkill(sectionSkills);
+    final skillActivities = selectedSkill == null
+        ? <ProgramActivity>[]
+        : activities
+            .where((activity) => activity.skillId == selectedSkill.id)
+            .toList()
+      ..sort(_compareActivities);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (app.canManagePrograms)
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: () => _showProgramDialog(context),
-                icon: const Icon(Icons.add),
-                label: const Text('إضافة برنامج'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: () => _seedCorePrograms(app),
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('إنشاء البرامج الأساسية'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: () => _confirmRebuildCorePrograms(context, app),
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة إنشاء البرامج الأساسية'),
-              ),
-            ],
-          ),
+        _ProgramsToolbar(
+          canManage: app.canManagePrograms,
+          programs: app.programs,
+          selectedProgram: selectedProgram,
+          onProgramSelected: (program) => setState(() {
+            selectedProgramId = program.id;
+            selectedSectionId = null;
+            selectedSkillId = null;
+          }),
+          onAddProgram: () => _showProgramDialog(context),
+          onSeed: () => _seedCorePrograms(app),
+          onRebuild: () => _confirmRebuildCorePrograms(context, app),
+        ),
         const SizedBox(height: 12),
         if (app.programs.isEmpty)
-          const EmptyState(
+          EmptyState(
             icon: Icons.extension_outlined,
             title: 'لا توجد برامج علاجية',
-            message:
-                'أنشئ العلاج النطقي والتكامل الحسي، ثم جرّب المحتوى داخل الجلسات.',
+            message: 'ابدأ بإنشاء البرامج الأساسية أو أضف برنامجًا جديدًا.',
+            action: app.canManagePrograms
+                ? FilledButton.icon(
+                    onPressed: () => _seedCorePrograms(app),
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('إنشاء البرامج الأساسية'),
+                  )
+                : null,
           )
-        else ...[
-          AppCard(
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: app.programs.map((program) {
-                return ChoiceChip(
-                  selected: program.id == selectedProgram?.id,
-                  label: Text('${program.name} - ${program.type}'),
-                  onSelected: (_) =>
-                      setState(() => selectedProgramId = program.id),
-                );
-              }).toList(),
-            ),
+        else if (selectedProgram != null) ...[
+          _ProgramHeader(program: selectedProgram),
+          const SizedBox(height: 12),
+          _SectionPicker(
+            canManage: app.canManagePrograms,
+            sections: sections,
+            selectedSection: selectedSection,
+            onSelected: (section) => setState(() {
+              selectedSectionId = section.id;
+              selectedSkillId = null;
+            }),
+            onAddSection: () =>
+                _showSectionDialog(context, selectedProgram: selectedProgram),
           ),
           const SizedBox(height: 12),
-          AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(selectedProgram?.name ?? '',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.w900)),
-                if (selectedProgram?.description.isNotEmpty == true)
-                  Text(selectedProgram!.description),
-                const SizedBox(height: 12),
-                if (app.canManagePrograms)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton.tonalIcon(
-                        onPressed: selectedProgram == null
-                            ? null
-                            : () => _showSectionDialog(context,
-                                selectedProgram: selectedProgram),
-                        icon: const Icon(Icons.view_agenda_outlined),
-                        label: const Text('مرحلة'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: selectedProgram == null || sections.isEmpty
-                            ? null
-                            : () => _showSkillDialog(context,
-                                selectedProgram: selectedProgram,
-                                sections: sections),
-                        icon: const Icon(Icons.psychology_outlined),
-                        label: const Text('مهارة'),
-                      ),
-                      FilledButton.tonalIcon(
-                        onPressed: selectedProgram == null || skills.isEmpty
-                            ? null
-                            : () => _showActivityDialog(context,
-                                selectedProgram: selectedProgram,
-                                skills: skills),
-                        icon: const Icon(Icons.local_activity_outlined),
-                        label: const Text('نشاط'),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
+          _SkillPicker(
+            canManage: app.canManagePrograms,
+            skills: sectionSkills,
+            selectedSection: selectedSection,
+            selectedSkill: selectedSkill,
+            onSelected: (skill) => setState(() => selectedSkillId = skill.id),
+            onAddSkill: sections.isEmpty
+                ? null
+                : () => _showSkillDialog(
+                      context,
+                      selectedProgram: selectedProgram,
+                      sections: sections,
+                    ),
           ),
           const SizedBox(height: 12),
-          ResponsiveGrid(
-            children: sections.map((section) {
-              final sectionSkills = skills
-                  .where((skill) => skill.sectionId == section.id)
-                  .toList()
-                ..sort((a, b) => a.title.compareTo(b.title));
-              return AppCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(section.title,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w900, fontSize: 18)),
-                    const SizedBox(height: 8),
-                    if (sectionSkills.isEmpty)
-                      const Text('لا توجد مهارات في هذه المرحلة.')
-                    else
-                      ...sectionSkills.map((skill) {
-                        final skillActivities = activities
-                            .where((activity) => activity.skillId == skill.id)
-                            .toList()
-                          ..sort(_compareActivities);
-                        return ExpansionTile(
-                          tilePadding: EdgeInsets.zero,
-                          title: Text(skill.title),
-                          subtitle: Text(skill.description.isEmpty
-                              ? 'مهارة علاجية'
-                              : skill.description),
-                          children: skillActivities.map((activity) {
-                            final structured =
-                                _StructuredActivityContent.tryParse(activity);
-                            return ListTile(
-                              leading: const Icon(Icons.play_circle_outline),
-                              title: Text(activity.title),
-                              subtitle: Text(structured == null
-                                  ? activity.instructions
-                                  : structured.preview),
-                              trailing: app.canManagePrograms
-                                  ? Wrap(
-                                      spacing: 4,
-                                      children: [
-                                        IconButton(
-                                          tooltip: 'تعديل النشاط',
-                                          onPressed: () => _showActivityDialog(
-                                            context,
-                                            selectedProgram: selectedProgram!,
-                                            skills: skills,
-                                            activity: activity,
-                                          ),
-                                          icon: const Icon(Icons.edit_outlined),
-                                        ),
-                                        IconButton(
-                                          tooltip: 'حذف النشاط',
-                                          onPressed: () => _deleteActivity(
-                                              context, activity),
-                                          icon:
-                                              const Icon(Icons.delete_outline),
-                                        ),
-                                      ],
-                                    )
-                                  : Text(
-                                      activity.evaluationType == 'sensory'
-                                          ? 'تكامل حسي'
-                                          : 'نطقي',
-                                    ),
-                            );
-                          }).toList(),
-                        );
-                      }),
-                  ],
-                ),
-              );
-            }).toList(),
+          _ActivitiesPanel(
+            canManage: app.canManagePrograms,
+            selectedSkill: selectedSkill,
+            activities: skillActivities,
+            onAddActivity: skills.isEmpty
+                ? null
+                : () => _showActivityDialog(
+                      context,
+                      selectedProgram: selectedProgram,
+                      skills: selectedSkill == null ? skills : [selectedSkill],
+                    ),
+            onEditActivity: (activity) => _showActivityDialog(
+              context,
+              selectedProgram: selectedProgram,
+              skills: skills,
+              activity: activity,
+            ),
+            onDeleteActivity: (activity) => _deleteActivity(context, activity),
           ),
         ],
       ],
@@ -251,6 +174,24 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       if (program.id == selectedProgramId) return program;
     }
     return app.programs.first;
+  }
+
+  ProgramSection? _selectedSection(List<ProgramSection> sections) {
+    if (sections.isEmpty) return null;
+    if (selectedSectionId == null) return sections.first;
+    for (final section in sections) {
+      if (section.id == selectedSectionId) return section;
+    }
+    return sections.first;
+  }
+
+  ProgramSkill? _selectedSkill(List<ProgramSkill> skills) {
+    if (skills.isEmpty) return null;
+    if (selectedSkillId == null) return skills.first;
+    for (final skill in skills) {
+      if (skill.id == selectedSkillId) return skill;
+    }
+    return skills.first;
   }
 
   int _compareActivities(ProgramActivity a, ProgramActivity b) {
@@ -1290,6 +1231,390 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   }
 }
 
+class _ProgramsToolbar extends StatelessWidget {
+  const _ProgramsToolbar({
+    required this.canManage,
+    required this.programs,
+    required this.selectedProgram,
+    required this.onProgramSelected,
+    required this.onAddProgram,
+    required this.onSeed,
+    required this.onRebuild,
+  });
+
+  final bool canManage;
+  final List<TherapyProgram> programs;
+  final TherapyProgram? selectedProgram;
+  final ValueChanged<TherapyProgram> onProgramSelected;
+  final VoidCallback onAddProgram;
+  final VoidCallback onSeed;
+  final VoidCallback onRebuild;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('البرامج العلاجية',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          if (programs.isNotEmpty)
+            DropdownButtonFormField<String>(
+              initialValue: selectedProgram?.id,
+              decoration: const InputDecoration(labelText: 'اختر البرنامج'),
+              items: programs
+                  .map((program) => DropdownMenuItem(
+                        value: program.id,
+                        child:
+                            Text(program.name, overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                for (final program in programs) {
+                  if (program.id == value) onProgramSelected(program);
+                }
+              },
+            ),
+          if (canManage) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: onAddProgram,
+                  icon: const Icon(Icons.add),
+                  label: const Text('إضافة برنامج'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onSeed,
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('إنشاء البرامج الأساسية'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onRebuild,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('إعادة إنشاء البرامج الأساسية'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgramHeader extends StatelessWidget {
+  const _ProgramHeader({required this.program});
+
+  final TherapyProgram program;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(program.name,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          if (program.description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(program.description),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionPicker extends StatelessWidget {
+  const _SectionPicker({
+    required this.canManage,
+    required this.sections,
+    required this.selectedSection,
+    required this.onSelected,
+    required this.onAddSection,
+  });
+
+  final bool canManage;
+  final List<ProgramSection> sections;
+  final ProgramSection? selectedSection;
+  final ValueChanged<ProgramSection> onSelected;
+  final VoidCallback onAddSection;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PanelTitle(
+              title: 'الأقسام',
+              action: canManage
+                  ? FilledButton.tonalIcon(
+                      onPressed: onAddSection,
+                      icon: const Icon(Icons.view_agenda_outlined),
+                      label: const Text('إضافة قسم'),
+                    )
+                  : null),
+          const SizedBox(height: 10),
+          if (sections.isEmpty)
+            const Text('أضف أول قسم لهذا البرنامج.')
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: sections.map((section) {
+                return ChoiceChip(
+                  selected: section.id == selectedSection?.id,
+                  label: Text(section.title),
+                  onSelected: (_) => onSelected(section),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkillPicker extends StatelessWidget {
+  const _SkillPicker({
+    required this.canManage,
+    required this.skills,
+    required this.selectedSection,
+    required this.selectedSkill,
+    required this.onSelected,
+    required this.onAddSkill,
+  });
+
+  final bool canManage;
+  final List<ProgramSkill> skills;
+  final ProgramSection? selectedSection;
+  final ProgramSkill? selectedSkill;
+  final ValueChanged<ProgramSkill> onSelected;
+  final VoidCallback? onAddSkill;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PanelTitle(
+              title: 'المهارات',
+              subtitle: selectedSection?.title,
+              action: canManage
+                  ? FilledButton.tonalIcon(
+                      onPressed: onAddSkill,
+                      icon: const Icon(Icons.psychology_outlined),
+                      label: const Text('إضافة مهارة'),
+                    )
+                  : null),
+          const SizedBox(height: 10),
+          if (selectedSection == null)
+            const Text('اختر قسمًا أولًا.')
+          else if (skills.isEmpty)
+            const Text('أضف أول مهارة لهذا القسم.')
+          else
+            Column(
+              children: skills.map((skill) {
+                final selected = skill.id == selectedSkill?.id;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(selected
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked),
+                  title: Text(skill.title),
+                  subtitle: skill.description.isEmpty
+                      ? null
+                      : Text(skill.description,
+                          maxLines: 2, overflow: TextOverflow.ellipsis),
+                  onTap: () => onSelected(skill),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivitiesPanel extends StatelessWidget {
+  const _ActivitiesPanel({
+    required this.canManage,
+    required this.selectedSkill,
+    required this.activities,
+    required this.onAddActivity,
+    required this.onEditActivity,
+    required this.onDeleteActivity,
+  });
+
+  final bool canManage;
+  final ProgramSkill? selectedSkill;
+  final List<ProgramActivity> activities;
+  final VoidCallback? onAddActivity;
+  final ValueChanged<ProgramActivity> onEditActivity;
+  final ValueChanged<ProgramActivity> onDeleteActivity;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _PanelTitle(
+              title: 'الأنشطة',
+              subtitle: selectedSkill?.title,
+              action: canManage
+                  ? FilledButton.icon(
+                      onPressed: onAddActivity,
+                      icon: const Icon(Icons.local_activity_outlined),
+                      label: const Text('إضافة نشاط'),
+                    )
+                  : null),
+          const SizedBox(height: 10),
+          if (selectedSkill == null)
+            const Text('اختر مهارة أولًا.')
+          else if (activities.isEmpty)
+            const Text('أضف أول نشاط لهذه المهارة.')
+          else
+            ...activities.map((activity) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ActivityCard(
+                  activity: activity,
+                  canManage: canManage,
+                  onEdit: () => onEditActivity(activity),
+                  onDelete: () => onDeleteActivity(activity),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({
+    required this.activity,
+    required this.canManage,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final ProgramActivity activity;
+  final bool canManage;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _StructuredActivityContent.tryParse(activity);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.play_circle_outline),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(activity.title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w900)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    Chip(label: Text(content?.typeLabel ?? 'أخرى')),
+                    Chip(
+                        label: Text(activity.evaluationType == 'sensory'
+                            ? 'تكامل حسي'
+                            : 'نطقي')),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  content?.preview ?? activity.instructions,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (canManage)
+            Wrap(
+              spacing: 4,
+              children: [
+                IconButton(
+                  tooltip: 'تعديل النشاط',
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                ),
+                IconButton(
+                  tooltip: 'حذف النشاط',
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelTitle extends StatelessWidget {
+  const _PanelTitle({required this.title, this.subtitle, this.action});
+
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w900)),
+              if (subtitle?.isNotEmpty == true)
+                Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+        if (action != null) action!,
+      ],
+    );
+  }
+}
+
 class _StructuredActivityContent {
   const _StructuredActivityContent({
     required this.kind,
@@ -1326,6 +1651,19 @@ class _StructuredActivityContent {
       return 'حرف $letter: ${sentences.join(' / ')}';
     }
     return instructions;
+  }
+
+  String get typeLabel {
+    return switch (kind) {
+      'speechLetter' => 'حرف',
+      'speechWord' => 'كلمة',
+      'speechSentence' => 'جملة',
+      'oralExercise' => 'تمرين فموي',
+      'auditory' => 'تمييز سمعي',
+      'sensoryActivity' => 'نشاط حسي',
+      'sign' => 'لغة إشارة',
+      _ => 'أخرى',
+    };
   }
 
   static _StructuredActivityContent? tryParse(ProgramActivity activity) {
