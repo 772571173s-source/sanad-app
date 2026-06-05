@@ -45,9 +45,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
               decoration: const InputDecoration(labelText: 'نوع التقرير'),
               items: const [
                 'تقرير جلسة',
+                'تقرير أسبوعي',
                 'تقرير شهري',
-                'تقرير ربع سنوي',
-                'تقرير ختامي'
+                'تقرير ثلاثة أشهر',
+                'تقرير سنة',
+                'تقرير شامل',
+                'تقرير ختامي',
               ]
                   .map((item) =>
                       DropdownMenuItem(value: item, child: Text(item)))
@@ -65,6 +68,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 FilledButton.icon(
                     onPressed: () => runWithFeedback(
@@ -75,6 +79,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         loading: 'جار إنشاء التقرير...'),
                     icon: const Icon(Icons.picture_as_pdf_outlined),
                     label: const Text('إصدار PDF')),
+                FilledButton.tonalIcon(
+                    onPressed: () => setState(() => type = 'تقرير شامل'),
+                    icon: const Icon(Icons.date_range_outlined),
+                    label: const Text('شامل حسب الفترة لاحقًا')),
               ],
             ),
             const SizedBox(height: 16),

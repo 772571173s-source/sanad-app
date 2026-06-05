@@ -207,9 +207,9 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                         width: double.infinity,
                         height: 52,
                         child: FilledButton.icon(
-                          onPressed: () => _markDone(app, exercise),
+                          onPressed: () => _openHomeworkFlow(app, exercise),
                           icon: const Icon(Icons.check_circle_outline),
-                          label: const Text('تم الإنجاز'),
+                          label: const Text('فتح الواجب'),
                         ),
                       ),
                     if (app.isParent) const SizedBox(height: 8),
@@ -317,16 +317,102 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
     );
   }
 
-  Future<void> _markDone(AppProvider app, Exercise exercise) {
-    return runWithFeedback(
-      context,
-      () => app.saveExercise(_copyExercise(
-        exercise,
-        status: 'مكتمل',
-        stars: exercise.stars + 1,
-      )),
-      success: 'تم تسجيل إنجاز الواجب.',
+  Future<void> _openHomeworkFlow(AppProvider app, Exercise exercise) async {
+    final activities = _homeworkActivities(exercise.instructions);
+    var index = 0;
+    var status = 'تم الإنجاز';
+    final note = TextEditingController(text: exercise.parentNote);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final current = activities[index];
+          return AlertDialog(
+            title: Text(exercise.title),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('نشاط ${index + 1} من ${activities.length}',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(current,
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  const SizedBox(height: 12),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(
+                          value: 'تم الإنجاز', label: Text('تم الإنجاز')),
+                      ButtonSegment(
+                          value: 'يحتاج مساعدة', label: Text('يحتاج مساعدة')),
+                      ButtonSegment(value: 'لم ينجز', label: Text('لم ينجز')),
+                    ],
+                    selected: {status},
+                    onSelectionChanged: (value) =>
+                        setDialogState(() => status = value.first),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: note,
+                    maxLines: 3,
+                    decoration:
+                        const InputDecoration(labelText: 'ملاحظة اختيارية'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed:
+                      index == 0 ? null : () => setDialogState(() => index--),
+                  child: const Text('السابق')),
+              TextButton(
+                  onPressed: index >= activities.length - 1
+                      ? null
+                      : () => setDialogState(() => index++),
+                  child: const Text('التالي')),
+              FilledButton(
+                onPressed: () async {
+                  await app.saveExercise(_copyExercise(
+                    exercise,
+                    status: status,
+                    parentNote: note.text.trim(),
+                    stars: status == 'تم الإنجاز'
+                        ? exercise.stars + 1
+                        : exercise.stars,
+                  ));
+                  if (dialogContext.mounted) Navigator.pop(dialogContext);
+                },
+                child: const Text('حفظ الواجب'),
+              ),
+            ],
+          );
+        },
+      ),
     );
+  }
+
+  List<String> _homeworkActivities(String instructions) {
+    final lines = instructions
+        .split('\n')
+        .map((line) => line.trim().replaceFirst(RegExp(r'^\d+\.\s*'), ''))
+        .where((line) => line.isNotEmpty)
+        .toList();
+    return lines.isEmpty ? [instructions] : lines;
   }
 
   Future<void> _approve(AppProvider app, Exercise exercise) {
