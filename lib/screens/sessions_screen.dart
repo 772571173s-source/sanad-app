@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/app_models.dart';
@@ -26,12 +27,15 @@ class _SessionsScreenState extends State<SessionsScreen> {
   final selectedActivityIds = <String>{};
   final activityResults = <String, String>{};
   final notes = TextEditingController();
+  final sessionFocus = FocusNode();
+  bool autoMoveToNext = true;
   _SessionSummary? lastSummary;
 
   @override
   void dispose() {
     timer?.cancel();
     notes.dispose();
+    sessionFocus.dispose();
     super.dispose();
   }
 
@@ -156,33 +160,43 @@ class _SessionsScreenState extends State<SessionsScreen> {
           ],
           _PreviousSessions(app: app),
         ] else ...[
-          _ActiveSessionCard(
-            activity: activities[activityIndex],
-            index: activityIndex,
-            total: activities.length,
-            selectedValue: activityResults[activities[activityIndex].id],
-            options: _options(activities[activityIndex]),
-            elapsedSeconds: seconds,
-            successRate: _successRate(activities),
-            homeworkSentCount: homeworkSentCount,
-            hasSessionHomework: _hasHomework(activities),
-            hasEvaluations: activityResults.isNotEmpty,
-            notes: notes,
-            onEvaluate: (value) => setState(
-                () => activityResults[activities[activityIndex].id] = value),
-            onPrevious: activityIndex == 0
-                ? null
-                : () => setState(() => activityIndex--),
-            onNext: activityIndex >= activities.length - 1
-                ? null
-                : () => setState(() => activityIndex++),
-            onSendSessionHomework: () => _sendSessionHomework(app, activities),
-            onSave: () => _saveSession(app, activities),
-            onPrintReport: () => _printSessionReport(app, activities),
-            onStop: () => setState(() {
-              sessionStarted = false;
-              timer?.cancel();
-            }),
+          Focus(
+            focusNode: sessionFocus,
+            autofocus: true,
+            onKeyEvent: (node, event) => _handleSessionKey(event, activities),
+            child: _ActiveSessionCard(
+              activity: activities[activityIndex],
+              index: activityIndex,
+              total: activities.length,
+              completedCount: activityResults.length,
+              selectedValue: activityResults[activities[activityIndex].id],
+              options: _options(activities[activityIndex]),
+              elapsedSeconds: seconds,
+              successRate: _successRate(activities),
+              homeworkSentCount: homeworkSentCount,
+              hasSessionHomework: _hasHomework(activities),
+              hasEvaluations: activityResults.isNotEmpty,
+              autoMoveToNext: autoMoveToNext,
+              notes: notes,
+              onEvaluate: (value) => _evaluateCurrent(value, activities),
+              onPrevious: activityIndex == 0
+                  ? null
+                  : () => setState(() => activityIndex--),
+              onNext: activityIndex >= activities.length - 1
+                  ? null
+                  : () => setState(() => activityIndex++),
+              onToggleAutoMove: (value) =>
+                  setState(() => autoMoveToNext = value),
+              onQuickNote: _addQuickNote,
+              onSendSessionHomework: () =>
+                  _sendSessionHomework(app, activities),
+              onSave: () => _saveSession(app, activities),
+              onPrintReport: () => _printSessionReport(app, activities),
+              onStop: () => setState(() {
+                sessionStarted = false;
+                timer?.cancel();
+              }),
+            ),
           ),
         ],
       ],
@@ -216,10 +230,53 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   List<String> _options(ProgramActivity activity) {
-    if (activity.evaluationType == 'sensory') {
-      return const ['لا يؤدي', 'بمساعدة', 'جيد'];
+    return const ['تم الإنجاز', 'يحتاج مساعدة', 'لم ينجز'];
+  }
+
+  KeyEventResult _handleSessionKey(
+      KeyEvent event, List<ProgramActivity> activities) {
+    if (event is! KeyDownEvent || activities.isEmpty) {
+      return KeyEventResult.ignored;
     }
-    return const ['صحيح', 'جزئي', 'خطأ'];
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
+      _evaluateCurrent('تم الإنجاز', activities);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
+      _evaluateCurrent('يحتاج مساعدة', activities);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
+      _evaluateCurrent('لم ينجز', activities);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight && activityIndex > 0) {
+      setState(() => activityIndex--);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft &&
+        activityIndex < activities.length - 1) {
+      setState(() => activityIndex++);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  void _evaluateCurrent(String value, List<ProgramActivity> activities) {
+    if (activities.isEmpty) return;
+    setState(() {
+      activityResults[activities[activityIndex].id] = value;
+      if (autoMoveToNext && activityIndex < activities.length - 1) {
+        activityIndex++;
+      }
+    });
+  }
+
+  void _addQuickNote(String value) {
+    final current = notes.text.trim();
+    notes.text = current.isEmpty ? value : '$current، $value';
+    notes.selection = TextSelection.collapsed(offset: notes.text.length);
   }
 
   void _startTimer() {
@@ -234,8 +291,12 @@ class _SessionsScreenState extends State<SessionsScreen> {
     for (final activity in activities) {
       final value = activityResults[activity.id];
       if (value == null) continue;
-      if (value == 'صحيح' || value == 'جيد') score += 1;
-      if (value == 'جزئي' || value == 'بمساعدة') score += .5;
+      if (value == 'صحيح' || value == 'جيد' || value == 'تم الإنجاز') {
+        score += 1;
+      }
+      if (value == 'جزئي' || value == 'بمساعدة' || value == 'يحتاج مساعدة') {
+        score += .5;
+      }
     }
     return ((score / activities.length) * 100).round();
   }
@@ -553,9 +614,30 @@ class _SessionSummaryCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text('ملاحظة الأخصائي: ${summary.notes}'),
           ],
+          const SizedBox(height: AppSpacing.md),
+          SemanticAlertCard(
+            kind: summary.successRate >= 70
+                ? SemanticAlertKind.success
+                : summary.successRate >= 40
+                    ? SemanticAlertKind.warning
+                    : SemanticAlertKind.error,
+            icon: Icons.psychology_alt_outlined,
+            title: 'قراءة سند للجلسة',
+            message: _insight(summary),
+          ),
         ],
       ),
     );
+  }
+
+  String _insight(_SessionSummary summary) {
+    if (summary.successRate >= 70) {
+      return 'الأداء جيد. حافظ على نفس المهارة مع زيادة بسيطة في الصعوبة أو عدد المحاولات.';
+    }
+    if (summary.successRate >= 40) {
+      return 'الأداء متوسط. يفضل إعادة نفس المهارة مع دعم بصري أو نموذج صوتي أوضح.';
+    }
+    return 'الجلسة تحتاج تبسيط. ابدأ بمحاولات أقل، وركز على نشاط واحد مع واجب منزلي قصير.';
   }
 }
 
@@ -564,6 +646,7 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.activity,
     required this.index,
     required this.total,
+    required this.completedCount,
     required this.selectedValue,
     required this.options,
     required this.elapsedSeconds,
@@ -571,10 +654,13 @@ class _ActiveSessionCard extends StatelessWidget {
     required this.homeworkSentCount,
     required this.hasSessionHomework,
     required this.hasEvaluations,
+    required this.autoMoveToNext,
     required this.notes,
     required this.onEvaluate,
     required this.onPrevious,
     required this.onNext,
+    required this.onToggleAutoMove,
+    required this.onQuickNote,
     required this.onSendSessionHomework,
     required this.onSave,
     required this.onPrintReport,
@@ -584,6 +670,7 @@ class _ActiveSessionCard extends StatelessWidget {
   final ProgramActivity activity;
   final int index;
   final int total;
+  final int completedCount;
   final String? selectedValue;
   final List<String> options;
   final int elapsedSeconds;
@@ -591,10 +678,13 @@ class _ActiveSessionCard extends StatelessWidget {
   final int homeworkSentCount;
   final bool hasSessionHomework;
   final bool hasEvaluations;
+  final bool autoMoveToNext;
   final TextEditingController notes;
   final ValueChanged<String> onEvaluate;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final ValueChanged<bool> onToggleAutoMove;
+  final ValueChanged<String> onQuickNote;
   final VoidCallback onSendSessionHomework;
   final VoidCallback onSave;
   final VoidCallback onPrintReport;
@@ -605,9 +695,11 @@ class _ActiveSessionCard extends StatelessWidget {
     final content = _StructuredActivityContent.tryParse(activity);
     final homework = content?.homework ?? activity.homework;
     final progress = total == 0 ? 0.0 : (index + 1) / total;
+    final remaining = total - completedCount;
+    final estimatedMinutes = remaining <= 0 ? 0 : remaining * 2;
     return TherapyCard(
-      title: 'النشاط الحالي',
-      icon: Icons.play_circle_outline,
+      title: 'وضع التركيز العلاجي',
+      icon: Icons.center_focus_strong_outlined,
       trailing: AppPill(
         label: Duration(seconds: elapsedSeconds).toString().split('.').first,
         icon: Icons.timer_outlined,
@@ -615,58 +707,54 @@ class _ActiveSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text('نشاط ${index + 1} من $total',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w900)),
-              ),
-              AppPill(label: 'نجاح $successRate%'),
-            ],
+          _SmartSessionProgress(
+            index: index,
+            total: total,
+            completedCount: completedCount,
+            successRate: successRate,
+            estimatedMinutes: estimatedMinutes,
           ),
           const SizedBox(height: AppSpacing.sm),
           LinearProgressIndicator(value: progress),
-          const SizedBox(height: AppSpacing.md),
-          Text(activity.title,
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: AppSpacing.lg),
           if (content == null)
-            _PlainActivity(instructions: activity.instructions)
+            _PlainActivity(
+                title: activity.title, instructions: activity.instructions)
           else
-            _ActivityContentView(content: content),
+            _ActivityContentView(title: activity.title, content: content),
           if (homework.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.md),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text('الواجب المقترح'),
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(homework),
-                ),
-              ],
+            _HomeworkSuggestion(
+              homework: homework,
+              selectedValue: selectedValue,
+              content: content,
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.tonalIcon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('سيتم تفعيل إرفاق صوت الأخصائي قريبًا.'),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.mic_none_outlined),
-              label: const Text('إرفاق صوت للأخصائي'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: autoMoveToNext,
+                  onChanged: onToggleAutoMove,
+                  title: const Text('انتقال تلقائي بعد التقييم'),
+                  subtitle:
+                      const Text('اختصارات: 1 إنجاز، 2 مساعدة، 3 لم ينجز'),
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('سيتم تفعيل إرفاق صوت الأخصائي قريبًا.'),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.mic_none_outlined),
+                label: const Text('إرفاق صوت'),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
@@ -683,8 +771,8 @@ class _ActiveSessionCard extends StatelessWidget {
             children: options.map((option) {
               final selected = selectedValue == option;
               return SizedBox(
-                height: 56,
-                width: 132,
+                height: 68,
+                width: 172,
                 child: selected
                     ? FilledButton(
                         onPressed: () => onEvaluate(option),
@@ -698,6 +786,8 @@ class _ActiveSessionCard extends StatelessWidget {
             }).toList(),
           ),
           const SizedBox(height: AppSpacing.md),
+          _QuickNotes(onQuickNote: onQuickNote),
+          const SizedBox(height: AppSpacing.md),
           TextField(
             controller: notes,
             maxLines: 2,
@@ -708,15 +798,15 @@ class _ActiveSessionCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: [
-              FilledButton.tonalIcon(
+              FilledButton.icon(
                 onPressed: onPrevious,
                 icon: const Icon(Icons.arrow_back),
-                label: const Text('النشاط السابق'),
+                label: const Text('السابق'),
               ),
-              FilledButton.tonalIcon(
+              FilledButton.icon(
                 onPressed: onNext,
                 icon: const Icon(Icons.arrow_forward),
-                label: const Text('النشاط التالي'),
+                label: const Text('التالي'),
               ),
               FilledButton.tonalIcon(
                 onPressed: hasSessionHomework ? onSendSessionHomework : null,
@@ -736,7 +826,7 @@ class _ActiveSessionCard extends StatelessWidget {
               TextButton.icon(
                 onPressed: onStop,
                 icon: const Icon(Icons.close),
-                label: const Text('إنهاء العرض'),
+                label: const Text('إيقاف الجلسة'),
               ),
             ],
           ),
@@ -745,7 +835,9 @@ class _ActiveSessionCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
             children: [
-              AppPill(label: 'الأنشطة: $total', icon: Icons.layers_outlined),
+              AppPill(
+                  label: 'المكتمل: $completedCount / $total',
+                  icon: Icons.layers_outlined),
               AppPill(
                   label: 'واجبات مرسلة: $homeworkSentCount',
                   icon: Icons.assignment_turned_in_outlined),
@@ -758,8 +850,9 @@ class _ActiveSessionCard extends StatelessWidget {
 }
 
 class _PlainActivity extends StatelessWidget {
-  const _PlainActivity({required this.instructions});
+  const _PlainActivity({required this.title, required this.instructions});
 
+  final String title;
   final String instructions;
 
   @override
@@ -770,20 +863,33 @@ class _PlainActivity extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
-      child: Text(
-        instructions.trim().isEmpty
-            ? 'نشاط علاجي بدون تعليمات إضافية.'
-            : instructions,
-        style: Theme.of(context).textTheme.titleMedium,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _InstructionSteps(
+            text: instructions.trim().isEmpty
+                ? 'نشاط علاجي بدون تعليمات إضافية.'
+                : instructions,
+          ),
+        ],
       ),
     );
   }
 }
 
 class _ActivityContentView extends StatelessWidget {
-  const _ActivityContentView({required this.content});
+  const _ActivityContentView({required this.title, required this.content});
 
+  final String title;
   final _StructuredActivityContent content;
 
   @override
@@ -826,45 +932,54 @@ class _ActivityContentView extends StatelessWidget {
       );
     }
     if (content.kind != 'speechLetter') {
-      return _PlainActivity(instructions: content.instructions);
+      return _PlainActivity(title: title, instructions: content.instructions);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(36),
           decoration: BoxDecoration(
             color: colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(AppRadii.card),
+            border:
+                Border.all(color: colorScheme.primary.withValues(alpha: .3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
+                title,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
                 content.letterDisplay,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 84,
+                  fontSize: 104,
                   color: colorScheme.onPrimaryContainer,
                   fontWeight: FontWeight.w900,
                   height: 1,
                 ),
               ),
               const SizedBox(height: 8),
-              Chip(
-                label: Text(content.vocalization),
-                backgroundColor: colorScheme.surface,
-                side: BorderSide(color: colorScheme.outlineVariant),
+              AppPill(
+                label: content.vocalization,
+                icon: Icons.graphic_eq_outlined,
+                selected: true,
               ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         if (content.instructions.isNotEmpty)
-          Text(content.instructions,
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700)),
+          _InstructionSteps(text: content.instructions),
       ],
     );
   }
@@ -892,6 +1007,215 @@ class _ActivityContentView extends StatelessWidget {
                 ),
               ))
           .toList(),
+    );
+  }
+}
+
+class _SmartSessionProgress extends StatelessWidget {
+  const _SmartSessionProgress({
+    required this.index,
+    required this.total,
+    required this.completedCount,
+    required this.successRate,
+    required this.estimatedMinutes,
+  });
+
+  final int index;
+  final int total;
+  final int completedCount;
+  final int successRate;
+  final int estimatedMinutes;
+
+  @override
+  Widget build(BuildContext context) {
+    final remaining = (total - completedCount).clamp(0, total);
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        AppPill(
+          label: 'النشاط ${index + 1} من $total',
+          icon: Icons.playlist_play_outlined,
+          selected: true,
+        ),
+        AppPill(
+          label: 'اكتمل $completedCount',
+          icon: Icons.check_circle_outline,
+        ),
+        AppPill(
+          label: 'متبقي $remaining',
+          icon: Icons.pending_actions_outlined,
+        ),
+        AppPill(
+          label: '$successRate%',
+          icon: Icons.trending_up,
+          selected: successRate >= 70,
+        ),
+        AppPill(
+          label: estimatedMinutes == 0
+              ? 'جاهز للإنهاء'
+              : 'حوالي $estimatedMinutes دقائق',
+          icon: Icons.schedule_outlined,
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickNotes extends StatelessWidget {
+  const _QuickNotes({required this.onQuickNote});
+
+  final ValueChanged<String> onQuickNote;
+
+  @override
+  Widget build(BuildContext context) {
+    const values = [
+      'تحسن ممتاز',
+      'يحتاج متابعة',
+      'تشتت',
+      'نطق أفضل',
+      'تعاون ممتاز',
+      'يحتاج تدريب منزلي',
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('ملاحظات سريعة', style: SanadText.subtitle(context)),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: values
+              .map(
+                (value) => ActionChip(
+                  label: Text(value),
+                  avatar: const Icon(Icons.add_comment_outlined, size: 18),
+                  onPressed: () => onQuickNote(value),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeworkSuggestion extends StatelessWidget {
+  const _HomeworkSuggestion({
+    required this.homework,
+    required this.selectedValue,
+    required this.content,
+  });
+
+  final String homework;
+  final String? selectedValue;
+  final _StructuredActivityContent? content;
+
+  @override
+  Widget build(BuildContext context) {
+    final tone = sanadAlertTone(context, SemanticAlertKind.info);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: tone.background,
+        border: Border.all(color: tone.border),
+        borderRadius: BorderRadius.circular(AppRadii.card),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_outlined, color: tone.icon),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  'اقتراح واجب ذكي',
+                  style: TextStyle(
+                    color: tone.foreground,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            _suggestionText(),
+            style: TextStyle(
+              color: tone.foreground,
+              fontWeight: FontWeight.w700,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _suggestionText() {
+    final base = homework.trim();
+    if (selectedValue == 'لم ينجز') {
+      return '$base\nخفف صعوبة التدريب وابدأ بتكرار قصير مع دعم ولي الأمر.';
+    }
+    if (selectedValue == 'يحتاج مساعدة') {
+      return '$base\nيفضل تدريب منزلي قصير مع نموذج صوتي واضح.';
+    }
+    if (selectedValue == 'تم الإنجاز') {
+      return '$base\nيمكن زيادة التحدي قليلًا أو استخدام كلمات مشابهة.';
+    }
+    if (content?.kind == 'speechLetter') {
+      return '$base\nابدأ بصوت الحرف منفردًا ثم كرره بهدوء.';
+    }
+    return base;
+  }
+}
+
+class _InstructionSteps extends StatelessWidget {
+  const _InstructionSteps({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = text
+        .split(RegExp(r'[.\n،]+'))
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    if (steps.length <= 1) {
+      return Text(
+        text,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              height: 1.55,
+            ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < steps.length; i++) ...[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppPill(label: '${i + 1}', selected: true),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  steps[i],
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          if (i < steps.length - 1) const SizedBox(height: AppSpacing.sm),
+        ],
+      ],
     );
   }
 }
