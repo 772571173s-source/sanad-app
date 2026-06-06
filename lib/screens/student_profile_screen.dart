@@ -26,6 +26,8 @@ class StudentProfileScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _ProfileSummary(app: app),
         const SizedBox(height: 16),
+        _ClinicalAssessmentProfileSection(app: app),
+        const SizedBox(height: 16),
         _QuickActions(app: app, student: student),
         const SizedBox(height: 16),
         _PreviousSessions(app: app),
@@ -441,6 +443,95 @@ class _QuickActions extends StatelessWidget {
   }
 }
 
+class _ClinicalAssessmentProfileSection extends StatelessWidget {
+  const _ClinicalAssessmentProfileSection({required this.app});
+
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
+    final assessments = app.clinicalAssessments;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(
+            context,
+            'التقييم العلاجي',
+            Icons.fact_check_outlined,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (assessments.isEmpty)
+            const Text(
+              'لم يتم حفظ تقييم علاجي بعد. ابدأ من شاشة التقييم العلاجي لبناء الأهداف.',
+            )
+          else
+            ...assessments.take(3).map((assessment) {
+              final findings =
+                  app.clinicalFindingsByAssessment[assessment.id] ?? const [];
+              final weaknesses =
+                  findings.where((finding) => !finding.isNormal).toList();
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'تقييم نطقي - ${assessment.createdAt.split('T').first}',
+                            style: SanadText.subtitle(context),
+                          ),
+                        ),
+                        AppPill(
+                          label: weaknesses.isEmpty
+                              ? 'كلها طبيعية'
+                              : '${weaknesses.length} أهداف',
+                          icon: weaknesses.isEmpty
+                              ? Icons.verified_outlined
+                              : Icons.track_changes_outlined,
+                          selected: weaknesses.isEmpty,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (assessment.strengthsSummary.isNotEmpty)
+                      Text(
+                        'القوة:\n${assessment.strengthsSummary}',
+                        style: SanadText.secondary(context),
+                      ),
+                    if (assessment.weaknessesSummary.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'الضعف:\n${assessment.weaknessesSummary}',
+                        style: SanadText.secondary(context),
+                      ),
+                    ],
+                    if (assessment.goalsSummary.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'الأهداف:\n${assessment.goalsSummary}',
+                        style: SanadText.secondary(context),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProfileSummary extends StatelessWidget {
   const _ProfileSummary({required this.app});
 
@@ -675,6 +766,13 @@ class _Timeline extends StatelessWidget {
           'تقييم حرف ${evaluation.letter}',
           '${evaluation.position} - ${evaluation.errorType} - شدة ${evaluation.severity}',
           evaluation.createdAt)),
+      ...app.clinicalAssessments.map((assessment) => _TimelineItem(
+          Icons.psychology_alt_outlined,
+          'تقييم علاجي نطقي',
+          assessment.weaknessesSummary.isEmpty
+              ? 'لا توجد نقاط ضعف في البنود المقيمة.'
+              : assessment.weaknessesSummary,
+          assessment.createdAt)),
       ...app.exercises.map((exercise) => _TimelineItem(
           Icons.assignment_outlined,
           'واجب منزلي',

@@ -28,6 +28,8 @@ class AppProvider extends ChangeNotifier {
   List<ProgramActivity> programActivities = [];
   List<Exercise> exercises = [];
   List<ReportRecord> reports = [];
+  List<ClinicalAssessment> clinicalAssessments = [];
+  Map<String, List<ClinicalFinding>> clinicalFindingsByAssessment = {};
   List<SignResource> signResources = [];
   List<AuditLog> auditLogs = [];
   List<TherapySession> centerSessions = [];
@@ -274,6 +276,8 @@ class AppProvider extends ChangeNotifier {
     programActivities = [];
     exercises = [];
     reports = [];
+    clinicalAssessments = [];
+    clinicalFindingsByAssessment = {};
     signResources = [];
     auditLogs = [];
     centerSessions = [];
@@ -401,6 +405,8 @@ class AppProvider extends ChangeNotifier {
       plans = [];
       exercises = [];
       reports = [];
+      clinicalAssessments = [];
+      clinicalFindingsByAssessment = {};
       auditLogs = isOwner || isCenterManager
           ? await _repository.auditLogs(
               centerId: isOwner ? null : activeCenterId)
@@ -412,6 +418,12 @@ class AppProvider extends ChangeNotifier {
       plans = await _repository.plans(student.id);
       exercises = await _repository.exercises(student.id);
       reports = await _repository.reports(student.id);
+      clinicalAssessments = await _repository.clinicalAssessments(student.id);
+      clinicalFindingsByAssessment = {};
+      for (final assessment in clinicalAssessments) {
+        clinicalFindingsByAssessment[assessment.id] =
+            await _repository.clinicalFindings(assessment.id);
+      }
       auditLogs = isOwner || isCenterManager
           ? await _repository.auditLogs(
               centerId: isOwner ? null : activeCenterId, studentId: student.id)
@@ -657,6 +669,42 @@ class AppProvider extends ChangeNotifier {
         entityId: plan.id,
         centerId: plan.centerId,
         details: '${plan.studentId} - ${plan.goal}');
+    await selectStudent(selectedStudent);
+  }
+
+  Future<void> saveClinicalAssessment({
+    required ClinicalAssessment assessment,
+    required List<ClinicalFinding> findings,
+  }) async {
+    _ensure(canWriteClinical, 'التقييم العلاجي يضيفه الأخصائي فقط.');
+    _ensureClinicalAccess(assessment.studentId, assessment.centerId);
+    await _repository.saveClinicalAssessment(assessment);
+    for (final finding in findings) {
+      await _repository.saveClinicalFinding(finding);
+      if (!finding.isNormal && finding.goal.trim().isNotEmpty) {
+        await _repository.savePlan(
+          TrainingPlan(
+            id: 'plan_${finding.id}',
+            centerId: finding.centerId,
+            studentId: finding.studentId,
+            goal: finding.goal,
+            targetDate: DateTime.now()
+                .add(const Duration(days: 45))
+                .toIso8601String()
+                .split('T')
+                .first,
+            progress: 0,
+          ),
+        );
+      }
+    }
+    await _log(
+      action: 'حفظ تقييم علاجي نطقي',
+      entityType: 'clinical_assessment',
+      entityId: assessment.id,
+      centerId: assessment.centerId,
+      details: '${assessment.studentId} - ${findings.length} بنود',
+    );
     await selectStudent(selectedStudent);
   }
 

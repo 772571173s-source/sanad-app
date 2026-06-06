@@ -790,6 +790,131 @@ class ReportRecord {
       };
 }
 
+class ClinicalAssessment {
+  const ClinicalAssessment({
+    required this.id,
+    required this.centerId,
+    required this.studentId,
+    required this.specialistId,
+    required this.specialistName,
+    required this.type,
+    required this.strengthsSummary,
+    required this.weaknessesSummary,
+    required this.goalsSummary,
+    required this.trainingSummary,
+    required this.createdAt,
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String specialistId;
+  final String specialistName;
+  final String type;
+  final String strengthsSummary;
+  final String weaknessesSummary;
+  final String goalsSummary;
+  final String trainingSummary;
+  final String createdAt;
+  final String updatedAt;
+
+  static ClinicalAssessment fromMap(Map<String, Object?> row) =>
+      ClinicalAssessment(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        studentId: row['student_id'] as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
+        specialistName: (row['specialist_name'] ?? '') as String,
+        type: (row['type'] ?? 'speech') as String,
+        strengthsSummary: (row['strengths_summary'] ?? '') as String,
+        weaknessesSummary: (row['weaknesses_summary'] ?? '') as String,
+        goalsSummary: (row['goals_summary'] ?? '') as String,
+        trainingSummary: (row['training_summary'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'student_id': studentId,
+        'specialist_id': specialistId,
+        'specialist_name': specialistName,
+        'type': type,
+        'strengths_summary': strengthsSummary,
+        'weaknesses_summary': weaknessesSummary,
+        'goals_summary': goalsSummary,
+        'training_summary': trainingSummary,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class ClinicalFinding {
+  const ClinicalFinding({
+    required this.id,
+    required this.assessmentId,
+    required this.centerId,
+    required this.studentId,
+    required this.domain,
+    required this.itemTitle,
+    required this.result,
+    required this.isNormal,
+    this.weakness = '',
+    this.goal = '',
+    this.training = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String assessmentId;
+  final String centerId;
+  final String studentId;
+  final String domain;
+  final String itemTitle;
+  final String result;
+  final bool isNormal;
+  final String weakness;
+  final String goal;
+  final String training;
+  final String createdAt;
+  final String updatedAt;
+
+  static ClinicalFinding fromMap(Map<String, Object?> row) => ClinicalFinding(
+        id: row['id'] as String,
+        assessmentId: row['assessment_id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        studentId: row['student_id'] as String,
+        domain: row['domain'] as String,
+        itemTitle: row['item_title'] as String,
+        result: row['result'] as String,
+        isNormal: ((row['is_normal'] ?? 0) as int) == 1,
+        weakness: (row['weakness'] ?? '') as String,
+        goal: (row['goal'] ?? '') as String,
+        training: (row['training'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'assessment_id': assessmentId,
+        'center_id': centerId,
+        'student_id': studentId,
+        'domain': domain,
+        'item_title': itemTitle,
+        'result': result,
+        'is_normal': isNormal ? 1 : 0,
+        'weakness': weakness,
+        'goal': goal,
+        'training': training,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
 class SignResource {
   const SignResource({
     required this.id,

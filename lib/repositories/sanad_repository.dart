@@ -362,6 +362,28 @@ class SanadRepository {
   Future<void> saveReport(ReportRecord report) =>
       _db.upsert('reports', report.toMap());
 
+  Future<List<ClinicalAssessment>> clinicalAssessments(String studentId) async {
+    final rows = await _db.where('clinical_assessments',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'created_at DESC');
+    return rows.map(ClinicalAssessment.fromMap).toList();
+  }
+
+  Future<List<ClinicalFinding>> clinicalFindings(String assessmentId) async {
+    final rows = await _db.where('clinical_findings',
+        where: 'assessment_id = ?',
+        whereArgs: [assessmentId],
+        orderBy: 'domain, item_title');
+    return rows.map(ClinicalFinding.fromMap).toList();
+  }
+
+  Future<void> saveClinicalAssessment(ClinicalAssessment assessment) =>
+      _db.upsert('clinical_assessments', assessment.toMap());
+
+  Future<void> saveClinicalFinding(ClinicalFinding finding) =>
+      _db.upsert('clinical_findings', finding.toMap());
+
   Future<List<SignResource>> signResources(String centerId) async {
     final rows = await _db.where('sign_resources',
         where: 'center_id = ?',

@@ -7,6 +7,7 @@ import '../widgets/app_widgets.dart';
 import 'centers_screen.dart';
 import 'dashboard_screen.dart';
 import 'data_entry_screen.dart';
+import 'evaluations_screen.dart';
 import 'owner_support_screen.dart';
 import 'parent_dashboard_screen.dart';
 import 'programs_screen.dart';
@@ -183,7 +184,7 @@ class _AppShellState extends State<AppShell> {
           Icons.groups_2_outlined,
           StudentsScreen(
             onOpenProfile: () => setState(() => index = 3),
-            onStartSession: () => setState(() => index = 4),
+            onStartSession: () => setState(() => index = 5),
           ),
         ),
         const _NavItem(
@@ -195,6 +196,11 @@ class _AppShellState extends State<AppShell> {
           'ملف الطالب',
           Icons.folder_shared_outlined,
           StudentProfileScreen(),
+        ),
+        const _NavItem(
+          'التقييم العلاجي',
+          Icons.fact_check_outlined,
+          EvaluationsScreen(),
         ),
         const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
         const _NavItem(

@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 7;
+  static const currentVersion = 8;
 
   mobile.Database? _database;
 
@@ -240,6 +240,7 @@ class DatabaseService {
         FOREIGN KEY(student_id) REFERENCES students(id)
       )
     ''');
+    await _createClinicalAssessmentTables(db);
     await db.execute('''
       CREATE TABLE therapy_programs (
         id TEXT PRIMARY KEY,
@@ -388,6 +389,9 @@ class DatabaseService {
           'activity_results': "TEXT NOT NULL DEFAULT ''",
         },
       });
+    }
+    if (oldVersion < 8) {
+      await _ensureClinicalAssessmentTables(db);
     }
   }
 
@@ -634,6 +638,83 @@ class DatabaseService {
         instructions TEXT NOT NULL DEFAULT '',
         homework TEXT NOT NULL DEFAULT '',
         evaluation_type TEXT NOT NULL DEFAULT 'speech',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createClinicalAssessmentTables(mobile.Database db) async {
+    await db.execute('''
+      CREATE TABLE clinical_assessments (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL DEFAULT '',
+        specialist_name TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL DEFAULT 'speech',
+        strengths_summary TEXT NOT NULL DEFAULT '',
+        weaknesses_summary TEXT NOT NULL DEFAULT '',
+        goals_summary TEXT NOT NULL DEFAULT '',
+        training_summary TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE clinical_findings (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        item_title TEXT NOT NULL,
+        result TEXT NOT NULL,
+        is_normal INTEGER NOT NULL DEFAULT 0,
+        weakness TEXT NOT NULL DEFAULT '',
+        goal TEXT NOT NULL DEFAULT '',
+        training TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(assessment_id) REFERENCES clinical_assessments(id),
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+  }
+
+  Future<void> _ensureClinicalAssessmentTables(mobile.Database db) async {
+    await _ensureTable(db, 'clinical_assessments', '''
+      CREATE TABLE clinical_assessments (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL DEFAULT '',
+        specialist_name TEXT NOT NULL DEFAULT '',
+        type TEXT NOT NULL DEFAULT 'speech',
+        strengths_summary TEXT NOT NULL DEFAULT '',
+        weaknesses_summary TEXT NOT NULL DEFAULT '',
+        goals_summary TEXT NOT NULL DEFAULT '',
+        training_summary TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'clinical_findings', '''
+      CREATE TABLE clinical_findings (
+        id TEXT PRIMARY KEY,
+        assessment_id TEXT NOT NULL,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        domain TEXT NOT NULL,
+        item_title TEXT NOT NULL,
+        result TEXT NOT NULL,
+        is_normal INTEGER NOT NULL DEFAULT 0,
+        weakness TEXT NOT NULL DEFAULT '',
+        goal TEXT NOT NULL DEFAULT '',
+        training TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
