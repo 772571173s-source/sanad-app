@@ -28,6 +28,8 @@ class StudentProfileScreen extends StatelessWidget {
         const SizedBox(height: 16),
         _ClinicalAssessmentProfileSection(app: app),
         const SizedBox(height: 16),
+        _GoalProgressSection(app: app),
+        const SizedBox(height: 16),
         _QuickActions(app: app, student: student),
         const SizedBox(height: 16),
         _PreviousSessions(app: app),
@@ -529,6 +531,121 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _GoalProgressSection extends StatelessWidget {
+  const _GoalProgressSection({required this.app});
+
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionHeader(
+            context,
+            'متابعة الأهداف العلاجية',
+            Icons.track_changes_outlined,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (app.plans.isEmpty)
+            const EmptyState(
+              icon: Icons.track_changes_outlined,
+              title: 'لا توجد أهداف علاجية بعد',
+              message:
+                  'ابدأ بتقييم علاجي؛ سيحوّل سند نقاط الضعف إلى أهداف ومهارات قابلة للتتبع.',
+            )
+          else
+            ...app.plans.map((plan) {
+              final steps = app.stepsForGoal(plan.id);
+              final completed =
+                  steps.where((step) => step.status == 'متقن').length;
+              final remaining = steps.length - completed;
+              final progress = app.goalProgress(plan.id);
+              final status = app.goalStatus(plan.id);
+              final lastSession = _lastSessionDate(app, steps);
+              return Container(
+                margin: const EdgeInsets.only(bottom: AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpacing.md),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(plan.goal,
+                              style: SanadText.subtitle(context)),
+                        ),
+                        AppPill(
+                          label: status,
+                          icon: status == 'مكتمل'
+                              ? Icons.verified_outlined
+                              : Icons.trending_up_outlined,
+                          selected: status == 'مكتمل',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    LinearProgressIndicator(value: progress / 100),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        AppPill(label: 'التقدم: $progress%'),
+                        AppPill(label: 'متقن: $completed'),
+                        AppPill(label: 'متبقي: $remaining'),
+                        AppPill(label: 'آخر جلسة: $lastSession'),
+                      ],
+                    ),
+                    if (steps.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.sm,
+                        runSpacing: AppSpacing.sm,
+                        children: steps.map((step) {
+                          return Chip(
+                            avatar: Icon(
+                              step.status == 'متقن'
+                                  ? Icons.check_circle_outline
+                                  : Icons.radio_button_unchecked,
+                              size: 18,
+                            ),
+                            label: Text('${step.title} - ${step.status}'),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  String _lastSessionDate(AppProvider app, List<GoalSkillStep> steps) {
+    final sessionIds = steps
+        .map((step) => step.lastSessionId)
+        .where((value) => value.trim().isNotEmpty)
+        .toSet();
+    final matches = app.sessions
+        .where((session) => sessionIds.contains(session.id))
+        .toList()
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    if (matches.isEmpty) return 'لا توجد';
+    return matches.first.startedAt.split('T').first;
   }
 }
 

@@ -458,6 +458,82 @@ class TrainingPlan {
       };
 }
 
+class GoalSkillStep {
+  const GoalSkillStep({
+    required this.id,
+    required this.centerId,
+    required this.studentId,
+    required this.goalId,
+    required this.title,
+    this.status = 'لم يبدأ',
+    this.sortOrder = 0,
+    this.notes = '',
+    this.lastSessionId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String goalId;
+  final String title;
+  final String status;
+  final int sortOrder;
+  final String notes;
+  final String lastSessionId;
+  final String createdAt;
+  final String updatedAt;
+
+  static GoalSkillStep fromMap(Map<String, Object?> row) => GoalSkillStep(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        studentId: row['student_id'] as String,
+        goalId: row['goal_id'] as String,
+        title: row['title'] as String,
+        status: (row['status'] ?? 'لم يبدأ') as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        notes: (row['notes'] ?? '') as String,
+        lastSessionId: (row['last_session_id'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'student_id': studentId,
+        'goal_id': goalId,
+        'title': title,
+        'status': status,
+        'sort_order': sortOrder,
+        'notes': notes,
+        'last_session_id': lastSessionId,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+
+  GoalSkillStep copyWith({
+    String? status,
+    String? notes,
+    String? lastSessionId,
+    String? updatedAt,
+  }) =>
+      GoalSkillStep(
+        id: id,
+        centerId: centerId,
+        studentId: studentId,
+        goalId: goalId,
+        title: title,
+        status: status ?? this.status,
+        sortOrder: sortOrder,
+        notes: notes ?? this.notes,
+        lastSessionId: lastSessionId ?? this.lastSessionId,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+}
+
 class TherapyProgram {
   const TherapyProgram({
     required this.id,

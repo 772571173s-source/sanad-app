@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 8;
+  static const currentVersion = 9;
 
   mobile.Database? _database;
 
@@ -191,6 +191,7 @@ class DatabaseService {
         FOREIGN KEY(student_id) REFERENCES students(id)
       )
     ''');
+    await _createGoalSkillStepsTable(db);
     await db.execute('''
       CREATE TABLE exercises (
         id TEXT PRIMARY KEY,
@@ -392,6 +393,9 @@ class DatabaseService {
     }
     if (oldVersion < 8) {
       await _ensureClinicalAssessmentTables(db);
+    }
+    if (oldVersion < 9) {
+      await _ensureGoalSkillStepsTable(db);
     }
   }
 
@@ -715,6 +719,45 @@ class DatabaseService {
         weakness TEXT NOT NULL DEFAULT '',
         goal TEXT NOT NULL DEFAULT '',
         training TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createGoalSkillStepsTable(mobile.Database db) async {
+    await db.execute('''
+      CREATE TABLE goal_skill_steps (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        goal_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'لم يبدأ',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        notes TEXT NOT NULL DEFAULT '',
+        last_session_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(center_id) REFERENCES centers(id),
+        FOREIGN KEY(student_id) REFERENCES students(id),
+        FOREIGN KEY(goal_id) REFERENCES training_plans(id)
+      )
+    ''');
+  }
+
+  Future<void> _ensureGoalSkillStepsTable(mobile.Database db) async {
+    await _ensureTable(db, 'goal_skill_steps', '''
+      CREATE TABLE goal_skill_steps (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        goal_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'لم يبدأ',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        notes TEXT NOT NULL DEFAULT '',
+        last_session_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )

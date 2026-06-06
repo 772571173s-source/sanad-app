@@ -284,6 +284,23 @@ class SanadRepository {
   Future<void> savePlan(TrainingPlan plan) =>
       _db.upsert('training_plans', plan.toMap());
 
+  Future<List<GoalSkillStep>> goalSkillSteps(String studentId) async {
+    final rows = await _db.where('goal_skill_steps',
+        where: 'student_id = ?',
+        whereArgs: [studentId],
+        orderBy: 'goal_id, sort_order');
+    return rows.map(GoalSkillStep.fromMap).toList();
+  }
+
+  Future<List<GoalSkillStep>> goalStepsForGoal(String goalId) async {
+    final rows = await _db.where('goal_skill_steps',
+        where: 'goal_id = ?', whereArgs: [goalId], orderBy: 'sort_order');
+    return rows.map(GoalSkillStep.fromMap).toList();
+  }
+
+  Future<void> saveGoalSkillStep(GoalSkillStep step) =>
+      _db.upsert('goal_skill_steps', step.toMap());
+
   Future<List<TherapyProgram>> programs(String centerId) async {
     final rows = await _db.where('therapy_programs',
         where: 'center_id = ? AND is_active = 1',

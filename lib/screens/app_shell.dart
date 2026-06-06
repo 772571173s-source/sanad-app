@@ -594,25 +594,29 @@ class _SidebarTileState extends State<_SidebarTile> {
                 : Colors.transparent,
           ),
         ),
-        child: ListTile(
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          leading: Icon(
-            widget.item.icon,
-            size: 24,
-            color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
-          ),
-          title: Text(
-            widget.item.title,
-            style: TextStyle(
-              fontWeight: active ? FontWeight.w900 : FontWeight.w700,
-              color: active ? colorScheme.primary : null,
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.control),
             ),
+            leading: Icon(
+              widget.item.icon,
+              size: 24,
+              color:
+                  active ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+            title: Text(
+              widget.item.title,
+              style: TextStyle(
+                fontWeight: active ? FontWeight.w900 : FontWeight.w700,
+                color: active ? colorScheme.primary : null,
+              ),
+            ),
+            onTap: widget.onTap,
           ),
-          onTap: widget.onTap,
         ),
       ),
     );

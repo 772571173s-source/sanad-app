@@ -22,6 +22,7 @@ class AppProvider extends ChangeNotifier {
   List<TherapySession> sessions = [];
   List<Evaluation> evaluations = [];
   List<TrainingPlan> plans = [];
+  List<GoalSkillStep> goalSkillSteps = [];
   List<TherapyProgram> programs = [];
   List<ProgramSection> programSections = [];
   List<ProgramSkill> programSkills = [];
@@ -403,6 +404,7 @@ class AppProvider extends ChangeNotifier {
       sessions = [];
       evaluations = [];
       plans = [];
+      goalSkillSteps = [];
       exercises = [];
       reports = [];
       clinicalAssessments = [];
@@ -416,6 +418,7 @@ class AppProvider extends ChangeNotifier {
       sessions = await _repository.sessions(student.id);
       evaluations = await _repository.evaluations(student.id);
       plans = await _repository.plans(student.id);
+      goalSkillSteps = await _repository.goalSkillSteps(student.id);
       exercises = await _repository.exercises(student.id);
       reports = await _repository.reports(student.id);
       clinicalAssessments = await _repository.clinicalAssessments(student.id);
@@ -672,6 +675,74 @@ class AppProvider extends ChangeNotifier {
     await selectStudent(selectedStudent);
   }
 
+  List<GoalSkillStep> stepsForGoal(String goalId) =>
+      goalSkillSteps.where((step) => step.goalId == goalId).toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  int goalProgress(String goalId) {
+    final steps = stepsForGoal(goalId);
+    if (steps.isEmpty) {
+      final matches = plans.where((item) => item.id == goalId).toList();
+      return matches.isEmpty ? 0 : matches.first.progress;
+    }
+    final completed = steps.where((step) => step.status == 'متقن').length;
+    return ((completed / steps.length) * 100).round();
+  }
+
+  String goalStatus(String goalId) {
+    final progress = goalProgress(goalId);
+    if (progress >= 100) return 'مكتمل';
+    if (progress >= 70) return 'متحسن';
+    if (progress > 0) return 'قيد التدريب';
+    final hasStarted = stepsForGoal(goalId)
+        .any((step) => step.status != 'لم يبدأ' && step.status.isNotEmpty);
+    return hasStarted ? 'يحتاج متابعة' : 'جديد';
+  }
+
+  Future<void> saveGoalSkillStep(GoalSkillStep step) async {
+    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensureClinicalAccess(step.studentId, step.centerId);
+    await _repository.saveGoalSkillStep(step);
+    await _syncGoalProgress(step.goalId);
+    await selectStudent(selectedStudent);
+  }
+
+  Future<void> updateGoalSkillStepStatus({
+    required GoalSkillStep step,
+    required String status,
+    required String notes,
+    String lastSessionId = '',
+  }) async {
+    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensureClinicalAccess(step.studentId, step.centerId);
+    await _repository.saveGoalSkillStep(step.copyWith(
+      status: status,
+      notes: notes,
+      lastSessionId: lastSessionId.isEmpty ? step.lastSessionId : lastSessionId,
+      updatedAt: DateTime.now().toIso8601String(),
+    ));
+    await _syncGoalProgress(step.goalId);
+  }
+
+  Future<void> _syncGoalProgress(String goalId) async {
+    final goalSteps = await _repository.goalStepsForGoal(goalId);
+    final matches = plans.where((plan) => plan.id == goalId).toList();
+    if (matches.isEmpty || goalSteps.isEmpty) return;
+    final plan = matches.first;
+    final completed = goalSteps.where((step) => step.status == 'متقن').length;
+    final progress = ((completed / goalSteps.length) * 100).round();
+    await _repository.savePlan(TrainingPlan(
+      id: plan.id,
+      centerId: plan.centerId,
+      studentId: plan.studentId,
+      goal: plan.goal,
+      targetDate: plan.targetDate,
+      progress: progress,
+      createdAt: plan.createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+    ));
+  }
+
   Future<void> saveClinicalAssessment({
     required ClinicalAssessment assessment,
     required List<ClinicalFinding> findings,
@@ -682,9 +753,11 @@ class AppProvider extends ChangeNotifier {
     for (final finding in findings) {
       await _repository.saveClinicalFinding(finding);
       if (!finding.isNormal && finding.goal.trim().isNotEmpty) {
+        final planId = 'plan_${finding.id}';
+        final now = DateTime.now().toIso8601String();
         await _repository.savePlan(
           TrainingPlan(
-            id: 'plan_${finding.id}',
+            id: planId,
             centerId: finding.centerId,
             studentId: finding.studentId,
             goal: finding.goal,
@@ -694,8 +767,29 @@ class AppProvider extends ChangeNotifier {
                 .split('T')
                 .first,
             progress: 0,
+            createdAt: now,
+            updatedAt: now,
           ),
         );
+        final training =
+            finding.training.trim().isEmpty ? finding.goal : finding.training;
+        final stepTitles = [
+          'يشاهد الأخصائي ينفذ التدريب: $training',
+          'ينفذ التدريب بمساعدة: $training',
+          'ينفذ التدريب باستقلالية: $training',
+        ];
+        for (var index = 0; index < stepTitles.length; index++) {
+          await _repository.saveGoalSkillStep(GoalSkillStep(
+            id: 'step_${finding.id}_${index + 1}',
+            centerId: finding.centerId,
+            studentId: finding.studentId,
+            goalId: planId,
+            title: stepTitles[index],
+            sortOrder: index,
+            createdAt: now,
+            updatedAt: now,
+          ));
+        }
       }
     }
     await _log(
