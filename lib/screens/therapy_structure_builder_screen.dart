@@ -522,14 +522,33 @@ class _ItemAddRowState extends State<_ItemAddRow> {
             ),
           ),
           SizedBox(
-            width: 190,
+            width: 280,
             child: DropdownButtonFormField<String>(
               initialValue: responseType,
-              decoration: const InputDecoration(labelText: 'نوع البند'),
+              isExpanded: true,
+              alignment: AlignmentDirectional.centerStart,
+              decoration: const InputDecoration(
+                labelText: 'آلية التقييم',
+                helperText: 'طريقة ظهور الاحتمالات داخل هذا البند',
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
               items: const [
                 DropdownMenuItem(
-                    value: 'custom', child: Text('احتمالات مخصصة')),
+                  value: 'custom',
+                  child: Text('احتمالات مخصصة'),
+                ),
                 DropdownMenuItem(value: 'yesNo', child: Text('نعم / لا')),
+                DropdownMenuItem(
+                  value: 'speechMatrix',
+                  enabled: false,
+                  child: Text('تقييم الحروف - من تبويب Matrix'),
+                ),
+                DropdownMenuItem(
+                  value: 'scale',
+                  enabled: false,
+                  child: Text('درجات / Scale - لاحقًا'),
+                ),
               ],
               onChanged: (value) =>
                   setState(() => responseType = value ?? responseType),
@@ -584,6 +603,20 @@ class _ItemAddRowState extends State<_ItemAddRow> {
   }
 }
 
+String _responseTypeLabel(String value) {
+  switch (value) {
+    case 'yesNo':
+      return 'نعم / لا';
+    case 'speechMatrix':
+      return 'تقييم الحروف';
+    case 'scale':
+      return 'درجات / Scale';
+    case 'custom':
+    default:
+      return 'احتمالات مخصصة';
+  }
+}
+
 class _ItemTemplateCard extends StatelessWidget {
   const _ItemTemplateCard({required this.app, required this.item});
 
@@ -610,9 +643,7 @@ class _ItemTemplateCard extends StatelessWidget {
                       spacing: AppSpacing.xs,
                       children: [
                         AppPill(
-                          label: item.responseType == 'yesNo'
-                              ? 'نعم / لا'
-                              : 'احتمالات مخصصة',
+                          label: _responseTypeLabel(item.responseType),
                           icon: Icons.tune_outlined,
                         ),
                       ],
