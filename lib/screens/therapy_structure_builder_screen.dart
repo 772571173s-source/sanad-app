@@ -24,12 +24,15 @@ class TherapyStructureBuilderScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SemanticAlertCard(
+        SemanticAlertCard(
           kind: SemanticAlertKind.info,
           icon: Icons.schema_outlined,
-          title: 'Therapy Structure Builder',
-          message:
-              'هذه الشاشة تبني القوالب العلاجية فقط. لا يوجد طالب هنا، ولا جلسة، ولا تقرير. التقييم يستخدم هذه القوالب لاحقًا لتوليد نقاط الضعف والأهداف والتدريبات.',
+          title: app.isGlobalTherapyStructureMode
+              ? 'مكتبة سند العلاجية العامة'
+              : 'هيكل البرامج العلاجية داخل المركز',
+          message: app.isGlobalTherapyStructureMode
+              ? 'أي قالب تضيفه هنا يصبح مرجعًا عامًا متاحًا لكل المراكز.'
+              : 'ستظهر هنا مكتبة سند العامة أولًا، ثم قوالب المركز الخاصة. القوالب العامة للقراءة فقط داخل المركز.',
         ),
         const SizedBox(height: AppSpacing.md),
         _AssessmentStructureSheet(app: app),
@@ -101,7 +104,15 @@ class _SectionAddRowState extends State<_SectionAddRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('إضافة قسم تقييم', style: SanadText.subtitle(context)),
+          Row(
+            children: [
+              Expanded(
+                child:
+                    Text('إضافة قسم تقييم', style: SanadText.subtitle(context)),
+              ),
+              _ScopeBadge(centerId: widget.app.therapyStructureWriteCenterId),
+            ],
+          ),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
@@ -143,7 +154,7 @@ class _SectionAddRowState extends State<_SectionAddRow> {
       () => widget.app.saveAssessmentSectionTemplate(
         AssessmentSectionTemplate(
           id: 'section_${DateTime.now().microsecondsSinceEpoch}',
-          centerId: widget.app.activeCenterId,
+          centerId: widget.app.therapyStructureWriteCenterId,
           title: title.text.trim(),
           description: description.text.trim(),
           sortOrder: widget.app.assessmentSections.length,
@@ -167,6 +178,7 @@ class _SectionTemplateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(section.centerId);
     final items =
         app.assessmentItems.where((item) => item.sectionId == section.id);
     return AppCard(
@@ -175,18 +187,29 @@ class _SectionTemplateCard extends StatelessWidget {
         initiallyExpanded: true,
         tilePadding: EdgeInsets.zero,
         childrenPadding: EdgeInsets.zero,
-        title: Text(section.title, style: SanadText.title(context)),
+        title: Row(
+          children: [
+            Expanded(
+                child: Text(section.title, style: SanadText.title(context))),
+            _ScopeBadge(centerId: section.centerId),
+          ],
+        ),
         subtitle: section.description.isEmpty
             ? const Text('قسم تقييم')
             : Text(section.description),
-        trailing: IconButton(
-          tooltip: 'حذف القسم',
-          onPressed: () => app.deleteAssessmentSectionTemplate(section.id),
-          icon: const Icon(Icons.delete_outline),
-        ),
+        trailing: canEdit
+            ? IconButton(
+                tooltip: 'حذف القسم',
+                onPressed: () =>
+                    app.deleteAssessmentSectionTemplate(section.id),
+                icon: const Icon(Icons.delete_outline),
+              )
+            : const Icon(Icons.lock_outline),
         children: [
-          _ItemAddRow(app: app, section: section, nextOrder: items.length),
-          const SizedBox(height: AppSpacing.sm),
+          if (canEdit) ...[
+            _ItemAddRow(app: app, section: section, nextOrder: items.length),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (items.isEmpty)
             const EmptyState(
               icon: Icons.playlist_add_outlined,
@@ -274,7 +297,7 @@ class _ItemAddRowState extends State<_ItemAddRow> {
     await widget.app.saveAssessmentItemTemplate(
       AssessmentItemTemplate(
         id: 'item_${DateTime.now().microsecondsSinceEpoch}',
-        centerId: widget.app.activeCenterId,
+        centerId: widget.section.centerId,
         sectionId: widget.section.id,
         title: title.text.trim(),
         prompt: prompt.text.trim(),
@@ -296,6 +319,7 @@ class _ItemTemplateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(item.centerId);
     final options =
         app.assessmentOptions.where((option) => option.itemId == item.id);
     return AppCard(
@@ -314,16 +338,21 @@ class _ItemTemplateCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'حذف البند',
-                onPressed: () => app.deleteAssessmentItemTemplate(item.id),
-                icon: const Icon(Icons.delete_outline),
-              ),
+              if (canEdit)
+                IconButton(
+                  tooltip: 'حذف البند',
+                  onPressed: () => app.deleteAssessmentItemTemplate(item.id),
+                  icon: const Icon(Icons.delete_outline),
+                )
+              else
+                const Icon(Icons.lock_outline),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _OptionAddRow(app: app, item: item, nextOrder: options.length),
-          const SizedBox(height: AppSpacing.sm),
+          if (canEdit) ...[
+            _OptionAddRow(app: app, item: item, nextOrder: options.length),
+            const SizedBox(height: AppSpacing.sm),
+          ],
           if (options.isEmpty)
             const Text('أضف احتمالات هذا البند مثل: طبيعي، مائل لليمين...')
           else
@@ -374,6 +403,16 @@ class _OptionAddRowState extends State<_OptionAddRow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('إضافة خلية للمصفوفة',
+                    style: SanadText.subtitle(context)),
+              ),
+              _ScopeBadge(centerId: widget.app.therapyStructureWriteCenterId),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
@@ -425,7 +464,7 @@ class _OptionAddRowState extends State<_OptionAddRow> {
     await widget.app.saveAssessmentOptionTemplate(
       AssessmentOptionTemplate(
         id: 'option_${DateTime.now().microsecondsSinceEpoch}',
-        centerId: widget.app.activeCenterId,
+        centerId: widget.item.centerId,
         itemId: widget.item.id,
         label: label.text.trim(),
         generatesTherapy: generatesTherapy,
@@ -453,6 +492,7 @@ class _OptionTemplatePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(option.centerId);
     final steps = app.skillStepTemplates
         .where(
             (step) => step.ownerType == 'option' && step.ownerId == option.id)
@@ -482,27 +522,33 @@ class _OptionTemplatePanel extends StatelessWidget {
                 Expanded(
                   child: Text(option.label, style: SanadText.subtitle(context)),
                 ),
-                IconButton(
-                  tooltip: 'حذف الاحتمال',
-                  onPressed: () =>
-                      app.deleteAssessmentOptionTemplate(option.id),
-                  icon: const Icon(Icons.delete_outline),
-                ),
+                if (canEdit)
+                  IconButton(
+                    tooltip: 'حذف الاحتمال',
+                    onPressed: () =>
+                        app.deleteAssessmentOptionTemplate(option.id),
+                    icon: const Icon(Icons.delete_outline),
+                  )
+                else
+                  const Icon(Icons.lock_outline),
               ],
             ),
             if (option.generatesTherapy) ...[
               const SizedBox(height: AppSpacing.sm),
               _TemplatePreview(
-                  label: 'Weakness', value: option.weaknessTemplate),
-              _TemplatePreview(label: 'Goal', value: option.goalTemplate),
-              _TemplatePreview(label: 'Therapy', value: option.therapyTemplate),
+                  label: 'نقطة الضعف', value: option.weaknessTemplate),
+              _TemplatePreview(
+                  label: 'الهدف العلاجي', value: option.goalTemplate),
+              _TemplatePreview(
+                  label: 'العلاج / التدريب', value: option.therapyTemplate),
               const SizedBox(height: AppSpacing.sm),
-              _SkillStepAddRow(
-                app: app,
-                ownerType: 'option',
-                ownerId: option.id,
-                nextOrder: steps.length,
-              ),
+              if (canEdit)
+                _SkillStepAddRow(
+                  app: app,
+                  ownerType: 'option',
+                  ownerId: option.id,
+                  nextOrder: steps.length,
+                ),
               ...steps.map((step) => _SkillStepTile(app: app, step: step)),
             ],
           ],
@@ -653,7 +699,7 @@ class _SoundTriggerAddRowState extends State<_SoundTriggerAddRow> {
     await widget.app.saveSpeechSoundTriggerTemplate(
       SpeechSoundTriggerTemplate(
         id: 'sound_${DateTime.now().microsecondsSinceEpoch}',
-        centerId: widget.app.activeCenterId,
+        centerId: widget.app.therapyStructureWriteCenterId,
         letter: letter.text.trim(),
         errorType: errorType,
         position: position,
@@ -681,6 +727,7 @@ class _SoundTriggerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(trigger.centerId);
     final steps = app.skillStepTemplates
         .where(
             (step) => step.ownerType == 'sound' && step.ownerId == trigger.id)
@@ -706,28 +753,35 @@ class _SoundTriggerCard extends StatelessWidget {
                   children: [
                     AppPill(label: trigger.errorType, selected: true),
                     AppPill(label: trigger.position),
+                    _ScopeBadge(centerId: trigger.centerId),
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'حذف الخلية',
-                onPressed: () =>
-                    app.deleteSpeechSoundTriggerTemplate(trigger.id),
-                icon: const Icon(Icons.delete_outline),
-              ),
+              if (canEdit)
+                IconButton(
+                  tooltip: 'حذف الخلية',
+                  onPressed: () =>
+                      app.deleteSpeechSoundTriggerTemplate(trigger.id),
+                  icon: const Icon(Icons.delete_outline),
+                )
+              else
+                const Icon(Icons.lock_outline),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _TemplatePreview(label: 'Weakness', value: trigger.weaknessTemplate),
-          _TemplatePreview(label: 'Goal', value: trigger.goalTemplate),
-          _TemplatePreview(label: 'Therapy', value: trigger.therapyTemplate),
+          _TemplatePreview(
+              label: 'نقطة الضعف', value: trigger.weaknessTemplate),
+          _TemplatePreview(label: 'الهدف العلاجي', value: trigger.goalTemplate),
+          _TemplatePreview(
+              label: 'العلاج / التدريب', value: trigger.therapyTemplate),
           const SizedBox(height: AppSpacing.sm),
-          _SkillStepAddRow(
-            app: app,
-            ownerType: 'sound',
-            ownerId: trigger.id,
-            nextOrder: steps.length,
-          ),
+          if (canEdit)
+            _SkillStepAddRow(
+              app: app,
+              ownerType: 'sound',
+              ownerId: trigger.id,
+              nextOrder: steps.length,
+            ),
           ...steps.map((step) => _SkillStepTile(app: app, step: step)),
         ],
       ),
@@ -752,17 +806,17 @@ class _TherapyTemplateFields extends StatelessWidget {
       children: [
         TextField(
           controller: weakness,
-          decoration: const InputDecoration(labelText: 'Weakness Template'),
+          decoration: const InputDecoration(labelText: 'نقطة الضعف'),
         ),
         const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: goal,
-          decoration: const InputDecoration(labelText: 'Goal Template'),
+          decoration: const InputDecoration(labelText: 'الهدف العلاجي'),
         ),
         const SizedBox(height: AppSpacing.sm),
         TextField(
           controller: therapy,
-          decoration: const InputDecoration(labelText: 'Therapy Template'),
+          decoration: const InputDecoration(labelText: 'العلاج / التدريب'),
         ),
       ],
     );
@@ -805,7 +859,7 @@ class _SkillStepAddRowState extends State<_SkillStepAddRow> {
           width: 420,
           child: TextField(
             controller: title,
-            decoration: const InputDecoration(labelText: 'Skill Step'),
+            decoration: const InputDecoration(labelText: 'مهارة علاجية'),
           ),
         ),
         FilledButton.tonalIcon(
@@ -844,16 +898,35 @@ class _SkillStepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(step.centerId);
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(child: Text('${step.sortOrder + 1}')),
       title: Text(step.title),
-      trailing: IconButton(
-        tooltip: 'حذف الخطوة',
-        onPressed: () => app.deleteSkillStepTemplate(step.id),
-        icon: const Icon(Icons.close),
-      ),
+      trailing: canEdit
+          ? IconButton(
+              tooltip: 'حذف الخطوة',
+              onPressed: () => app.deleteSkillStepTemplate(step.id),
+              icon: const Icon(Icons.close),
+            )
+          : const Icon(Icons.lock_outline),
+    );
+  }
+}
+
+class _ScopeBadge extends StatelessWidget {
+  const _ScopeBadge({required this.centerId});
+
+  final String centerId;
+
+  @override
+  Widget build(BuildContext context) {
+    final global = centerId.isEmpty;
+    return AppPill(
+      label: global ? 'عام من سند' : 'خاص بالمركز',
+      icon: global ? Icons.public_outlined : Icons.business_outlined,
+      selected: global,
     );
   }
 }

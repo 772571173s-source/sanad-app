@@ -146,6 +146,11 @@ class _AppShellState extends State<AppShell> {
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem('المراكز', Icons.business_outlined, CentersScreen()),
         _NavItem('المدراء', Icons.manage_accounts_outlined, StaffScreen()),
+        _NavItem(
+          'مكتبة سند العلاجية',
+          Icons.schema_outlined,
+          TherapyStructureBuilderScreen(),
+        ),
         _NavItem('المساعدة', Icons.support_agent, OwnerSupportScreen()),
         _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
       ];

@@ -360,9 +360,11 @@ class SanadRepository {
       String centerId) async {
     final rows = await _db.where(
       'assessment_section_templates',
-      where: 'center_id = ?',
-      whereArgs: [centerId],
-      orderBy: 'sort_order, created_at',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, sort_order, created_at',
     );
     return rows.map(AssessmentSectionTemplate.fromMap).toList();
   }
@@ -371,9 +373,11 @@ class SanadRepository {
       String centerId) async {
     final rows = await _db.where(
       'assessment_item_templates',
-      where: 'center_id = ?',
-      whereArgs: [centerId],
-      orderBy: 'sort_order, created_at',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, sort_order, created_at',
     );
     return rows.map(AssessmentItemTemplate.fromMap).toList();
   }
@@ -382,9 +386,11 @@ class SanadRepository {
       String centerId) async {
     final rows = await _db.where(
       'assessment_option_templates',
-      where: 'center_id = ?',
-      whereArgs: [centerId],
-      orderBy: 'sort_order, created_at',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, sort_order, created_at',
     );
     return rows.map(AssessmentOptionTemplate.fromMap).toList();
   }
@@ -392,9 +398,11 @@ class SanadRepository {
   Future<List<SkillStepTemplate>> skillStepTemplates(String centerId) async {
     final rows = await _db.where(
       'skill_step_templates',
-      where: 'center_id = ?',
-      whereArgs: [centerId],
-      orderBy: 'owner_type, owner_id, sort_order, created_at',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, owner_type, owner_id, sort_order, created_at',
     );
     return rows.map(SkillStepTemplate.fromMap).toList();
   }
@@ -403,9 +411,11 @@ class SanadRepository {
       String centerId) async {
     final rows = await _db.where(
       'speech_sound_trigger_templates',
-      where: 'center_id = ?',
-      whereArgs: [centerId],
-      orderBy: 'sort_order, letter, error_type, position',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, sort_order, letter, error_type, position',
     );
     return rows.map(SpeechSoundTriggerTemplate.fromMap).toList();
   }

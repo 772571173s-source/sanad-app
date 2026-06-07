@@ -78,6 +78,9 @@ class AppProvider extends ChangeNotifier {
   bool get canCreateHomework => hasPermission(AppPermission.createHomework);
   bool get canManageTherapyStructure =>
       hasPermission(AppPermission.manageTherapyStructure);
+  bool get isGlobalTherapyStructureMode => isOwner && !isSupportMode;
+  String get therapyStructureWriteCenterId =>
+      isGlobalTherapyStructureMode ? '' : activeCenterId;
   bool get canWriteParentArea =>
       isParent || hasPermission(AppPermission.createHomework);
   bool get canViewReports => hasPermission(AppPermission.viewReports);
@@ -364,7 +367,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> _loadTherapyStructure() async {
-    if (activeCenterId.isEmpty) {
+    if (!isGlobalTherapyStructureMode && activeCenterId.isEmpty) {
       assessmentSections = [];
       assessmentItems = [];
       assessmentOptions = [];
@@ -372,14 +375,15 @@ class AppProvider extends ChangeNotifier {
       speechSoundTriggers = [];
       return;
     }
+    final scopeCenterId = isGlobalTherapyStructureMode ? '' : activeCenterId;
     assessmentSections =
-        await _repository.assessmentSectionTemplates(activeCenterId);
-    assessmentItems = await _repository.assessmentItemTemplates(activeCenterId);
+        await _repository.assessmentSectionTemplates(scopeCenterId);
+    assessmentItems = await _repository.assessmentItemTemplates(scopeCenterId);
     assessmentOptions =
-        await _repository.assessmentOptionTemplates(activeCenterId);
-    skillStepTemplates = await _repository.skillStepTemplates(activeCenterId);
+        await _repository.assessmentOptionTemplates(scopeCenterId);
+    skillStepTemplates = await _repository.skillStepTemplates(scopeCenterId);
     speechSoundTriggers =
-        await _repository.speechSoundTriggerTemplates(activeCenterId);
+        await _repository.speechSoundTriggerTemplates(scopeCenterId);
   }
 
   Future<void> enterSupportMode(SanadCenter center) async {
@@ -826,9 +830,10 @@ class AppProvider extends ChangeNotifier {
       AssessmentSectionTemplate section) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final writeCenterId = therapyStructureWriteCenterId;
     final normalized = AssessmentSectionTemplate(
       id: section.id,
-      centerId: activeCenterId,
+      centerId: writeCenterId,
       title: section.title,
       description: section.description,
       sortOrder: section.sortOrder,
@@ -836,6 +841,8 @@ class AppProvider extends ChangeNotifier {
       updatedAt: section.updatedAt,
     );
     await _repository.saveAssessmentSectionTemplate(normalized);
+    await _logTherapyStructureChange('حفظ قسم تقييم', normalized.id,
+        centerId: writeCenterId, details: normalized.title);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -843,9 +850,13 @@ class AppProvider extends ChangeNotifier {
   Future<void> saveAssessmentItemTemplate(AssessmentItemTemplate item) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final section =
+        assessmentSections.firstWhere((entry) => entry.id == item.sectionId);
+    _ensureCanWriteTherapyTemplate(section.centerId);
+    final writeCenterId = section.centerId;
     final normalized = AssessmentItemTemplate(
       id: item.id,
-      centerId: activeCenterId,
+      centerId: writeCenterId,
       sectionId: item.sectionId,
       title: item.title,
       prompt: item.prompt,
@@ -854,6 +865,8 @@ class AppProvider extends ChangeNotifier {
       updatedAt: item.updatedAt,
     );
     await _repository.saveAssessmentItemTemplate(normalized);
+    await _logTherapyStructureChange('حفظ بند تقييم', normalized.id,
+        centerId: writeCenterId, details: normalized.title);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -862,9 +875,13 @@ class AppProvider extends ChangeNotifier {
       AssessmentOptionTemplate option) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final item =
+        assessmentItems.firstWhere((entry) => entry.id == option.itemId);
+    _ensureCanWriteTherapyTemplate(item.centerId);
+    final writeCenterId = item.centerId;
     final normalized = AssessmentOptionTemplate(
       id: option.id,
-      centerId: activeCenterId,
+      centerId: writeCenterId,
       itemId: option.itemId,
       label: option.label,
       generatesTherapy: option.generatesTherapy,
@@ -876,6 +893,8 @@ class AppProvider extends ChangeNotifier {
       updatedAt: option.updatedAt,
     );
     await _repository.saveAssessmentOptionTemplate(normalized);
+    await _logTherapyStructureChange('حفظ احتمال تقييم', normalized.id,
+        centerId: writeCenterId, details: normalized.label);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -883,9 +902,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> saveSkillStepTemplate(SkillStepTemplate step) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final writeCenterId = _skillStepOwnerCenterId(step.ownerType, step.ownerId);
+    _ensureCanWriteTherapyTemplate(writeCenterId);
     final normalized = SkillStepTemplate(
       id: step.id,
-      centerId: activeCenterId,
+      centerId: writeCenterId,
       ownerType: step.ownerType,
       ownerId: step.ownerId,
       title: step.title,
@@ -894,6 +915,8 @@ class AppProvider extends ChangeNotifier {
       updatedAt: step.updatedAt,
     );
     await _repository.saveSkillStepTemplate(normalized);
+    await _logTherapyStructureChange('حفظ خطوة مهارية', normalized.id,
+        centerId: writeCenterId, details: normalized.title);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -902,9 +925,10 @@ class AppProvider extends ChangeNotifier {
       SpeechSoundTriggerTemplate trigger) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final writeCenterId = therapyStructureWriteCenterId;
     final normalized = SpeechSoundTriggerTemplate(
       id: trigger.id,
-      centerId: activeCenterId,
+      centerId: writeCenterId,
       letter: trigger.letter,
       errorType: trigger.errorType,
       position: trigger.position,
@@ -917,6 +941,10 @@ class AppProvider extends ChangeNotifier {
       updatedAt: trigger.updatedAt,
     );
     await _repository.saveSpeechSoundTriggerTemplate(normalized);
+    await _logTherapyStructureChange('حفظ خلية مصفوفة حروف', normalized.id,
+        centerId: writeCenterId,
+        details:
+            '${normalized.letter} - ${normalized.errorType} - ${normalized.position}');
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -924,15 +952,37 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteAssessmentSectionTemplate(String id) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final section = assessmentSections.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(section.centerId);
     await _repository.deleteAssessmentSectionTemplate(id);
+    await _logTherapyStructureChange('حذف قسم تقييم', id,
+        centerId: section.centerId, details: section.title);
     await _loadTherapyStructure();
     notifyListeners();
+  }
+
+  String _skillStepOwnerCenterId(String ownerType, String ownerId) {
+    if (ownerType == 'option') {
+      return assessmentOptions
+          .firstWhere((entry) => entry.id == ownerId)
+          .centerId;
+    }
+    if (ownerType == 'sound') {
+      return speechSoundTriggers
+          .firstWhere((entry) => entry.id == ownerId)
+          .centerId;
+    }
+    return therapyStructureWriteCenterId;
   }
 
   Future<void> deleteAssessmentItemTemplate(String id) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final item = assessmentItems.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(item.centerId);
     await _repository.deleteAssessmentItemTemplate(id);
+    await _logTherapyStructureChange('حذف بند تقييم', id,
+        centerId: item.centerId, details: item.title);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -940,7 +990,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteAssessmentOptionTemplate(String id) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final option = assessmentOptions.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(option.centerId);
     await _repository.deleteAssessmentOptionTemplate(id);
+    await _logTherapyStructureChange('حذف احتمال تقييم', id,
+        centerId: option.centerId, details: option.label);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -948,7 +1002,11 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteSkillStepTemplate(String id) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final step = skillStepTemplates.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(step.centerId);
     await _repository.deleteSkillStepTemplate(id);
+    await _logTherapyStructureChange('حذف خطوة مهارية', id,
+        centerId: step.centerId, details: step.title);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -956,9 +1014,41 @@ class AppProvider extends ChangeNotifier {
   Future<void> deleteSpeechSoundTriggerTemplate(String id) async {
     _ensure(canManageTherapyStructure,
         'بناء الهيكل العلاجي متاح لمدخل البرامج أو مدير المركز فقط.');
+    final trigger = speechSoundTriggers.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(trigger.centerId);
     await _repository.deleteSpeechSoundTriggerTemplate(id);
+    await _logTherapyStructureChange('حذف خلية مصفوفة حروف', id,
+        centerId: trigger.centerId,
+        details: '${trigger.letter} - ${trigger.errorType}');
     await _loadTherapyStructure();
     notifyListeners();
+  }
+
+  void _ensureCanWriteTherapyTemplate(String templateCenterId) {
+    if (templateCenterId.isEmpty) {
+      _ensure(isGlobalTherapyStructureMode,
+          'قوالب سند العامة يعدلها مالك سند فقط من إدارة سند.');
+    } else {
+      _ensure(isSupportMode || templateCenterId == activeCenterId,
+          'لا يمكن تعديل قوالب مركز آخر.');
+    }
+  }
+
+  bool canEditTherapyTemplate(String templateCenterId) {
+    if (templateCenterId.isEmpty) return isGlobalTherapyStructureMode;
+    return isSupportMode || templateCenterId == activeCenterId;
+  }
+
+  Future<void> _logTherapyStructureChange(String action, String entityId,
+      {required String centerId, String details = ''}) {
+    final scope = centerId.isEmpty ? 'مكتبة سند العامة' : 'مكتبة المركز';
+    return _log(
+      action: action,
+      entityType: 'therapy_structure',
+      entityId: entityId,
+      centerId: centerId,
+      details: '$scope - $details',
+    );
   }
 
   List<SkillStepTemplate> _skillStepTemplatesForFinding(
