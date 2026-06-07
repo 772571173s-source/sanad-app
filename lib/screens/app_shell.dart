@@ -10,7 +10,6 @@ import 'data_entry_screen.dart';
 import 'evaluations_screen.dart';
 import 'owner_support_screen.dart';
 import 'parent_dashboard_screen.dart';
-import 'programs_screen.dart';
 import 'sessions_screen.dart';
 import 'settings_hub_screen.dart';
 import 'staff_screen.dart';
@@ -42,7 +41,7 @@ class _AppShellState extends State<AppShell> {
     }
     final selected = app.user?.forcePasswordChange == true
         ? const _NavItem(
-            'تغيير كلمة المرور',
+            'ط·آ·ط¹آ¾ط·آ·ط·â€؛ط·آ¸ط¸آ¹ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ¸ط¦â€™ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط«â€ ط·آ·ط¢آ±',
             Icons.lock_reset,
             SettingsHubScreen(),
           )
@@ -117,23 +116,26 @@ class _AppShellState extends State<AppShell> {
         const _NavItem(
             'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
-          'الطلاب',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¨',
           Icons.groups_2_outlined,
           StudentsScreen(onOpenProfile: () => setState(() => index = 2)),
         ),
         const _NavItem(
-          'ملف الطالب',
+          'ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨',
           Icons.folder_shared_outlined,
           StudentProfileScreen(),
         ),
         const _NavItem(
-          'الموظفون',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ¸ط«â€ ط·آ·ط¢آ¸ط·آ¸ط¸آ¾ط·آ¸ط«â€ ط·آ¸أ¢â‚¬آ ',
           Icons.manage_accounts_outlined,
           StaffScreen(),
         ),
-        const _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
         const _NavItem(
-          'الإعدادات',
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.construction_outlined,
+            ToolsScreen()),
+        const _NavItem(
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
           Icons.settings_outlined,
           SettingsHubScreen(),
         ),
@@ -142,10 +144,22 @@ class _AppShellState extends State<AppShell> {
     if (app.isOwner) {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem('المراكز', Icons.business_outlined, CentersScreen()),
-        _NavItem('المدراء', Icons.manage_accounts_outlined, StaffScreen()),
-        _NavItem('المساعدة', Icons.support_agent, OwnerSupportScreen()),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ¸ط¦â€™ط·آ·ط¢آ²',
+            Icons.business_outlined,
+            CentersScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ·ط·إ’',
+            Icons.manage_accounts_outlined,
+            StaffScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ©',
+            Icons.support_agent,
+            OwnerSupportScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.settings_outlined,
+            SettingsHubScreen()),
       ];
     }
     if (app.isCenterManager) {
@@ -153,23 +167,26 @@ class _AppShellState extends State<AppShell> {
         const _NavItem(
             'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
-          'الطلاب',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¨',
           Icons.groups_2_outlined,
           StudentsScreen(onOpenProfile: () => setState(() => index = 2)),
         ),
         const _NavItem(
-          'ملف الطالب',
+          'ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨',
           Icons.folder_shared_outlined,
           StudentProfileScreen(),
         ),
         const _NavItem(
-          'الموظفون',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ¸ط«â€ ط·آ·ط¢آ¸ط·آ¸ط¸آ¾ط·آ¸ط«â€ ط·آ¸أ¢â‚¬آ ',
           Icons.manage_accounts_outlined,
           StaffScreen(),
         ),
-        const _NavItem('الأدوات', Icons.construction_outlined, ToolsScreen()),
         const _NavItem(
-          'الإعدادات',
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.construction_outlined,
+            ToolsScreen()),
+        const _NavItem(
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
           Icons.settings_outlined,
           SettingsHubScreen(),
         ),
@@ -180,31 +197,29 @@ class _AppShellState extends State<AppShell> {
         const _NavItem(
             'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
-          'الطلاب',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¨',
           Icons.groups_2_outlined,
           StudentsScreen(
-            onOpenProfile: () => setState(() => index = 3),
-            onStartSession: () => setState(() => index = 5),
+            onOpenProfile: () => setState(() => index = 2),
+            onStartSession: () => setState(() => index = 4),
           ),
         ),
         const _NavItem(
-          'البرامج العلاجية',
-          Icons.extension_outlined,
-          ProgramsScreen(),
-        ),
-        const _NavItem(
-          'ملف الطالب',
+          'ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨',
           Icons.folder_shared_outlined,
           StudentProfileScreen(),
         ),
         const _NavItem(
-          'التقييم العلاجي',
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¹ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¬ط·آ¸ط¸آ¹',
           Icons.fact_check_outlined,
           EvaluationsScreen(),
         ),
-        const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
         const _NavItem(
-          'الإعدادات',
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.timer_outlined,
+            SessionsScreen()),
+        const _NavItem(
+          'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
           Icons.settings_outlined,
           SettingsHubScreen(),
         ),
@@ -213,26 +228,41 @@ class _AppShellState extends State<AppShell> {
     if (app.isDataEntry) {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem('الإدخال', Icons.person_add_alt, DataEntryScreen()),
-        _NavItem('الطلاب', Icons.groups_2_outlined, StudentsScreen()),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¯ط·آ·ط¢آ®ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چ',
+            Icons.person_add_alt,
+            DataEntryScreen()),
+        _NavItem('ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¨',
+            Icons.groups_2_outlined, StudentsScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.settings_outlined,
+            SettingsHubScreen()),
       ];
     }
     if (app.isProgramEntry) {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem('البرامج', Icons.extension_outlined, ProgramsScreen()),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem(
+          'ط·آ§ط¸â€‍ط·ع¾ط¸â€ڑط¸ظ¹ط¸ظ¹ط¸â€¦ ط·آ§ط¸â€‍ط·آ¹ط¸â€‍ط·آ§ط·آ¬ط¸ظ¹',
+          Icons.fact_check_outlined,
+          EvaluationsScreen(),
+        ),
+        _NavItem('ط·آ§ط¸â€‍ط·آ¥ط·آ¹ط·آ¯ط·آ§ط·آ¯ط·آ§ط·ع¾',
+            Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
     if (app.isParent) {
       return const [
         _NavItem(
-          'لوحة ولي الأمر',
+          'ط·آ¸أ¢â‚¬â€چط·آ¸ط«â€ ط·آ·ط¢آ­ط·آ·ط¢آ© ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±',
           Icons.family_restroom_outlined,
           ParentDashboardScreen(),
         ),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¹آ¾',
+            Icons.settings_outlined,
+            SettingsHubScreen()),
       ];
     }
     return const [
@@ -251,14 +281,16 @@ class _SupportModeBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return TherapyCard(
       icon: Icons.support_agent,
-      title: 'أنت الآن تساعد مركز: ${centerName.isEmpty ? '-' : centerName}',
+      title:
+          'ط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¹آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¢ط·آ¸أ¢â‚¬آ  ط·آ·ط¹آ¾ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¹ط·آ·ط¢آ¯ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²: ${centerName.isEmpty ? '-' : centerName}',
       trailing: FilledButton.tonalIcon(
         onPressed: onExit,
         icon: const Icon(Icons.keyboard_return),
-        label: const Text('العودة إلى إدارة سند'),
+        label: const Text(
+            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸ط«â€ ط·آ·ط¢آ¯ط·آ·ط¢آ© ط·آ·ط¢آ¥ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ° ط·آ·ط¢آ¥ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ·ط¢آ© ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯'),
       ),
       child: const Text(
-        'تعمل الآن داخل بيئة المركز بصلاحيات مدير المركز، مع بقاء حسابك كمالك سند.',
+        'ط·آ·ط¹آ¾ط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¢ط·آ¸أ¢â‚¬آ  ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ¨ط·آ¸ط¸آ¹ط·آ·ط¢آ¦ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ² ط·آ·ط¢آ¨ط·آ·ط¢آµط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ­ط·آ¸ط¸آ¹ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²ط·آ·ط¥â€™ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¹ ط·آ·ط¢آ¨ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ§ط·آ·ط·إ’ ط·آ·ط¢آ­ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¨ط·آ¸ط¦â€™ ط·آ¸ط¦â€™ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸ط¦â€™ ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯.',
       ),
     );
   }
@@ -273,8 +305,9 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final user = app.user;
-    final name =
-        user?.name.trim().isNotEmpty == true ? user!.name : 'مستخدم سند';
+    final name = user?.name.trim().isNotEmpty == true
+        ? user!.name
+        : 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¹آ¾ط·آ·ط¢آ®ط·آ·ط¢آ¯ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯';
     final roleLabel = _roleLabel(user?.role);
     final colorScheme = Theme.of(context).colorScheme;
     return Row(
@@ -303,7 +336,7 @@ class _Header extends StatelessWidget {
           ),
         ),
         PopupMenuButton<String>(
-          tooltip: 'الحساب',
+          tooltip: 'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ­ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¨',
           offset: const Offset(0, 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.control),
@@ -327,7 +360,8 @@ class _Header extends StatelessWidget {
               value: 'logout',
               child: _ProfileMenuItem(
                 icon: Icons.logout,
-                label: 'تسجيل الخروج',
+                label:
+                    'ط·آ·ط¹آ¾ط·آ·ط¢آ³ط·آ·ط¢آ¬ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ®ط·آ·ط¢آ±ط·آ¸ط«â€ ط·آ·ط¢آ¬',
                 danger: true,
               ),
             ),
@@ -372,42 +406,54 @@ class _Header extends StatelessWidget {
 
   String _greeting(String name) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'صباح الخير، $name 👋';
-    if (hour < 17) return 'أهلًا، $name ☀️';
-    return 'مساء الخير، $name 🌙';
+    if (hour < 12) {
+      return 'صباح الخير، $name';
+    }
+    if (hour < 17) {
+      return 'أهلًا، $name';
+    }
+    return 'مساء الخير، $name';
   }
 
   String _subtitle(AppProvider app, String title) {
-    if (app.isOwner) return 'إدارة سند والتأهيل';
+    if (app.isOwner) return 'ط¥ط¯ط§ط±ط© ط³ظ†ط¯ ظˆط§ظ„طھط£ظ‡ظٹظ„';
     if (app.isCenterManager) {
       final center = app.currentCenter?.name;
       return center == null || center.isEmpty
-          ? 'إدارة المركز'
-          : 'إدارة مركز $center';
+          ? 'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط±ظƒط²'
+          : 'ط¥ط¯ط§ط±ط© ظ…ط±ظƒط² $center';
     }
-    if (app.isSpecialist) return 'متابعة الجلسات والخطط العلاجية';
-    if (app.isParent) return 'متابعة الواجبات والتقدم المنزلي';
-    if (app.isDataEntry) return 'تنظيم إدخال الطلاب وبيانات أولياء الأمور';
-    if (app.isProgramEntry) return 'إدارة محتوى البرامج العلاجية';
+    if (app.isSpecialist) {
+      return 'ظ…طھط§ط¨ط¹ط© ط§ظ„طھظ‚ظٹظٹظ…ط§طھ ظˆط§ظ„ط£ظ‡ط¯ط§ظپ ظˆط§ظ„ط¬ظ„ط³ط§طھ ط§ظ„ط¹ظ„ط§ط¬ظٹط©';
+    }
+    if (app.isParent) {
+      return 'ظ…طھط§ط¨ط¹ط© ط§ظ„ظˆط§ط¬ط¨ط§طھ ظˆط§ظ„طھظ‚ط¯ظ… ط§ظ„ظ…ظ†ط²ظ„ظٹ';
+    }
+    if (app.isDataEntry) {
+      return 'طھظ†ط¸ظٹظ… ط¥ط¯ط®ط§ظ„ ط§ظ„ط·ظ„ط§ط¨ ظˆط¨ظٹط§ظ†ط§طھ ط£ظˆظ„ظٹط§ط، ط§ظ„ط£ظ…ظˆط±';
+    }
+    if (app.isProgramEntry) {
+      return 'طھظ†ط¸ظٹظ… ط§ظ„ظ†ظˆط§ط© ط§ظ„ط¹ظ„ط§ط¬ظٹط© ظˆط§ظ„ط£ظ‡ط¯ط§ظپ ط§ظ„ط³ط±ظٹط±ظٹط©';
+    }
     return title;
   }
 
   String _roleLabel(UserRole? role) {
     switch (role) {
       case UserRole.sanadOwner:
-        return 'مالك النظام';
+        return 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸ط¦â€™ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¸ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ¦';
       case UserRole.centerManager:
-        return 'مدير مركز';
+        return 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ²';
       case UserRole.specialist:
-        return 'أخصائي';
+        return 'ط·آ·ط¢آ£ط·آ·ط¢آ®ط·آ·ط¢آµط·آ·ط¢آ§ط·آ·ط¢آ¦ط·آ¸ط¸آ¹';
       case UserRole.dataEntry:
-        return 'مدخل بيانات';
+        return 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ¨ط·آ¸ط¸آ¹ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ§ط·آ·ط¹آ¾';
       case UserRole.programEntry:
-        return 'مدخل برامج';
+        return 'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ¨ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¬';
       case UserRole.parent:
-        return 'ولي أمر';
+        return 'ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ ط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±';
       case null:
-        return 'حساب';
+        return 'ط·آ·ط¢آ­ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¨';
     }
   }
 }
@@ -510,7 +556,7 @@ class _Sidebar extends StatelessWidget {
                 leading: CircleAvatar(
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   child: const Text(
-                    'س',
+                    'ط·آ·ط¢آ³',
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
@@ -523,7 +569,7 @@ class _Sidebar extends StatelessWidget {
                 ),
                 subtitle: Text(
                   context.watch<AppProvider>().currentCenter?.name ??
-                      'إدارة التخاطب والتأهيل',
+                      'ط·آ·ط¢آ¥ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ·ط¢آ®ط·آ·ط¢آ§ط·آ·ط¢آ·ط·آ·ط¢آ¨ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ·ط¢آ£ط·آ¸أ¢â‚¬طŒط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬â€چ',
                 ),
               ),
               const SizedBox(height: 12),

@@ -1,4 +1,4 @@
-enum UserRole {
+﻿enum UserRole {
   sanadOwner,
   centerManager,
   specialist,
@@ -11,17 +11,17 @@ extension UserRoleX on UserRole {
   String get label {
     switch (this) {
       case UserRole.sanadOwner:
-        return 'مالك النظام';
+        return 'ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ…';
       case UserRole.centerManager:
-        return 'مدير مركز';
+        return 'ظ…ط¯ظٹط± ظ…ط±ظƒط²';
       case UserRole.specialist:
-        return 'أخصائي';
+        return 'ط£ط®طµط§ط¦ظٹ';
       case UserRole.dataEntry:
-        return 'مدخل بيانات';
+        return 'ظ…ط¯ط®ظ„ ط¨ظٹط§ظ†ط§طھ';
       case UserRole.programEntry:
-        return 'مدخل برامج';
+        return 'ظ…ط¯ط®ظ„ ط¨ط±ط§ظ…ط¬';
       case UserRole.parent:
-        return 'ولي أمر';
+        return 'ظˆظ„ظٹ ط£ظ…ط±';
     }
   }
 
@@ -150,7 +150,7 @@ class Student {
     required this.age,
     required this.status,
     required this.diagnosis,
-    this.programType = 'نطق وتخاطب',
+    this.programType = 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
     required this.parentName,
     required this.parentPhone,
     required this.portalEmail,
@@ -186,7 +186,7 @@ class Student {
         age: row['age'] as int,
         status: row['status'] as String,
         diagnosis: row['diagnosis'] as String,
-        programType: (row['program_type'] ?? 'نطق وتخاطب') as String,
+        programType: (row['program_type'] ?? 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨') as String,
         parentName: row['parent_name'] as String,
         parentPhone: row['parent_phone'] as String,
         portalEmail: row['portal_email'] as String,
@@ -263,7 +263,7 @@ class TherapySession {
     this.programId = '',
     this.skillId = '',
     this.activityResults = '',
-    this.sessionType = 'نطق وتخاطب',
+    this.sessionType = 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
     this.targetLetter = '',
     this.letterPosition = '',
     this.errorType = '',
@@ -311,7 +311,7 @@ class TherapySession {
         programId: (row['program_id'] ?? '') as String,
         skillId: (row['skill_id'] ?? '') as String,
         activityResults: (row['activity_results'] ?? '') as String,
-        sessionType: (row['session_type'] ?? 'نطق وتخاطب') as String,
+        sessionType: (row['session_type'] ?? 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨') as String,
         targetLetter: (row['target_letter'] ?? '') as String,
         letterPosition: (row['letter_position'] ?? '') as String,
         errorType: (row['error_type'] ?? '') as String,
@@ -465,7 +465,7 @@ class GoalSkillStep {
     required this.studentId,
     required this.goalId,
     required this.title,
-    this.status = 'لم يبدأ',
+    this.status = 'ظ„ظ… ظٹط¨ط¯ط£',
     this.sortOrder = 0,
     this.notes = '',
     this.lastSessionId = '',
@@ -491,7 +491,7 @@ class GoalSkillStep {
         studentId: row['student_id'] as String,
         goalId: row['goal_id'] as String,
         title: row['title'] as String,
-        status: (row['status'] ?? 'لم يبدأ') as String,
+        status: (row['status'] ?? 'ظ„ظ… ظٹط¨ط¯ط£') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         notes: (row['notes'] ?? '') as String,
         lastSessionId: (row['last_session_id'] ?? '') as String,
@@ -532,186 +532,6 @@ class GoalSkillStep {
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
-}
-
-class TherapyProgram {
-  const TherapyProgram({
-    required this.id,
-    required this.centerId,
-    required this.name,
-    required this.type,
-    this.description = '',
-    this.isActive = true,
-    this.createdAt = '',
-    this.updatedAt = '',
-  });
-
-  final String id;
-  final String centerId;
-  final String name;
-  final String type;
-  final String description;
-  final bool isActive;
-  final String createdAt;
-  final String updatedAt;
-
-  static TherapyProgram fromMap(Map<String, Object?> row) => TherapyProgram(
-        id: row['id'] as String,
-        centerId: (row['center_id'] ?? '') as String,
-        name: row['name'] as String,
-        type: row['type'] as String,
-        description: (row['description'] ?? '') as String,
-        isActive: ((row['is_active'] ?? 1) as int) == 1,
-        createdAt: (row['created_at'] ?? '') as String,
-        updatedAt: (row['updated_at'] ?? '') as String,
-      );
-
-  Map<String, Object?> toMap() => {
-        'id': id,
-        'center_id': centerId,
-        'name': name,
-        'type': type,
-        'description': description,
-        'is_active': isActive ? 1 : 0,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
-}
-
-class ProgramSection {
-  const ProgramSection({
-    required this.id,
-    required this.centerId,
-    required this.programId,
-    required this.title,
-    this.sortOrder = 0,
-    this.createdAt = '',
-    this.updatedAt = '',
-  });
-
-  final String id;
-  final String centerId;
-  final String programId;
-  final String title;
-  final int sortOrder;
-  final String createdAt;
-  final String updatedAt;
-
-  static ProgramSection fromMap(Map<String, Object?> row) => ProgramSection(
-        id: row['id'] as String,
-        centerId: (row['center_id'] ?? '') as String,
-        programId: row['program_id'] as String,
-        title: row['title'] as String,
-        sortOrder: (row['sort_order'] ?? 0) as int,
-        createdAt: (row['created_at'] ?? '') as String,
-        updatedAt: (row['updated_at'] ?? '') as String,
-      );
-
-  Map<String, Object?> toMap() => {
-        'id': id,
-        'center_id': centerId,
-        'program_id': programId,
-        'title': title,
-        'sort_order': sortOrder,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
-}
-
-class ProgramSkill {
-  const ProgramSkill({
-    required this.id,
-    required this.centerId,
-    required this.programId,
-    required this.sectionId,
-    required this.title,
-    this.description = '',
-    this.createdAt = '',
-    this.updatedAt = '',
-  });
-
-  final String id;
-  final String centerId;
-  final String programId;
-  final String sectionId;
-  final String title;
-  final String description;
-  final String createdAt;
-  final String updatedAt;
-
-  static ProgramSkill fromMap(Map<String, Object?> row) => ProgramSkill(
-        id: row['id'] as String,
-        centerId: (row['center_id'] ?? '') as String,
-        programId: row['program_id'] as String,
-        sectionId: row['section_id'] as String,
-        title: row['title'] as String,
-        description: (row['description'] ?? '') as String,
-        createdAt: (row['created_at'] ?? '') as String,
-        updatedAt: (row['updated_at'] ?? '') as String,
-      );
-
-  Map<String, Object?> toMap() => {
-        'id': id,
-        'center_id': centerId,
-        'program_id': programId,
-        'section_id': sectionId,
-        'title': title,
-        'description': description,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
-}
-
-class ProgramActivity {
-  const ProgramActivity({
-    required this.id,
-    required this.centerId,
-    required this.programId,
-    required this.skillId,
-    required this.title,
-    this.instructions = '',
-    this.homework = '',
-    this.evaluationType = 'speech',
-    this.createdAt = '',
-    this.updatedAt = '',
-  });
-
-  final String id;
-  final String centerId;
-  final String programId;
-  final String skillId;
-  final String title;
-  final String instructions;
-  final String homework;
-  final String evaluationType;
-  final String createdAt;
-  final String updatedAt;
-
-  static ProgramActivity fromMap(Map<String, Object?> row) => ProgramActivity(
-        id: row['id'] as String,
-        centerId: (row['center_id'] ?? '') as String,
-        programId: row['program_id'] as String,
-        skillId: row['skill_id'] as String,
-        title: row['title'] as String,
-        instructions: (row['instructions'] ?? '') as String,
-        homework: (row['homework'] ?? '') as String,
-        evaluationType: (row['evaluation_type'] ?? 'speech') as String,
-        createdAt: (row['created_at'] ?? '') as String,
-        updatedAt: (row['updated_at'] ?? '') as String,
-      );
-
-  Map<String, Object?> toMap() => {
-        'id': id,
-        'center_id': centerId,
-        'program_id': programId,
-        'skill_id': skillId,
-        'title': title,
-        'instructions': instructions,
-        'homework': homework,
-        'evaluation_type': evaluationType,
-        'created_at': createdAt,
-        'updated_at': updatedAt,
-      };
 }
 
 class Exercise {
@@ -1000,7 +820,7 @@ class SignResource {
     required this.mediaType,
     required this.mediaPath,
     this.notes = '',
-    this.level = 'مبتدئ',
+    this.level = 'ظ…ط¨طھط¯ط¦',
     this.isFavorite = false,
   });
 
@@ -1022,7 +842,7 @@ class SignResource {
         mediaType: row['media_type'] as String,
         mediaPath: row['media_path'] as String,
         notes: row['notes'] as String,
-        level: (row['level'] ?? 'مبتدئ') as String,
+        level: (row['level'] ?? 'ظ…ط¨طھط¯ط¦') as String,
         isFavorite: ((row['is_favorite'] ?? 0) as int) == 1,
       );
 
@@ -1094,7 +914,7 @@ class TrainingItem {
     required this.title,
     this.letter = '',
     this.position = '',
-    this.level = 'مبتدئ',
+    this.level = 'ظ…ط¨طھط¯ط¦',
     this.category = '',
   });
 

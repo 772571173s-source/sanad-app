@@ -10,7 +10,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 9;
+  static const currentVersion = 10;
 
   mobile.Database? _database;
 
@@ -104,7 +104,7 @@ class DatabaseService {
         age INTEGER NOT NULL,
         status TEXT NOT NULL,
         diagnosis TEXT NOT NULL,
-        program_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
+        program_type TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
         parent_name TEXT NOT NULL,
         parent_phone TEXT NOT NULL,
         portal_email TEXT NOT NULL,
@@ -140,7 +140,7 @@ class DatabaseService {
         program_id TEXT NOT NULL DEFAULT '',
         skill_id TEXT NOT NULL DEFAULT '',
         activity_results TEXT NOT NULL DEFAULT '',
-        session_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
+        session_type TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
         target_letter TEXT NOT NULL DEFAULT '',
         letter_position TEXT NOT NULL DEFAULT '',
         error_type TEXT NOT NULL DEFAULT '',
@@ -243,64 +243,6 @@ class DatabaseService {
     ''');
     await _createClinicalAssessmentTables(db);
     await db.execute('''
-      CREATE TABLE therapy_programs (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY(center_id) REFERENCES centers(id)
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE program_sections (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY(center_id) REFERENCES centers(id),
-        FOREIGN KEY(program_id) REFERENCES therapy_programs(id)
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE program_skills (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        section_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY(center_id) REFERENCES centers(id),
-        FOREIGN KEY(program_id) REFERENCES therapy_programs(id),
-        FOREIGN KEY(section_id) REFERENCES program_sections(id)
-      )
-    ''');
-    await db.execute('''
-      CREATE TABLE program_activities (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        skill_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        instructions TEXT NOT NULL DEFAULT '',
-        homework TEXT NOT NULL DEFAULT '',
-        evaluation_type TEXT NOT NULL DEFAULT 'speech',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        FOREIGN KEY(center_id) REFERENCES centers(id),
-        FOREIGN KEY(program_id) REFERENCES therapy_programs(id),
-        FOREIGN KEY(skill_id) REFERENCES program_skills(id)
-      )
-    ''');
-    await db.execute('''
       CREATE TABLE sign_resources (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
@@ -309,7 +251,7 @@ class DatabaseService {
         media_type TEXT NOT NULL,
         media_path TEXT NOT NULL,
         notes TEXT NOT NULL,
-        level TEXT NOT NULL DEFAULT 'مبتدئ',
+        level TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦',
         is_favorite INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT '',
@@ -344,7 +286,7 @@ class DatabaseService {
           media_type TEXT NOT NULL,
           media_path TEXT NOT NULL,
           notes TEXT NOT NULL,
-          level TEXT NOT NULL DEFAULT 'مبتدئ',
+          level TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦',
           is_favorite INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT '',
           updated_at TEXT NOT NULL DEFAULT ''
@@ -376,13 +318,12 @@ class DatabaseService {
     if (oldVersion < 6) {
       await _addColumns(db, {
         'sign_resources': {
-          'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
+          'level': "TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦'",
           'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
         },
       });
     }
     if (oldVersion < 7) {
-      await _ensureProgramTables(db);
       await _addColumns(db, {
         'sessions': {
           'program_id': "TEXT NOT NULL DEFAULT ''",
@@ -396,6 +337,9 @@ class DatabaseService {
     }
     if (oldVersion < 9) {
       await _ensureGoalSkillStepsTable(db);
+    }
+    if (oldVersion < 10) {
+      await _dropLegacyProgramTables(db);
     }
   }
 
@@ -427,7 +371,7 @@ class DatabaseService {
       },
       'students': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
-        'program_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
+        'program_type': "TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨'",
         'deleted_at': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
@@ -443,7 +387,7 @@ class DatabaseService {
         'program_id': "TEXT NOT NULL DEFAULT ''",
         'skill_id': "TEXT NOT NULL DEFAULT ''",
         'activity_results': "TEXT NOT NULL DEFAULT ''",
-        'session_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
+        'session_type': "TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨'",
         'target_letter': "TEXT NOT NULL DEFAULT ''",
         'letter_position': "TEXT NOT NULL DEFAULT ''",
         'error_type': "TEXT NOT NULL DEFAULT ''",
@@ -485,7 +429,7 @@ class DatabaseService {
       },
       'sign_resources': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
-        'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
+        'level': "TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦'",
         'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
@@ -518,11 +462,18 @@ class DatabaseService {
 
   Future<void> _removeDemoData(mobile.Database db) async {
     await db.delete('users', where: 'is_demo = 1');
-    await db.delete('centers', where: 'name LIKE ?', whereArgs: ['%تجريبي%']);
+    await db
+        .delete('centers', where: 'name LIKE ?', whereArgs: ['%طھط¬ط±ظٹط¨ظٹ%']);
+  }
+
+  Future<void> _dropLegacyProgramTables(mobile.Database db) async {
+    await db.execute('DROP TABLE IF EXISTS program_activities');
+    await db.execute('DROP TABLE IF EXISTS program_skills');
+    await db.execute('DROP TABLE IF EXISTS program_sections');
+    await db.execute('DROP TABLE IF EXISTS therapy_programs');
   }
 
   Future<void> _ensureMigrationTables(mobile.Database db) async {
-    await _ensureProgramTables(db);
     await _ensureTable(db, 'parents', '''
       CREATE TABLE parents (
         id TEXT PRIMARY KEY,
@@ -592,58 +543,6 @@ class DatabaseService {
         manager_signature TEXT NOT NULL DEFAULT '',
         file_path TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT ''
-      )
-    ''');
-  }
-
-  Future<void> _ensureProgramTables(mobile.Database db) async {
-    await _ensureTable(db, 'therapy_programs', '''
-      CREATE TABLE therapy_programs (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        type TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        is_active INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-    await _ensureTable(db, 'program_sections', '''
-      CREATE TABLE program_sections (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        sort_order INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-    await _ensureTable(db, 'program_skills', '''
-      CREATE TABLE program_skills (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        section_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    ''');
-    await _ensureTable(db, 'program_activities', '''
-      CREATE TABLE program_activities (
-        id TEXT PRIMARY KEY,
-        center_id TEXT NOT NULL,
-        program_id TEXT NOT NULL,
-        skill_id TEXT NOT NULL,
-        title TEXT NOT NULL,
-        instructions TEXT NOT NULL DEFAULT '',
-        homework TEXT NOT NULL DEFAULT '',
-        evaluation_type TEXT NOT NULL DEFAULT 'speech',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
       )
     ''');
   }
@@ -733,7 +632,7 @@ class DatabaseService {
         student_id TEXT NOT NULL,
         goal_id TEXT NOT NULL,
         title TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'لم يبدأ',
+        status TEXT NOT NULL DEFAULT 'ظ„ظ… ظٹط¨ط¯ط£',
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',
@@ -754,7 +653,7 @@ class DatabaseService {
         student_id TEXT NOT NULL,
         goal_id TEXT NOT NULL,
         title TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'لم يبدأ',
+        status TEXT NOT NULL DEFAULT 'ظ„ظ… ظٹط¨ط¯ط£',
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',

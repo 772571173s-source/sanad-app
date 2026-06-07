@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
-import 'programs_screen.dart';
 import 'reports_screen.dart';
 import 'staff_screen.dart';
 import 'students_screen.dart';
@@ -28,29 +27,22 @@ class _ToolsScreenState extends State<ToolsScreen> {
           children: [
             _ToolCard(
               icon: Icons.search,
-              title: 'بحث عن طالب',
-              subtitle: '${app.students.length} طالب في المركز',
+              title: 'ط¨ط­ط« ط¹ظ† ط·ط§ظ„ط¨',
+              subtitle: '${app.students.length} ط·ط§ظ„ط¨ ظپظٹ ط§ظ„ظ…ط±ظƒط²',
               selected: selected == 'students',
               onTap: () => setState(() => selected = 'students'),
             ),
             _ToolCard(
               icon: Icons.picture_as_pdf_outlined,
-              title: 'طباعة تقرير',
-              subtitle: 'تقارير PDF للطلاب',
+              title: 'ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط±',
+              subtitle: 'طھظ‚ط§ط±ظٹط± PDF ظ„ظ„ط·ظ„ط§ط¨',
               selected: selected == 'reports',
               onTap: () => setState(() => selected = 'reports'),
             ),
             _ToolCard(
-              icon: Icons.extension_outlined,
-              title: 'إدارة البرامج',
-              subtitle: '${app.programs.length} برنامج علاجي',
-              selected: selected == 'programs',
-              onTap: () => setState(() => selected = 'programs'),
-            ),
-            _ToolCard(
               icon: Icons.manage_accounts_outlined,
-              title: 'إنشاء حسابات',
-              subtitle: '${app.staff.length} حساب موظف ومدير',
+              title: 'ط¥ظ†ط´ط§ط، ط­ط³ط§ط¨ط§طھ',
+              subtitle: '${app.staff.length} ط­ط³ط§ط¨ ظ…ظˆط¸ظپ ظˆظ…ط¯ظٹط±',
               selected: selected == 'staff',
               onTap: () => setState(() => selected = 'staff'),
             ),
@@ -59,7 +51,6 @@ class _ToolsScreenState extends State<ToolsScreen> {
         const SizedBox(height: 16),
         if (selected == 'students') const StudentsScreen(),
         if (selected == 'reports') const ReportsScreen(),
-        if (selected == 'programs') const ProgramsScreen(),
         if (selected == 'staff') const StaffScreen(),
       ],
     );

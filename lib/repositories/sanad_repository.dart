@@ -15,7 +15,7 @@ class SanadRepository {
     required String password,
   }) async {
     if (await hasUsers()) {
-      throw StateError('تم إعداد النظام مسبقًا.');
+      throw StateError('طھظ… ط¥ط¹ط¯ط§ط¯ ط§ظ„ظ†ط¸ط§ظ… ظ…ط³ط¨ظ‚ظ‹ط§.');
     }
     await saveUser(
       AppUser(
@@ -43,7 +43,7 @@ class SanadRepository {
       final center = centerRow == null ? null : SanadCenter.fromMap(centerRow);
       if (center == null || !center.isActive) {
         throw StateError(
-            'تم إيقاف خدمات هذا المركز مؤقتًا.\nيرجى التواصل مع خدمة العملاء أو إدارة سند.');
+            'طھظ… ط¥ظٹظ‚ط§ظپ ط®ط¯ظ…ط§طھ ظ‡ط°ط§ ط§ظ„ظ…ط±ظƒط² ظ…ط¤ظ‚طھظ‹ط§.\nظٹط±ط¬ظ‰ ط§ظ„طھظˆط§طµظ„ ظ…ط¹ ط®ط¯ظ…ط© ط§ظ„ط¹ظ…ظ„ط§ط، ط£ظˆ ط¥ط¯ط§ط±ط© ط³ظ†ط¯.');
       }
     }
     return user;
@@ -150,7 +150,7 @@ class SanadRepository {
     if (existingEmailUser != null &&
         existingEmailUser.role != UserRole.parent) {
       throw StateError(
-          'رقم ولي الأمر مستخدم مسبقًا لحساب غير ولي أمر، لذلك لا يمكن إنشاء بريد مكرر.');
+          'ط±ظ‚ظ… ظˆظ„ظٹ ط§ظ„ط£ظ…ط± ظ…ط³طھط®ط¯ظ… ظ…ط³ط¨ظ‚ظ‹ط§ ظ„ط­ط³ط§ط¨ ط؛ظٹط± ظˆظ„ظٹ ط£ظ…ط±طŒ ظ„ط°ظ„ظƒ ظ„ط§ ظٹظ…ظƒظ† ط¥ظ†ط´ط§ط، ط¨ط±ظٹط¯ ظ…ظƒط±ط±.');
     }
     await _db.upsert(
       'students',
@@ -190,7 +190,8 @@ class SanadRepository {
         ? existingEmailUser
         : AppUser.fromMap(existingParentUser);
     if (existingAccount == null && student.portalPassword.isEmpty) {
-      throw StateError('كلمة مرور ولي الأمر مطلوبة عند إنشاء حساب جديد.');
+      throw StateError(
+          'ظƒظ„ظ…ط© ظ…ط±ظˆط± ظˆظ„ظٹ ط§ظ„ط£ظ…ط± ظ…ط·ظ„ظˆط¨ط© ط¹ظ†ط¯ ط¥ظ†ط´ط§ط، ط­ط³ط§ط¨ ط¬ط¯ظٹط¯.');
     }
     if (existingAccount == null || student.portalPassword.isNotEmpty) {
       await _db.upsert(
@@ -244,7 +245,7 @@ class SanadRepository {
       'students',
       {
         'deleted_at': DateTime.now().toIso8601String(),
-        'status': 'محذوف',
+        'status': 'ظ…ط­ط°ظˆظپ',
       },
       'id = ?',
       [id],
@@ -300,53 +301,6 @@ class SanadRepository {
 
   Future<void> saveGoalSkillStep(GoalSkillStep step) =>
       _db.upsert('goal_skill_steps', step.toMap());
-
-  Future<List<TherapyProgram>> programs(String centerId) async {
-    final rows = await _db.where('therapy_programs',
-        where: 'center_id = ? AND is_active = 1',
-        whereArgs: [centerId],
-        orderBy: 'type, name');
-    return rows.map(TherapyProgram.fromMap).toList();
-  }
-
-  Future<void> saveProgram(TherapyProgram program) =>
-      _db.upsert('therapy_programs', program.toMap());
-
-  Future<List<ProgramSection>> programSections(String programId) async {
-    final rows = await _db.where('program_sections',
-        where: 'program_id = ?', whereArgs: [programId], orderBy: 'sort_order');
-    return rows.map(ProgramSection.fromMap).toList();
-  }
-
-  Future<void> saveProgramSection(ProgramSection section) =>
-      _db.upsert('program_sections', section.toMap());
-
-  Future<List<ProgramSkill>> programSkills(String programId) async {
-    final rows = await _db.where('program_skills',
-        where: 'program_id = ?', whereArgs: [programId], orderBy: 'title');
-    return rows.map(ProgramSkill.fromMap).toList();
-  }
-
-  Future<void> saveProgramSkill(ProgramSkill skill) =>
-      _db.upsert('program_skills', skill.toMap());
-
-  Future<List<ProgramActivity>> programActivities(String programId) async {
-    final rows = await _db.where('program_activities',
-        where: 'program_id = ?', whereArgs: [programId], orderBy: 'title');
-    return rows.map(ProgramActivity.fromMap).toList();
-  }
-
-  Future<void> saveProgramActivity(ProgramActivity activity) =>
-      _db.upsert('program_activities', activity.toMap());
-
-  Future<void> deleteProgramActivity(String id) =>
-      _db.delete('program_activities', id);
-
-  Future<void> deleteProgramContent(String programId) async {
-    await _db.deleteWhere('program_activities', 'program_id = ?', [programId]);
-    await _db.deleteWhere('program_skills', 'program_id = ?', [programId]);
-    await _db.deleteWhere('program_sections', 'program_id = ?', [programId]);
-  }
 
   Future<List<Exercise>> exercises(String studentId) async {
     final rows = await _db.where('exercises',

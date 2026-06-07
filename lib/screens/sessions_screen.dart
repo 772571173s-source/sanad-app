@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,20 +17,17 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
-  Timer? timer;
-  int seconds = 0;
-  String? programId;
-  bool sessionStarted = false;
-  int activityIndex = 0;
-  int homeworkSentCount = 0;
-  final selectedActivityIds = <String>{};
-  final selectedGoalStepIds = <String>{};
-  final activityResults = <String, String>{};
-  final goalStepResults = <String, String>{};
+  final selectedStepIds = <String>{};
+  final stepResults = <String, String>{};
   final notes = TextEditingController();
   final sessionFocus = FocusNode();
+  Timer? timer;
+  int seconds = 0;
+  int stepIndex = 0;
+  int homeworkSentCount = 0;
+  bool sessionStarted = false;
   bool autoMoveToNext = true;
-  _SessionSummary? lastSummary;
+  _ClinicalSessionSummary? lastSummary;
 
   @override
   void dispose() {
@@ -45,343 +41,148 @@ class _SessionsScreenState extends State<SessionsScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final student = app.selectedStudent;
-    final program = _program(app);
-    final sections = program == null
-        ? <ProgramSection>[]
-        : app.programSections
-            .where((section) => section.programId == program.id)
-            .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final programSkills = program == null
-        ? <ProgramSkill>[]
-        : app.programSkills
-            .where((skill) => skill.programId == program.id)
-            .toList();
-    final libraryActivities = program == null
-        ? <ProgramActivity>[]
-        : app.programActivities
-            .where((activity) => activity.programId == program.id)
-            .toList()
-      ..sort(_compareActivities);
-    final activities = libraryActivities
-        .where((activity) => selectedActivityIds.contains(activity.id))
-        .toList();
-    final selectedGoalSteps = app.goalSkillSteps
-        .where((step) => selectedGoalStepIds.contains(step.id))
-        .toList()
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    final goalMode = selectedGoalSteps.isNotEmpty;
-    final activeCount = goalMode ? selectedGoalSteps.length : activities.length;
-    if (activityIndex >= activeCount) activityIndex = 0;
+    final selectedSteps = _selectedSteps(app);
+    if (stepIndex >= selectedSteps.length) stepIndex = 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!sessionStarted) ...[
-          _SetupCard(
-            title: 'تجهيز الجلسة',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: student?.id,
-                  decoration: const InputDecoration(labelText: 'الطالب'),
-                  items: app.students
-                      .map((item) => DropdownMenuItem(
-                          value: item.id,
-                          child:
-                              Text(item.name, overflow: TextOverflow.ellipsis)))
-                      .toList(),
-                  onChanged: (value) async {
-                    final matches =
-                        app.students.where((item) => item.id == value).toList();
-                    await app
-                        .selectStudent(matches.isEmpty ? null : matches.first);
-                    setState(_resetSelectionAfterStudent);
-                  },
-                ),
-                const SizedBox(height: 10),
-                if (student != null) ...[
-                  _GoalDrivenPicker(
-                    app: app,
-                    selectedGoalStepIds: selectedGoalStepIds,
-                    onChanged: (stepId, selected) {
-                      setState(() {
-                        if (selected) {
-                          selectedGoalStepIds.add(stepId);
-                          selectedActivityIds.clear();
-                          activityResults.clear();
-                        } else {
-                          selectedGoalStepIds.remove(stepId);
-                          goalStepResults.remove(stepId);
-                        }
-                        activityIndex = 0;
-                        lastSummary = null;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                DropdownButtonFormField<String>(
-                  initialValue: programId,
-                  decoration:
-                      const InputDecoration(labelText: 'البرنامج العلاجي'),
-                  items: app.programs
-                      .map((item) => DropdownMenuItem(
-                          value: item.id,
-                          child:
-                              Text(item.name, overflow: TextOverflow.ellipsis)))
-                      .toList(),
-                  onChanged: student == null
-                      ? null
-                      : (value) => setState(() {
-                            programId = value;
-                            activityIndex = 0;
-                            selectedActivityIds.clear();
-                            selectedGoalStepIds.clear();
-                            activityResults.clear();
-                            goalStepResults.clear();
-                            lastSummary = null;
-                          }),
-                ),
-                const SizedBox(height: 10),
-                if (program == null)
-                  const EmptyState(
-                    icon: Icons.tune_outlined,
-                    title: 'اختر الطالب والبرنامج',
-                    message:
-                        'بعد الاختيار ستظهر مكتبة الأنشطة المناسبة للجلسة.',
-                  )
-                else
-                  _ActivityLibraryPicker(
-                    sections: sections,
-                    skills: programSkills,
-                    activities: libraryActivities,
-                    selectedActivityIds: selectedActivityIds,
-                    onChanged: (activityId, selected) {
-                      setState(() {
-                        if (selected) {
-                          selectedActivityIds.add(activityId);
-                          selectedGoalStepIds.clear();
-                          goalStepResults.clear();
-                        } else {
-                          selectedActivityIds.remove(activityId);
-                          activityResults.remove(activityId);
-                        }
-                        activityIndex = 0;
-                        lastSummary = null;
-                      });
-                    },
-                  ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: activeCount == 0 ? null : () => _startSession(),
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text('ابدأ الجلسة ($activeCount)'),
-                  ),
-                ),
-              ],
-            ),
+          _ClinicalSetupCard(
+            app: app,
+            selectedStepIds: selectedStepIds,
+            onStudentChanged: (student) async {
+              await app.selectStudent(student);
+              setState(_resetForStudent);
+            },
+            onStepChanged: (stepId, selected) {
+              setState(() {
+                if (selected) {
+                  selectedStepIds.add(stepId);
+                } else {
+                  selectedStepIds.remove(stepId);
+                  stepResults.remove(stepId);
+                }
+                stepIndex = 0;
+                lastSummary = null;
+              });
+            },
+            onStart: selectedSteps.isEmpty ? null : _startSession,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.md),
           if (lastSummary != null) ...[
-            _SessionSummaryCard(summary: lastSummary!),
-            const SizedBox(height: 16),
+            _ClinicalSessionSummaryCard(summary: lastSummary!),
+            const SizedBox(height: AppSpacing.md),
           ],
-          _PreviousSessions(app: app),
-        ] else ...[
+          _PreviousGoalSessions(app: app),
+        ] else if (student != null && selectedSteps.isNotEmpty) ...[
           Focus(
             focusNode: sessionFocus,
             autofocus: true,
-            onKeyEvent: (node, event) => goalMode
-                ? _handleGoalSessionKey(event, selectedGoalSteps)
-                : _handleSessionKey(event, activities),
-            child: goalMode
-                ? _ActiveGoalSessionCard(
-                    step: selectedGoalSteps[activityIndex],
-                    goal: _goalForStep(app, selectedGoalSteps[activityIndex]),
-                    index: activityIndex,
-                    total: selectedGoalSteps.length,
-                    completedCount: goalStepResults.length,
-                    selectedValue:
-                        goalStepResults[selectedGoalSteps[activityIndex].id],
-                    elapsedSeconds: seconds,
-                    progressRate: _goalSessionProgress(selectedGoalSteps),
-                    homeworkSentCount: homeworkSentCount,
-                    autoMoveToNext: autoMoveToNext,
-                    notes: notes,
-                    onEvaluate: (value) =>
-                        _evaluateCurrentGoalStep(value, selectedGoalSteps),
-                    onPrevious: activityIndex == 0
-                        ? null
-                        : () => setState(() => activityIndex--),
-                    onNext: activityIndex >= selectedGoalSteps.length - 1
-                        ? null
-                        : () => setState(() => activityIndex++),
-                    onToggleAutoMove: (value) =>
-                        setState(() => autoMoveToNext = value),
-                    onQuickNote: _addQuickNote,
-                    onSendHomework: () =>
-                        _sendGoalSessionHomework(app, selectedGoalSteps),
-                    onSave: () => _saveGoalSession(app, selectedGoalSteps),
-                    onStop: () => setState(() {
-                      sessionStarted = false;
-                      timer?.cancel();
-                    }),
-                  )
-                : _ActiveSessionCard(
-                    activity: activities[activityIndex],
-                    index: activityIndex,
-                    total: activities.length,
-                    completedCount: activityResults.length,
-                    selectedValue:
-                        activityResults[activities[activityIndex].id],
-                    options: _options(activities[activityIndex]),
-                    elapsedSeconds: seconds,
-                    successRate: _successRate(activities),
-                    homeworkSentCount: homeworkSentCount,
-                    hasSessionHomework: _hasHomework(activities),
-                    hasEvaluations: activityResults.isNotEmpty,
-                    autoMoveToNext: autoMoveToNext,
-                    notes: notes,
-                    onEvaluate: (value) => _evaluateCurrent(value, activities),
-                    onPrevious: activityIndex == 0
-                        ? null
-                        : () => setState(() => activityIndex--),
-                    onNext: activityIndex >= activities.length - 1
-                        ? null
-                        : () => setState(() => activityIndex++),
-                    onToggleAutoMove: (value) =>
-                        setState(() => autoMoveToNext = value),
-                    onQuickNote: _addQuickNote,
-                    onSendSessionHomework: () =>
-                        _sendSessionHomework(app, activities),
-                    onSave: () => _saveSession(app, activities),
-                    onPrintReport: () => _printSessionReport(app, activities),
-                    onStop: () => setState(() {
-                      sessionStarted = false;
-                      timer?.cancel();
-                    }),
-                  ),
+            onKeyEvent: (node, event) => _handleKey(event, selectedSteps),
+            child: _GoalFocusSessionCard(
+              step: selectedSteps[stepIndex],
+              goal: _goalForStep(app, selectedSteps[stepIndex]),
+              index: stepIndex,
+              total: selectedSteps.length,
+              completedCount: stepResults.length,
+              selectedValue: stepResults[selectedSteps[stepIndex].id],
+              elapsedSeconds: seconds,
+              masteryRate: _masteryRate(selectedSteps),
+              homeworkSentCount: homeworkSentCount,
+              autoMoveToNext: autoMoveToNext,
+              notes: notes,
+              onEvaluate: (value) => _evaluateStep(value, selectedSteps),
+              onPrevious:
+                  stepIndex == 0 ? null : () => setState(() => stepIndex--),
+              onNext: stepIndex >= selectedSteps.length - 1
+                  ? null
+                  : () => setState(() => stepIndex++),
+              onToggleAutoMove: (value) =>
+                  setState(() => autoMoveToNext = value),
+              onQuickNote: _addQuickNote,
+              onSendHomework: () => _sendSmartHomework(app, selectedSteps),
+              onSave: () => _saveClinicalSession(app, selectedSteps),
+              onStop: _stopSession,
+            ),
           ),
         ],
       ],
     );
   }
 
-  void _resetSelectionAfterStudent() {
-    programId = null;
-    activityIndex = 0;
-    selectedActivityIds.clear();
-    selectedGoalStepIds.clear();
-    activityResults.clear();
-    goalStepResults.clear();
+  List<GoalSkillStep> _selectedSteps(AppProvider app) => app.goalSkillSteps
+      .where((step) => selectedStepIds.contains(step.id))
+      .toList()
+    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  void _resetForStudent() {
+    selectedStepIds.clear();
+    stepResults.clear();
+    stepIndex = 0;
+    homeworkSentCount = 0;
     sessionStarted = false;
+    lastSummary = null;
+    notes.clear();
   }
 
   void _startSession() {
     setState(() {
       sessionStarted = true;
-      activityIndex = 0;
-      homeworkSentCount = 0;
+      stepIndex = 0;
       seconds = 0;
+      homeworkSentCount = 0;
+      stepResults.clear();
     });
-    _startTimer();
+    timer?.cancel();
+    timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => setState(() => seconds++),
+    );
   }
 
-  TherapyProgram? _program(AppProvider app) {
-    if (programId == null) return null;
-    for (final program in app.programs) {
-      if (program.id == programId) return program;
-    }
-    return null;
+  void _stopSession() {
+    timer?.cancel();
+    setState(() => sessionStarted = false);
   }
 
-  List<String> _options(ProgramActivity activity) {
-    return const ['تم الإنجاز', 'يحتاج مساعدة', 'لم ينجز'];
-  }
-
-  KeyEventResult _handleSessionKey(
-      KeyEvent event, List<ProgramActivity> activities) {
-    if (event is! KeyDownEvent || activities.isEmpty) {
-      return KeyEventResult.ignored;
-    }
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
-      _evaluateCurrent('تم الإنجاز', activities);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
-      _evaluateCurrent('يحتاج مساعدة', activities);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
-      _evaluateCurrent('لم ينجز', activities);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight && activityIndex > 0) {
-      setState(() => activityIndex--);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft &&
-        activityIndex < activities.length - 1) {
-      setState(() => activityIndex++);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  void _evaluateCurrent(String value, List<ProgramActivity> activities) {
-    if (activities.isEmpty) return;
-    setState(() {
-      activityResults[activities[activityIndex].id] = value;
-      if (autoMoveToNext && activityIndex < activities.length - 1) {
-        activityIndex++;
-      }
-    });
-  }
-
-  void _evaluateCurrentGoalStep(String value, List<GoalSkillStep> steps) {
+  void _evaluateStep(String value, List<GoalSkillStep> steps) {
     if (steps.isEmpty) return;
     setState(() {
-      goalStepResults[steps[activityIndex].id] = value;
-      if (autoMoveToNext && activityIndex < steps.length - 1) {
-        activityIndex++;
+      stepResults[steps[stepIndex].id] = value;
+      if (autoMoveToNext && stepIndex < steps.length - 1) {
+        stepIndex++;
       }
     });
   }
 
-  KeyEventResult _handleGoalSessionKey(
-      KeyEvent event, List<GoalSkillStep> steps) {
+  KeyEventResult _handleKey(KeyEvent event, List<GoalSkillStep> steps) {
     if (event is! KeyDownEvent || steps.isEmpty) {
       return KeyEventResult.ignored;
     }
     final key = event.logicalKey;
     if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
-      _evaluateCurrentGoalStep('بمساعدة', steps);
+      _evaluateStep('بمساعدة', steps);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
-      _evaluateCurrentGoalStep('جزئي', steps);
+      _evaluateStep('جزئي', steps);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
-      _evaluateCurrentGoalStep('مستقل', steps);
+      _evaluateStep('مستقل', steps);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4) {
-      _evaluateCurrentGoalStep('متقن', steps);
+      _evaluateStep('متقن', steps);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowRight && activityIndex > 0) {
-      setState(() => activityIndex--);
+    if (key == LogicalKeyboardKey.arrowRight && stepIndex > 0) {
+      setState(() => stepIndex--);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.arrowLeft &&
-        activityIndex < steps.length - 1) {
-      setState(() => activityIndex++);
+    if (key == LogicalKeyboardKey.arrowLeft && stepIndex < steps.length - 1) {
+      setState(() => stepIndex++);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -394,95 +195,27 @@ class _SessionsScreenState extends State<SessionsScreen> {
     return null;
   }
 
-  int _goalSessionProgress(List<GoalSkillStep> steps) {
+  int _masteryRate(List<GoalSkillStep> steps) {
     if (steps.isEmpty) return 0;
-    final completed =
-        goalStepResults.values.where((value) => value == 'متقن').length;
-    return ((completed / steps.length) * 100).round();
+    final mastered =
+        stepResults.values.where((value) => value == 'متقن').length;
+    return ((mastered / steps.length) * 100).round();
   }
 
-  void _addQuickNote(String value) {
-    final current = notes.text.trim();
-    notes.text = current.isEmpty ? value : '$current، $value';
-    notes.selection = TextSelection.collapsed(offset: notes.text.length);
-  }
-
-  void _startTimer() {
-    timer?.cancel();
-    timer = Timer.periodic(
-        const Duration(seconds: 1), (_) => setState(() => seconds++));
-  }
-
-  int _successRate(List<ProgramActivity> activities) {
-    if (activities.isEmpty) return 0;
-    var score = 0.0;
-    for (final activity in activities) {
-      final value = activityResults[activity.id];
-      if (value == null) continue;
-      if (value == 'صحيح' || value == 'جيد' || value == 'تم الإنجاز') {
-        score += 1;
-      }
-      if (value == 'جزئي' || value == 'بمساعدة' || value == 'يحتاج مساعدة') {
-        score += .5;
-      }
-    }
-    return ((score / activities.length) * 100).round();
-  }
-
-  bool _hasHomework(List<ProgramActivity> activities) {
-    return activities.any((activity) {
-      final content = _StructuredActivityContent.tryParse(activity);
-      return (content?.homework ?? activity.homework).trim().isNotEmpty;
-    });
-  }
-
-  Future<void> _sendSessionHomework(
-      AppProvider app, List<ProgramActivity> activities) {
-    final student = app.selectedStudent;
-    final program = _program(app);
-    final items = activities
-        .map((activity) {
-          final content = _StructuredActivityContent.tryParse(activity);
-          final homework = content?.homework ?? activity.homework;
-          if (homework.trim().isEmpty) return '';
-          return '${activity.title}: $homework';
-        })
-        .where((item) => item.isNotEmpty)
-        .toList();
-    if (student == null || items.isEmpty) return Future.value();
-    return runWithFeedback(context, () async {
-      await app.saveExercise(Exercise(
-        id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
-        centerId: student.centerId,
-        studentId: student.id,
-        title:
-            '${program?.name ?? 'برنامج علاجي'} - واجب جلسة (${items.length} أنشطة)',
-        instructions: _sessionHomeworkInstructions(activities),
-        dueDate: DateTime.now()
-            .add(const Duration(days: 1))
-            .toIso8601String()
-            .split('T')
-            .first,
-        status: 'مرسل',
-      ));
-      setState(() => homeworkSentCount++);
-    }, success: 'تم إرسال واجب الجلسة لولي الأمر.');
-  }
-
-  Future<void> _sendGoalSessionHomework(
-      AppProvider app, List<GoalSkillStep> steps) {
+  Future<void> _sendSmartHomework(
+      AppProvider app, List<GoalSkillStep> steps) async {
     final student = app.selectedStudent;
     final items = steps.where((step) {
-      final result = goalStepResults[step.id] ?? step.status;
+      final result = stepResults[step.id] ?? step.status;
       return result != 'متقن';
     }).toList();
-    if (student == null || items.isEmpty) return Future.value();
-    return runWithFeedback(context, () async {
+    if (student == null || items.isEmpty) return;
+    await runWithFeedback(context, () async {
       await app.saveExercise(Exercise(
         id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
         centerId: student.centerId,
         studentId: student.id,
-        title: 'واجب هدف علاجي (${items.length} مهارات)',
+        title: 'واجب علاجي من أهداف الجلسة',
         instructions: items
             .map((step) => 'تدريب يومي: ${step.title} لمدة 5 دقائق.')
             .join('\n'),
@@ -494,106 +227,24 @@ class _SessionsScreenState extends State<SessionsScreen> {
         status: 'مرسل',
       ));
       setState(() => homeworkSentCount++);
-    }, success: 'تم إرسال واجب مبني على المهارات غير المكتملة.');
+    }, success: 'تم إرسال واجب ذكي من المهارات غير المكتملة.');
   }
 
-  String _sessionHomeworkInstructions(List<ProgramActivity> activities) {
-    final payload = activities
-        .map((activity) {
-          final content = _StructuredActivityContent.tryParse(activity);
-          final homework = content?.homework ?? activity.homework;
-          if (homework.trim().isEmpty) return null;
-          return {
-            'title': activity.title,
-            'homework': homework,
-            'kind': content?.kind ?? 'other',
-            'letter': content?.letter ?? '',
-            'letterDisplay': content?.letterDisplay ?? '',
-            'vocalization': content?.vocalization ?? '',
-            'position': content?.position ?? '',
-            'words': content?.words ?? const <String>[],
-            'sentences': content?.sentences ?? const <String>[],
-            'instructions': content?.instructions ?? activity.instructions,
-          };
-        })
-        .whereType<Map<String, Object>>()
-        .toList();
-    return jsonEncode({'kind': 'sessionHomework', 'activities': payload});
-  }
-
-  Future<void> _saveSession(AppProvider app, List<ProgramActivity> activities) {
+  Future<void> _saveClinicalSession(
+      AppProvider app, List<GoalSkillStep> steps) async {
     final student = app.selectedStudent;
-    final program = _program(app);
-    final firstActivity = activities.isEmpty ? null : activities.first;
-    final skill = firstActivity == null
-        ? null
-        : _findSkill(app.programSkills, firstActivity.skillId);
-    final skillTitle = _skillTitlesForActivities(app, activities);
-    return runWithFeedback(context, () async {
-      if (student == null || program == null || skill == null) {
-        throw StateError('اختر الطالب والبرنامج والأنشطة أولًا.');
-      }
-      if (activityResults.isEmpty) {
-        throw StateError('قيّم نشاطًا واحدًا على الأقل قبل حفظ الجلسة.');
-      }
-      final savedSummary = _SessionSummary(
-        activitiesCount: activities.length,
-        evaluatedCount: activityResults.length,
-        successRate: _successRate(activities),
-        homeworkSentCount: homeworkSentCount,
-        notes: notes.text.trim(),
-      );
-      await app.saveSession(TherapySession(
-        id: 'session_${DateTime.now().millisecondsSinceEpoch}',
-        centerId: student.centerId,
-        studentId: student.id,
-        programId: program.id,
-        skillId: skill.id,
-        activityResults: activityResults.entries
-            .map((entry) => '${entry.key}:${entry.value}')
-            .join('|'),
-        sessionType: program.type,
-        practiceItems: activities.map((activity) => activity.title).join('، '),
-        attempts: activityResults.length,
-        successRate: _successRate(activities),
-        startedAt: DateTime.now().toIso8601String(),
-        durationSeconds: seconds,
-        cardTitle: skillTitle,
-        quickResult: firstActivity == null
-            ? activityResults.values.first
-            : activityResults[firstActivity.id] ?? activityResults.values.first,
-        notes: notes.text.trim(),
-        summary:
-            'تم تقييم ${activityResults.length} من ${activities.length} نشاط، بنسبة نجاح ${_successRate(activities)}%. الواجبات المرسلة: $homeworkSentCount.',
-      ));
-      timer?.cancel();
-      setState(() {
-        sessionStarted = false;
-        seconds = 0;
-        activityIndex = 0;
-        activityResults.clear();
-        homeworkSentCount = 0;
-        lastSummary = savedSummary;
-        notes.clear();
-      });
-    }, success: 'تم حفظ الجلسة.');
-  }
-
-  Future<void> _saveGoalSession(AppProvider app, List<GoalSkillStep> steps) {
-    final student = app.selectedStudent;
-    return runWithFeedback(context, () async {
-      if (student == null || steps.isEmpty) {
-        throw StateError('اختر الطالب وخطوات الهدف أولًا.');
-      }
-      if (goalStepResults.isEmpty) {
+    if (student == null) return;
+    await runWithFeedback(context, () async {
+      if (stepResults.isEmpty) {
         throw StateError('حدّث حالة مهارة واحدة على الأقل قبل حفظ الجلسة.');
       }
       final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
-      final progress = _goalSessionProgress(steps);
-      final savedSummary = _SessionSummary(
-        activitiesCount: steps.length,
-        evaluatedCount: goalStepResults.length,
-        successRate: progress,
+      final now = DateTime.now().toIso8601String();
+      final rate = _masteryRate(steps);
+      final summary = _ClinicalSessionSummary(
+        stepsCount: steps.length,
+        updatedCount: stepResults.length,
+        masteryRate: rate,
         homeworkSentCount: homeworkSentCount,
         notes: notes.text.trim(),
       );
@@ -602,23 +253,24 @@ class _SessionsScreenState extends State<SessionsScreen> {
         centerId: student.centerId,
         studentId: student.id,
         planId: steps.first.goalId,
-        activityResults: goalStepResults.entries
-            .map((entry) => '${entry.key}:${entry.value}')
-            .join('|'),
-        sessionType: 'جلسة هدف علاجي',
+        activityResults:
+            stepResults.entries.map((e) => '${e.key}:${e.value}').join('|'),
+        sessionType: 'جلسة علاجية مبنية على هدف',
         practiceItems: steps.map((step) => step.title).join('، '),
-        attempts: goalStepResults.length,
-        successRate: progress,
-        startedAt: DateTime.now().toIso8601String(),
+        attempts: stepResults.length,
+        successRate: rate,
+        startedAt: now,
         durationSeconds: seconds,
-        cardTitle: 'تدريب أهداف علاجية',
-        quickResult: goalStepResults.values.last,
+        cardTitle: 'تتبع هدف علاجي',
+        quickResult: stepResults.values.last,
         notes: notes.text.trim(),
         summary:
-            'تم تحديث ${goalStepResults.length} من ${steps.length} مهارات. نسبة الإتقان داخل الجلسة $progress%.',
+            'تم تحديث ${stepResults.length} من ${steps.length} مهارات. نسبة الإتقان داخل الجلسة $rate%.',
+        createdAt: now,
+        updatedAt: now,
       ));
       for (final step in steps) {
-        final status = goalStepResults[step.id];
+        final status = stepResults[step.id];
         if (status == null) continue;
         await app.updateGoalSkillStepStatus(
           step: step,
@@ -631,153 +283,92 @@ class _SessionsScreenState extends State<SessionsScreen> {
       timer?.cancel();
       setState(() {
         sessionStarted = false;
+        stepIndex = 0;
         seconds = 0;
-        activityIndex = 0;
-        goalStepResults.clear();
-        selectedGoalStepIds.clear();
+        stepResults.clear();
+        selectedStepIds.clear();
         homeworkSentCount = 0;
-        lastSummary = savedSummary;
+        lastSummary = summary;
         notes.clear();
       });
-    }, success: 'تم حفظ جلسة الهدف وتحديث تقدم الطالب.');
+    }, success: 'تم حفظ الجلسة وتحديث رحلة الهدف.');
   }
 
-  Future<void> _printSessionReport(
-      AppProvider app, List<ProgramActivity> activities) {
-    final program = _program(app);
-    return runWithFeedback(
-      context,
-      () => app.printSessionReport(
-        activities: activities,
-        results: activityResults,
-        successRate: _successRate(activities),
-        durationSeconds: seconds,
-        homeworkSentCount: homeworkSentCount,
-        notes: notes.text.trim(),
-        programName: program?.name ?? 'برنامج علاجي',
-        skillTitle: _skillTitlesForActivities(app, activities),
-      ),
-      loading: 'جار إنشاء تقرير الجلسة...',
-      success: 'تم إنشاء تقرير الجلسة.',
-    );
-  }
-
-  ProgramSkill? _findSkill(List<ProgramSkill> skills, String id) {
-    for (final skill in skills) {
-      if (skill.id == id) return skill;
-    }
-    return null;
-  }
-
-  String _skillTitlesForActivities(
-      AppProvider app, List<ProgramActivity> activities) {
-    final names = <String>{};
-    for (final activity in activities) {
-      final skill = _findSkill(app.programSkills, activity.skillId);
-      if (skill != null) names.add(skill.title);
-    }
-    return names.isEmpty ? 'مهارة علاجية' : names.join('، ');
-  }
-
-  int _compareActivities(ProgramActivity a, ProgramActivity b) {
-    final aContent = _StructuredActivityContent.tryParse(a);
-    final bContent = _StructuredActivityContent.tryParse(b);
-    final aOrder = aContent?.sortOrder ?? 0;
-    final bOrder = bContent?.sortOrder ?? 0;
-    if (aOrder != bOrder) return aOrder.compareTo(bOrder);
-    return a.title.compareTo(b.title);
+  void _addQuickNote(String value) {
+    final current = notes.text.trim();
+    notes.text = current.isEmpty ? value : '$current، $value';
+    notes.selection = TextSelection.collapsed(offset: notes.text.length);
   }
 }
 
-class _GoalDrivenPicker extends StatelessWidget {
-  const _GoalDrivenPicker({
+class _ClinicalSetupCard extends StatelessWidget {
+  const _ClinicalSetupCard({
     required this.app,
-    required this.selectedGoalStepIds,
-    required this.onChanged,
+    required this.selectedStepIds,
+    required this.onStudentChanged,
+    required this.onStepChanged,
+    required this.onStart,
   });
 
   final AppProvider app;
-  final Set<String> selectedGoalStepIds;
-  final void Function(String stepId, bool selected) onChanged;
+  final Set<String> selectedStepIds;
+  final ValueChanged<Student?> onStudentChanged;
+  final void Function(String stepId, bool selected) onStepChanged;
+  final VoidCallback? onStart;
 
   @override
   Widget build(BuildContext context) {
-    final activePlans =
-        app.plans.where((plan) => app.goalStatus(plan.id) != 'مكتمل').toList();
-    if (activePlans.isEmpty) {
-      return const SemanticAlertCard(
-        kind: SemanticAlertKind.info,
-        icon: Icons.track_changes_outlined,
-        title: 'لا توجد أهداف علاجية نشطة',
-        message:
-            'بعد حفظ تقييم علاجي بنتائج غير طبيعية ستظهر هنا الأهداف والمهارات الناقصة.',
-      );
-    }
+    final student = app.selectedStudent;
     return TherapyCard(
-      title: 'جلسة مبنية على أهداف الطالب',
-      icon: Icons.track_changes_outlined,
+      title: 'الجلسة العلاجية الموجهة بالأهداف',
+      icon: Icons.psychology_alt_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            'اختر المهارات التي تريد تدريبها اليوم. الأهداف المكتملة لا تظهر في هذه القائمة.',
-            style: SanadText.secondary(context),
+          const SemanticAlertCard(
+            kind: SemanticAlertKind.info,
+            icon: Icons.account_tree_outlined,
+            title: 'Clinical Core',
+            message:
+                'مسار الجلسة الآن يبدأ من التقييم ونقاط الضعف ثم الأهداف والمهارات، وليس من برامج وأنشطة عامة.',
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ...activePlans.map((plan) {
-            final steps = app
-                .stepsForGoal(plan.id)
-                .where((step) => step.status != 'متقن')
-                .toList();
-            if (steps.isEmpty) return const SizedBox.shrink();
-            final progress = app.goalProgress(plan.id);
-            return Container(
-              margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppRadii.card),
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child:
-                            Text(plan.goal, style: SanadText.subtitle(context)),
-                      ),
-                      AppPill(label: app.goalStatus(plan.id)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  LinearProgressIndicator(value: progress / 100),
-                  const SizedBox(height: AppSpacing.sm),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: steps.map((step) {
-                      final selected = selectedGoalStepIds.contains(step.id);
-                      return FilterChip(
-                        selected: selected,
-                        label: Text('${step.title} - ${step.status}'),
-                        onSelected: (value) => onChanged(step.id, value),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            );
-          }),
+          const SizedBox(height: AppSpacing.md),
+          DropdownButtonFormField<String>(
+            initialValue: student?.id,
+            decoration: const InputDecoration(labelText: 'الطالب'),
+            items: app.students
+                .map((item) => DropdownMenuItem(
+                      value: item.id,
+                      child: Text(item.name, overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              final matches =
+                  app.students.where((item) => item.id == value).toList();
+              onStudentChanged(matches.isEmpty ? null : matches.first);
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+          if (student == null)
+            const EmptyState(
+              icon: Icons.person_search_outlined,
+              title: 'اختر طالبًا أولًا',
+              message:
+                  'بعد اختيار الطالب ستظهر أهدافه العلاجية الحالية والمهارات التي تحتاج تدريب.',
+            )
+          else
+            _GoalStepPicker(
+              app: app,
+              selectedStepIds: selectedStepIds,
+              onStepChanged: onStepChanged,
+            ),
+          const SizedBox(height: AppSpacing.md),
           Align(
             alignment: Alignment.centerRight,
-            child: AppPill(
-              label: 'المحدد: ${selectedGoalStepIds.length}',
-              icon: Icons.checklist_outlined,
-              selected: selectedGoalStepIds.isNotEmpty,
+            child: FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow),
+              label: Text('ابدأ جلسة هدف (${selectedStepIds.length})'),
             ),
           ),
         ],
@@ -786,179 +377,88 @@ class _GoalDrivenPicker extends StatelessWidget {
   }
 }
 
-class _ActivityLibraryPicker extends StatelessWidget {
-  const _ActivityLibraryPicker({
-    required this.sections,
-    required this.skills,
-    required this.activities,
-    required this.selectedActivityIds,
-    required this.onChanged,
+class _GoalStepPicker extends StatelessWidget {
+  const _GoalStepPicker({
+    required this.app,
+    required this.selectedStepIds,
+    required this.onStepChanged,
   });
 
-  final List<ProgramSection> sections;
-  final List<ProgramSkill> skills;
-  final List<ProgramActivity> activities;
-  final Set<String> selectedActivityIds;
-  final void Function(String activityId, bool selected) onChanged;
+  final AppProvider app;
+  final Set<String> selectedStepIds;
+  final void Function(String stepId, bool selected) onStepChanged;
 
   @override
   Widget build(BuildContext context) {
-    if (activities.isEmpty) {
+    final activeGoals =
+        app.plans.where((plan) => app.goalStatus(plan.id) != 'مكتمل').toList();
+    if (activeGoals.isEmpty) {
       return const EmptyState(
-        icon: Icons.library_books_outlined,
-        title: 'لا توجد أنشطة في البرنامج',
-        message: 'أضف أنشطة من شاشة البرامج أو أعد إنشاء البرامج الأساسية.',
+        icon: Icons.track_changes_outlined,
+        title: 'لا توجد أهداف علاجية نشطة',
+        message:
+            'ابدأ من شاشة التقييم العلاجي. أي نتيجة غير طبيعية ستنشئ هدفًا ومهارات تدريب تلقائيًا.',
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('اختر أنشطة من مكتبة البرنامج',
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w900)),
-        const SizedBox(height: 8),
-        ...sections.map((section) {
-          final sectionSkills =
-              skills.where((skill) => skill.sectionId == section.id).toList();
-          return ExpansionTile(
-            tilePadding: EdgeInsets.zero,
-            title: Text(section.title),
-            children: sectionSkills.map((skill) {
-              final skillActivities = activities
-                  .where((activity) => activity.skillId == skill.id)
-                  .toList();
-              if (skillActivities.isEmpty) return const SizedBox.shrink();
-              return ExpansionTile(
-                tilePadding: const EdgeInsetsDirectional.only(start: 12),
-                title: Text(skill.title),
-                children: skillActivities.map((activity) {
-                  final content = _StructuredActivityContent.tryParse(activity);
-                  return CheckboxListTile(
-                    value: selectedActivityIds.contains(activity.id),
-                    onChanged: (value) =>
-                        onChanged(activity.id, value ?? false),
-                    title: Text(activity.title),
-                    subtitle: Text(content?.summary ?? activity.instructions),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  );
-                }).toList(),
-              );
-            }).toList(),
+        Text('الأهداف الحالية', style: SanadText.subtitle(context)),
+        const SizedBox(height: AppSpacing.sm),
+        ...activeGoals.map((goal) {
+          final steps = app
+              .stepsForGoal(goal.id)
+              .where((step) => step.status != 'متقن')
+              .toList();
+          if (steps.isEmpty) return const SizedBox.shrink();
+          final progress = app.goalProgress(goal.id);
+          return Container(
+            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                        child: Text(goal.goal,
+                            style: SanadText.subtitle(context))),
+                    AppPill(label: app.goalStatus(goal.id)),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                LinearProgressIndicator(value: progress / 100),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  runSpacing: AppSpacing.sm,
+                  children: steps.map((step) {
+                    final selected = selectedStepIds.contains(step.id);
+                    return FilterChip(
+                      selected: selected,
+                      label: Text('${step.title} - ${step.status}'),
+                      onSelected: (value) => onStepChanged(step.id, value),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
           );
         }),
-        const SizedBox(height: 6),
-        Align(
-          alignment: Alignment.centerRight,
-          child: Chip(label: Text('المحدد: ${selectedActivityIds.length}')),
-        ),
       ],
     );
   }
 }
 
-class _SetupCard extends StatelessWidget {
-  const _SetupCard({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _SessionSummary {
-  const _SessionSummary({
-    required this.activitiesCount,
-    required this.evaluatedCount,
-    required this.successRate,
-    required this.homeworkSentCount,
-    required this.notes,
-  });
-
-  final int activitiesCount;
-  final int evaluatedCount;
-  final int successRate;
-  final int homeworkSentCount;
-  final String notes;
-}
-
-class _SessionSummaryCard extends StatelessWidget {
-  const _SessionSummaryCard({required this.summary});
-
-  final _SessionSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('ملخص آخر جلسة',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              Chip(label: Text('الأنشطة: ${summary.activitiesCount}')),
-              Chip(label: Text('المقيّم: ${summary.evaluatedCount}')),
-              Chip(label: Text('نسبة النجاح: ${summary.successRate}%')),
-              Chip(label: Text('الواجبات: ${summary.homeworkSentCount}')),
-            ],
-          ),
-          if (summary.notes.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text('ملاحظة الأخصائي: ${summary.notes}'),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          SemanticAlertCard(
-            kind: summary.successRate >= 70
-                ? SemanticAlertKind.success
-                : summary.successRate >= 40
-                    ? SemanticAlertKind.warning
-                    : SemanticAlertKind.error,
-            icon: Icons.psychology_alt_outlined,
-            title: 'قراءة سند للجلسة',
-            message: _insight(summary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _insight(_SessionSummary summary) {
-    if (summary.successRate >= 70) {
-      return 'الأداء جيد. حافظ على نفس المهارة مع زيادة بسيطة في الصعوبة أو عدد المحاولات.';
-    }
-    if (summary.successRate >= 40) {
-      return 'الأداء متوسط. يفضل إعادة نفس المهارة مع دعم بصري أو نموذج صوتي أوضح.';
-    }
-    return 'الجلسة تحتاج تبسيط. ابدأ بمحاولات أقل، وركز على نشاط واحد مع واجب منزلي قصير.';
-  }
-}
-
-class _ActiveGoalSessionCard extends StatelessWidget {
-  const _ActiveGoalSessionCard({
+class _GoalFocusSessionCard extends StatelessWidget {
+  const _GoalFocusSessionCard({
     required this.step,
     required this.goal,
     required this.index,
@@ -966,7 +466,7 @@ class _ActiveGoalSessionCard extends StatelessWidget {
     required this.completedCount,
     required this.selectedValue,
     required this.elapsedSeconds,
-    required this.progressRate,
+    required this.masteryRate,
     required this.homeworkSentCount,
     required this.autoMoveToNext,
     required this.notes,
@@ -987,7 +487,7 @@ class _ActiveGoalSessionCard extends StatelessWidget {
   final int completedCount;
   final String? selectedValue;
   final int elapsedSeconds;
-  final int progressRate;
+  final int masteryRate;
   final int homeworkSentCount;
   final bool autoMoveToNext;
   final TextEditingController notes;
@@ -1003,9 +503,10 @@ class _ActiveGoalSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const options = ['بمساعدة', 'جزئي', 'مستقل', 'متقن'];
+    final progress = total == 0 ? 0.0 : (index + 1) / total;
     return TherapyCard(
-      title: 'جلسة هدف علاجي',
-      icon: Icons.track_changes_outlined,
+      title: 'Focus Therapy Mode',
+      icon: Icons.center_focus_strong_outlined,
       trailing: AppPill(
         label: Duration(seconds: elapsedSeconds).toString().split('.').first,
         icon: Icons.timer_outlined,
@@ -1013,15 +514,18 @@ class _ActiveGoalSessionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _SmartSessionProgress(
-            index: index,
-            total: total,
-            completedCount: completedCount,
-            successRate: progressRate,
-            estimatedMinutes: (total - completedCount).clamp(0, total) * 2,
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
+            children: [
+              AppPill(label: 'المهارة ${index + 1} من $total', selected: true),
+              AppPill(label: 'تم تحديث $completedCount'),
+              AppPill(label: 'الإتقان $masteryRate%'),
+              AppPill(label: 'واجبات $homeworkSentCount'),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          LinearProgressIndicator(value: total == 0 ? 0 : (index + 1) / total),
+          LinearProgressIndicator(value: progress),
           const SizedBox(height: AppSpacing.lg),
           Container(
             padding: const EdgeInsets.all(AppSpacing.xl),
@@ -1067,10 +571,11 @@ class _ActiveGoalSessionCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          _HomeworkSuggestion(
-            homework: 'تدريب يومي: ${step.title} لمدة 5 دقائق.',
-            selectedValue: selectedValue,
-            content: null,
+          SemanticAlertCard(
+            kind: SemanticAlertKind.info,
+            icon: Icons.home_work_outlined,
+            title: 'واجب مقترح',
+            message: 'تدريب يومي: ${step.title} لمدة 5 دقائق.',
           ),
           const SizedBox(height: AppSpacing.md),
           SwitchListTile.adaptive(
@@ -1081,13 +586,7 @@ class _ActiveGoalSessionCard extends StatelessWidget {
             subtitle: const Text('اختصارات: 1 مساعدة، 2 جزئي، 3 مستقل، 4 متقن'),
           ),
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            'حالة المهارة',
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w900),
-          ),
+          Text('حالة المهارة', style: SanadText.subtitle(context)),
           const SizedBox(height: AppSpacing.sm),
           Wrap(
             spacing: AppSpacing.sm,
@@ -1149,445 +648,8 @@ class _ActiveGoalSessionCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              AppPill(
-                label: 'المحدث: $completedCount / $total',
-                icon: Icons.layers_outlined,
-              ),
-              AppPill(
-                label: 'واجبات مرسلة: $homeworkSentCount',
-                icon: Icons.assignment_turned_in_outlined,
-              ),
-            ],
-          ),
         ],
       ),
-    );
-  }
-}
-
-class _ActiveSessionCard extends StatelessWidget {
-  const _ActiveSessionCard({
-    required this.activity,
-    required this.index,
-    required this.total,
-    required this.completedCount,
-    required this.selectedValue,
-    required this.options,
-    required this.elapsedSeconds,
-    required this.successRate,
-    required this.homeworkSentCount,
-    required this.hasSessionHomework,
-    required this.hasEvaluations,
-    required this.autoMoveToNext,
-    required this.notes,
-    required this.onEvaluate,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onToggleAutoMove,
-    required this.onQuickNote,
-    required this.onSendSessionHomework,
-    required this.onSave,
-    required this.onPrintReport,
-    required this.onStop,
-  });
-
-  final ProgramActivity activity;
-  final int index;
-  final int total;
-  final int completedCount;
-  final String? selectedValue;
-  final List<String> options;
-  final int elapsedSeconds;
-  final int successRate;
-  final int homeworkSentCount;
-  final bool hasSessionHomework;
-  final bool hasEvaluations;
-  final bool autoMoveToNext;
-  final TextEditingController notes;
-  final ValueChanged<String> onEvaluate;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final ValueChanged<bool> onToggleAutoMove;
-  final ValueChanged<String> onQuickNote;
-  final VoidCallback onSendSessionHomework;
-  final VoidCallback onSave;
-  final VoidCallback onPrintReport;
-  final VoidCallback onStop;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = _StructuredActivityContent.tryParse(activity);
-    final homework = content?.homework ?? activity.homework;
-    final progress = total == 0 ? 0.0 : (index + 1) / total;
-    final remaining = total - completedCount;
-    final estimatedMinutes = remaining <= 0 ? 0 : remaining * 2;
-    return TherapyCard(
-      title: 'وضع التركيز العلاجي',
-      icon: Icons.center_focus_strong_outlined,
-      trailing: AppPill(
-        label: Duration(seconds: elapsedSeconds).toString().split('.').first,
-        icon: Icons.timer_outlined,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _SmartSessionProgress(
-            index: index,
-            total: total,
-            completedCount: completedCount,
-            successRate: successRate,
-            estimatedMinutes: estimatedMinutes,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          LinearProgressIndicator(value: progress),
-          const SizedBox(height: AppSpacing.lg),
-          if (content == null)
-            _PlainActivity(
-                title: activity.title, instructions: activity.instructions)
-          else
-            _ActivityContentView(title: activity.title, content: content),
-          if (homework.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _HomeworkSuggestion(
-              homework: homework,
-              selectedValue: selectedValue,
-              content: content,
-            ),
-          ],
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  value: autoMoveToNext,
-                  onChanged: onToggleAutoMove,
-                  title: const Text('انتقال تلقائي بعد التقييم'),
-                  subtitle:
-                      const Text('اختصارات: 1 إنجاز، 2 مساعدة، 3 لم ينجز'),
-                ),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('سيتم تفعيل إرفاق صوت الأخصائي قريبًا.'),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.mic_none_outlined),
-                label: const Text('إرفاق صوت'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'التقييم',
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: options.map((option) {
-              final selected = selectedValue == option;
-              return SizedBox(
-                height: 68,
-                width: 172,
-                child: selected
-                    ? FilledButton(
-                        onPressed: () => onEvaluate(option),
-                        child: Text(option),
-                      )
-                    : FilledButton.tonal(
-                        onPressed: () => onEvaluate(option),
-                        child: Text(option),
-                      ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _QuickNotes(onQuickNote: onQuickNote),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: notes,
-            maxLines: 2,
-            decoration: const InputDecoration(labelText: 'ملاحظة الأخصائي'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              FilledButton.icon(
-                onPressed: onPrevious,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('السابق'),
-              ),
-              FilledButton.icon(
-                onPressed: onNext,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('التالي'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: hasSessionHomework ? onSendSessionHomework : null,
-                icon: const Icon(Icons.playlist_add_check),
-                label: const Text('إرسال واجب الجلسة'),
-              ),
-              FilledButton.icon(
-                onPressed: hasEvaluations ? onSave : null,
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('حفظ الجلسة'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: hasEvaluations ? onPrintReport : null,
-                icon: const Icon(Icons.picture_as_pdf_outlined),
-                label: const Text('تقرير PDF'),
-              ),
-              TextButton.icon(
-                onPressed: onStop,
-                icon: const Icon(Icons.close),
-                label: const Text('إيقاف الجلسة'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              AppPill(
-                  label: 'المكتمل: $completedCount / $total',
-                  icon: Icons.layers_outlined),
-              AppPill(
-                  label: 'واجبات مرسلة: $homeworkSentCount',
-                  icon: Icons.assignment_turned_in_outlined),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PlainActivity extends StatelessWidget {
-  const _PlainActivity({required this.title, required this.instructions});
-
-  final String title;
-  final String instructions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _InstructionSteps(
-            text: instructions.trim().isEmpty
-                ? 'نشاط علاجي بدون تعليمات إضافية.'
-                : instructions,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ActivityContentView extends StatelessWidget {
-  const _ActivityContentView({required this.title, required this.content});
-
-  final String title;
-  final _StructuredActivityContent content;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    if (content.kind == 'speechWord') {
-      return _Panel(
-        title: 'كلمات حرف ${content.letter}',
-        subtitle: content.position,
-        child: _wordCards(context, content.words),
-      );
-    }
-    if (content.kind == 'speechSentence') {
-      return _Panel(
-        title: 'جمل حرف ${content.letter}',
-        subtitle: content.instructions,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: content.sentences
-              .map((sentence) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(AppRadii.card),
-                      ),
-                      child: Text(
-                        sentence,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                  ))
-              .toList(),
-        ),
-      );
-    }
-    if (content.kind != 'speechLetter') {
-      return _PlainActivity(title: title, instructions: content.instructions);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(36),
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border:
-                Border.all(color: colorScheme.primary.withValues(alpha: .3)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                content.letterDisplay,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.displayLarge?.copyWith(
-                  fontSize: 104,
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w900,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              AppPill(
-                label: content.vocalization,
-                icon: Icons.graphic_eq_outlined,
-                selected: true,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (content.instructions.isNotEmpty)
-          _InstructionSteps(text: content.instructions),
-      ],
-    );
-  }
-
-  Widget _wordCards(BuildContext context, List<String> values) {
-    final theme = Theme.of(context);
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: values
-          .map((value) => Container(
-                constraints: const BoxConstraints(minWidth: 104),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                ),
-                child: Text(
-                  value,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w900),
-                ),
-              ))
-          .toList(),
-    );
-  }
-}
-
-class _SmartSessionProgress extends StatelessWidget {
-  const _SmartSessionProgress({
-    required this.index,
-    required this.total,
-    required this.completedCount,
-    required this.successRate,
-    required this.estimatedMinutes,
-  });
-
-  final int index;
-  final int total;
-  final int completedCount;
-  final int successRate;
-  final int estimatedMinutes;
-
-  @override
-  Widget build(BuildContext context) {
-    final remaining = (total - completedCount).clamp(0, total);
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        AppPill(
-          label: 'النشاط ${index + 1} من $total',
-          icon: Icons.playlist_play_outlined,
-          selected: true,
-        ),
-        AppPill(
-          label: 'اكتمل $completedCount',
-          icon: Icons.check_circle_outline,
-        ),
-        AppPill(
-          label: 'متبقي $remaining',
-          icon: Icons.pending_actions_outlined,
-        ),
-        AppPill(
-          label: '$successRate%',
-          icon: Icons.trending_up,
-          selected: successRate >= 70,
-        ),
-        AppPill(
-          label: estimatedMinutes == 0
-              ? 'جاهز للإنهاء'
-              : 'حوالي $estimatedMinutes دقائق',
-          icon: Icons.schedule_outlined,
-        ),
-      ],
     );
   }
 }
@@ -1599,11 +661,10 @@ class _QuickNotes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const values = [
+    const notes = [
       'تحسن ممتاز',
       'يحتاج متابعة',
       'تشتت',
-      'نطق أفضل',
       'تعاون ممتاز',
       'يحتاج تدريب منزلي',
     ];
@@ -1615,14 +676,11 @@ class _QuickNotes extends StatelessWidget {
         Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
-          children: values
-              .map(
-                (value) => ActionChip(
-                  label: Text(value),
-                  avatar: const Icon(Icons.add_comment_outlined, size: 18),
-                  onPressed: () => onQuickNote(value),
-                ),
-              )
+          children: notes
+              .map((note) => ActionChip(
+                    label: Text(note),
+                    onPressed: () => onQuickNote(note),
+                  ))
               .toList(),
         ),
       ],
@@ -1630,248 +688,90 @@ class _QuickNotes extends StatelessWidget {
   }
 }
 
-class _HomeworkSuggestion extends StatelessWidget {
-  const _HomeworkSuggestion({
-    required this.homework,
-    required this.selectedValue,
-    required this.content,
+class _ClinicalSessionSummary {
+  const _ClinicalSessionSummary({
+    required this.stepsCount,
+    required this.updatedCount,
+    required this.masteryRate,
+    required this.homeworkSentCount,
+    required this.notes,
   });
 
-  final String homework;
-  final String? selectedValue;
-  final _StructuredActivityContent? content;
+  final int stepsCount;
+  final int updatedCount;
+  final int masteryRate;
+  final int homeworkSentCount;
+  final String notes;
+}
+
+class _ClinicalSessionSummaryCard extends StatelessWidget {
+  const _ClinicalSessionSummaryCard({required this.summary});
+
+  final _ClinicalSessionSummary summary;
 
   @override
   Widget build(BuildContext context) {
-    final tone = sanadAlertTone(context, SemanticAlertKind.info);
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: tone.background,
-        border: Border.all(color: tone.border),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-      ),
+    return TherapyCard(
+      title: 'ملخص آخر جلسة علاجية',
+      icon: Icons.summarize_outlined,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: AppSpacing.sm,
+            runSpacing: AppSpacing.sm,
             children: [
-              Icon(Icons.auto_awesome_outlined, color: tone.icon),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  'اقتراح واجب ذكي',
-                  style: TextStyle(
-                    color: tone.foreground,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
+              AppPill(label: 'المهارات: ${summary.stepsCount}'),
+              AppPill(label: 'المحدث: ${summary.updatedCount}'),
+              AppPill(label: 'الإتقان: ${summary.masteryRate}%'),
+              AppPill(label: 'الواجبات: ${summary.homeworkSentCount}'),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            _suggestionText(),
-            style: TextStyle(
-              color: tone.foreground,
-              fontWeight: FontWeight.w700,
-              height: 1.45,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _suggestionText() {
-    final base = homework.trim();
-    if (selectedValue == 'لم ينجز') {
-      return '$base\nخفف صعوبة التدريب وابدأ بتكرار قصير مع دعم ولي الأمر.';
-    }
-    if (selectedValue == 'يحتاج مساعدة') {
-      return '$base\nيفضل تدريب منزلي قصير مع نموذج صوتي واضح.';
-    }
-    if (selectedValue == 'تم الإنجاز') {
-      return '$base\nيمكن زيادة التحدي قليلًا أو استخدام كلمات مشابهة.';
-    }
-    if (content?.kind == 'speechLetter') {
-      return '$base\nابدأ بصوت الحرف منفردًا ثم كرره بهدوء.';
-    }
-    return base;
-  }
-}
-
-class _InstructionSteps extends StatelessWidget {
-  const _InstructionSteps({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final steps = text
-        .split(RegExp(r'[.\n،]+'))
-        .map((item) => item.trim())
-        .where((item) => item.isNotEmpty)
-        .toList();
-    if (steps.length <= 1) {
-      return Text(
-        text,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              height: 1.55,
-            ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < steps.length; i++) ...[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppPill(label: '${i + 1}', selected: true),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  steps[i],
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.45,
-                      ),
-                ),
-              ),
-            ],
-          ),
-          if (i < steps.length - 1) const SizedBox(height: AppSpacing.sm),
-        ],
-      ],
-    );
-  }
-}
-
-class _Panel extends StatelessWidget {
-  const _Panel(
-      {required this.title, required this.subtitle, required this.child});
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w900)),
-          if (subtitle.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(subtitle),
+          if (summary.notes.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text('ملاحظة الأخصائي: ${summary.notes}'),
           ],
-          const SizedBox(height: 10),
-          child,
         ],
       ),
     );
   }
 }
 
-class _StructuredActivityContent {
-  const _StructuredActivityContent({
-    required this.kind,
-    this.letter = '',
-    this.letterDisplay = '',
-    this.vocalization = '',
-    this.position = '',
-    this.words = const [],
-    this.sentences = const [],
-    this.instructions = '',
-    this.homework = '',
-    this.sortOrder = 0,
-  });
-
-  final String kind;
-  final String letter;
-  final String letterDisplay;
-  final String vocalization;
-  final String position;
-  final List<String> words;
-  final List<String> sentences;
-  final String instructions;
-  final String homework;
-  final int sortOrder;
-
-  String get summary {
-    if (kind == 'speechLetter') return '$letterDisplay - $vocalization';
-    if (kind == 'speechWord') return '$position: ${words.join(' - ')}';
-    if (kind == 'speechSentence') return sentences.join(' / ');
-    return instructions;
-  }
-
-  static _StructuredActivityContent? tryParse(ProgramActivity activity) {
-    try {
-      final json = jsonDecode(activity.instructions);
-      if (json is! Map<String, dynamic>) {
-        return null;
-      }
-      return _StructuredActivityContent(
-        kind: json['kind'] as String? ?? 'other',
-        letter: json['letter'] as String? ?? '',
-        letterDisplay: json['letterDisplay'] as String? ?? '',
-        vocalization: json['vocalization'] as String? ?? '',
-        position: json['position'] as String? ?? '',
-        words: _stringList(json['words']),
-        sentences: _stringList(json['sentences']),
-        instructions: json['instructions'] as String? ?? '',
-        homework: json['homework'] as String? ?? activity.homework,
-        sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static List<String> _stringList(Object? value) {
-    if (value is List) return value.map((item) => '$item').toList();
-    return const [];
-  }
-}
-
-class _PreviousSessions extends StatelessWidget {
-  const _PreviousSessions({required this.app});
+class _PreviousGoalSessions extends StatelessWidget {
+  const _PreviousGoalSessions({required this.app});
 
   final AppProvider app;
 
   @override
   Widget build(BuildContext context) {
-    if (app.sessions.isEmpty) {
-      return const EmptyState(
-        icon: Icons.event_note_outlined,
-        title: 'لا توجد جلسات',
-        message: 'بعد حفظ أول جلسة ستظهر هنا.',
-      );
-    }
-    return ResponsiveGrid(
-      children: app.sessions.map((session) {
-        return AppCard(
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.record_voice_over_outlined),
-            title: Text('${session.cardTitle} - ${session.quickResult}'),
-            subtitle: Text('${session.startedAt}\n${session.notes}'),
-            trailing: Text('${session.successRate}%'),
-          ),
-        );
-      }).toList(),
+    final sessions = app.sessions
+        .where((session) => session.sessionType.contains('هدف'))
+        .toList();
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('الجلسات المبنية على أهداف', style: SanadText.subtitle(context)),
+          const SizedBox(height: AppSpacing.sm),
+          if (sessions.isEmpty)
+            const EmptyState(
+              icon: Icons.timeline_outlined,
+              title: 'لا توجد جلسات أهداف بعد',
+              message:
+                  'بعد حفظ أول جلسة مبنية على هدف ستظهر هنا كجزء من رحلة التحسن.',
+            )
+          else
+            ...sessions.take(6).map((session) => ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.track_changes_outlined),
+                  title: Text(session.cardTitle),
+                  subtitle: Text(
+                    '${session.startedAt.split('T').first} - إتقان ${session.successRate}%',
+                  ),
+                  trailing: Text(session.quickResult),
+                )),
+        ],
+      ),
     );
   }
 }

@@ -23,10 +23,6 @@ class AppProvider extends ChangeNotifier {
   List<Evaluation> evaluations = [];
   List<TrainingPlan> plans = [];
   List<GoalSkillStep> goalSkillSteps = [];
-  List<TherapyProgram> programs = [];
-  List<ProgramSection> programSections = [];
-  List<ProgramSkill> programSkills = [];
-  List<ProgramActivity> programActivities = [];
   List<Exercise> exercises = [];
   List<ReportRecord> reports = [];
   List<ClinicalAssessment> clinicalAssessments = [];
@@ -66,19 +62,17 @@ class AppProvider extends ChangeNotifier {
   bool get canManageStudents => isCenterManager || isDataEntry;
   bool get canDeleteStudents => isCenterManager;
   bool get canWriteClinical => isSpecialist;
-  bool get canManagePrograms => isCenterManager || isProgramEntry;
-  bool get canUsePrograms => canManagePrograms || isSpecialist;
   bool get canWriteParentArea => isParent || canWriteClinical;
   bool get canViewReports => isCenterManager || isSpecialist;
   String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
 
   int get completedHomeworkCount =>
-      centerExercises.where((item) => item.status == 'مكتمل').length;
+      centerExercises.where((item) => item.status == 'ظ…ظƒطھظ…ظ„').length;
 
   String get hardestLetter {
     final counts = <String, int>{};
     for (final evaluation in centerEvaluations
-        .where((item) => item.score == 'خطأ' || item.severity >= 4)) {
+        .where((item) => item.score == 'ط®ط·ط£' || item.severity >= 4)) {
       counts[evaluation.letter] = (counts[evaluation.letter] ?? 0) + 1;
     }
     if (counts.isEmpty) return '-';
@@ -89,10 +83,10 @@ class AppProvider extends ChangeNotifier {
 
   String get mostUsedSign {
     final counts = <String, int>{};
-    for (final session
-        in centerSessions.where((item) => item.sessionType == 'لغة إشارة')) {
+    for (final session in centerSessions
+        .where((item) => item.sessionType == 'ظ„ط؛ط© ط¥ط´ط§ط±ط©')) {
       for (final item in session.practiceItems
-          .split(RegExp(r'[،,]'))
+          .split(RegExp(r'[طŒ,]'))
           .map((value) => value.trim())
           .where((value) => value.isNotEmpty)) {
         counts[item] = (counts[item] ?? 0) + 1;
@@ -108,74 +102,74 @@ class AppProvider extends ChangeNotifier {
         TrainingItem(
             id: 's1',
             type: 'word',
-            title: 'باب',
-            letter: 'ب',
-            position: 'أول الكلمة',
-            level: 'مبتدئ',
-            category: 'كلمات'),
+            title: 'ط¨ط§ط¨',
+            letter: 'ط¨',
+            position: 'ط£ظˆظ„ ط§ظ„ظƒظ„ظ…ط©',
+            level: 'ظ…ط¨طھط¯ط¦',
+            category: 'ظƒظ„ظ…ط§طھ'),
         TrainingItem(
             id: 's2',
             type: 'word',
-            title: 'كوب',
-            letter: 'ب',
-            position: 'آخر الكلمة',
-            level: 'مبتدئ',
-            category: 'كلمات'),
+            title: 'ظƒظˆط¨',
+            letter: 'ط¨',
+            position: 'ط¢ط®ط± ط§ظ„ظƒظ„ظ…ط©',
+            level: 'ظ…ط¨طھط¯ط¦',
+            category: 'ظƒظ„ظ…ط§طھ'),
         TrainingItem(
             id: 's3',
             type: 'sentence',
-            title: 'باب البيت مفتوح',
-            letter: 'ب',
-            position: 'أول الكلمة',
-            level: 'متوسط',
-            category: 'جمل'),
+            title: 'ط¨ط§ط¨ ط§ظ„ط¨ظٹطھ ظ…ظپطھظˆط­',
+            letter: 'ط¨',
+            position: 'ط£ظˆظ„ ط§ظ„ظƒظ„ظ…ط©',
+            level: 'ظ…طھظˆط³ط·',
+            category: 'ط¬ظ…ظ„'),
         TrainingItem(
             id: 's4',
             type: 'word',
-            title: 'سمك',
-            letter: 'س',
-            position: 'أول الكلمة',
-            level: 'مبتدئ',
-            category: 'كلمات'),
+            title: 'ط³ظ…ظƒ',
+            letter: 'ط³',
+            position: 'ط£ظˆظ„ ط§ظ„ظƒظ„ظ…ط©',
+            level: 'ظ…ط¨طھط¯ط¦',
+            category: 'ظƒظ„ظ…ط§طھ'),
         TrainingItem(
             id: 's5',
             type: 'sentence',
-            title: 'سامي يسمع الصوت',
-            letter: 'س',
-            position: 'وسط الكلمة',
-            level: 'متوسط',
-            category: 'جمل'),
+            title: 'ط³ط§ظ…ظٹ ظٹط³ظ…ط¹ ط§ظ„طµظˆطھ',
+            letter: 'ط³',
+            position: 'ظˆط³ط· ط§ظ„ظƒظ„ظ…ط©',
+            level: 'ظ…طھظˆط³ط·',
+            category: 'ط¬ظ…ظ„'),
       ];
 
   String get smartSessionSuggestion {
     if (evaluations.isEmpty && sessions.isEmpty) {
-      return 'ابدأ بهدف قصير من الخطة الحالية ثم قيّم 5 محاولات.';
+      return 'ط§ط¨ط¯ط£ ط¨ظ‡ط¯ظپ ظ‚طµظٹط± ظ…ظ† ط§ظ„ط®ط·ط© ط§ظ„ط­ط§ظ„ظٹط© ط«ظ… ظ‚ظٹظ‘ظ… 5 ظ…ط­ط§ظˆظ„ط§طھ.';
     }
     final weakEvaluation = evaluations
-        .where((item) => item.score == 'خطأ' || item.severity >= 4)
+        .where((item) => item.score == 'ط®ط·ط£' || item.severity >= 4)
         .toList();
     if (weakEvaluation.isNotEmpty) {
       final item = weakEvaluation.first;
-      return 'اقترح تدريب حرف ${item.letter} في موضع ${item.position} بسبب تكرار ${item.errorType}.';
+      return 'ط§ظ‚طھط±ط­ طھط¯ط±ظٹط¨ ط­ط±ظپ ${item.letter} ظپظٹ ظ…ظˆط¶ط¹ ${item.position} ط¨ط³ط¨ط¨ طھظƒط±ط§ط± ${item.errorType}.';
     }
     final lastSession = sessions.isEmpty ? null : sessions.first;
     if (lastSession != null && lastSession.successRate >= 85) {
-      return 'الأداء ممتاز؛ جرّب مستوى أصعب وزد نقاط XP عند الإتقان.';
+      return 'ط§ظ„ط£ط¯ط§ط، ظ…ظ…طھط§ط²ط› ط¬ط±ظ‘ط¨ ظ…ط³طھظˆظ‰ ط£طµط¹ط¨ ظˆط²ط¯ ظ†ظ‚ط§ط· XP ط¹ظ†ط¯ ط§ظ„ط¥طھظ‚ط§ظ†.';
     }
     if (lastSession != null &&
-        lastSession.letterPosition == 'آخر الكلمة' &&
-        lastSession.quickResult == 'خطأ') {
-      return 'ركّز على تدريبات آخر الكلمة في الجلسة القادمة.';
+        lastSession.letterPosition == 'ط¢ط®ط± ط§ظ„ظƒظ„ظ…ط©' &&
+        lastSession.quickResult == 'ط®ط·ط£') {
+      return 'ط±ظƒظ‘ط² ط¹ظ„ظ‰ طھط¯ط±ظٹط¨ط§طھ ط¢ط®ط± ط§ظ„ظƒظ„ظ…ط© ظپظٹ ط§ظ„ط¬ظ„ط³ط© ط§ظ„ظ‚ط§ط¯ظ…ط©.';
     }
-    return 'استمر على هدف الخطة الحالي مع تقليل المساعدة تدريجيًا.';
+    return 'ط§ط³طھظ…ط± ط¹ظ„ظ‰ ظ‡ط¯ظپ ط§ظ„ط®ط·ط© ط§ظ„ط­ط§ظ„ظٹ ظ…ط¹ طھظ‚ظ„ظٹظ„ ط§ظ„ظ…ط³ط§ط¹ط¯ط© طھط¯ط±ظٹط¬ظٹظ‹ط§.';
   }
 
   bool get signLanguageEnabledForSelectedStudent {
     final student = selectedStudent;
     if (student == null) return true;
-    return student.programType.contains('سمع') ||
-        student.programType.contains('إشارة') ||
-        plans.any((plan) => plan.goal.contains('إشارة'));
+    return student.programType.contains('ط³ظ…ط¹') ||
+        student.programType.contains('ط¥ط´ط§ط±ط©') ||
+        plans.any((plan) => plan.goal.contains('ط¥ط´ط§ط±ط©'));
   }
 
   Future<void> initialize() async {
@@ -197,13 +191,14 @@ class AppProvider extends ChangeNotifier {
     required String confirmPassword,
   }) async {
     if (name.trim().isEmpty || email.trim().isEmpty || password.isEmpty) {
-      throw StateError('أكمل بيانات مالك النظام.');
+      throw StateError('ط£ظƒظ…ظ„ ط¨ظٹط§ظ†ط§طھ ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ….');
     }
     if (password.length < 8) {
-      throw StateError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
+      throw StateError(
+          'ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظٹط¬ط¨ ط£ظ„ط§ طھظ‚ظ„ ط¹ظ† 8 ط£ط­ط±ظپ.');
     }
     if (password != confirmPassword) {
-      throw StateError('كلمتا المرور غير متطابقتين.');
+      throw StateError('ظƒظ„ظ…طھط§ ط§ظ„ظ…ط±ظˆط± ط؛ظٹط± ظ…طھط·ط§ط¨ظ‚طھظٹظ†.');
     }
     await _repository.createSystemOwner(
         name: name.trim(), email: email.trim(), password: password);
@@ -236,7 +231,8 @@ class AppProvider extends ChangeNotifier {
   Future<void> changePassword(String newPassword) async {
     final current = _requireUser();
     if (newPassword.length < 6) {
-      throw StateError('كلمة المرور يجب ألا تقل عن 6 أحرف.');
+      throw StateError(
+          'ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظٹط¬ط¨ ط£ظ„ط§ طھظ‚ظ„ ط¹ظ† 6 ط£ط­ط±ظپ.');
     }
     await _repository.changePassword(current, newPassword);
     user = AppUser(
@@ -271,10 +267,6 @@ class AppProvider extends ChangeNotifier {
     sessions = [];
     evaluations = [];
     plans = [];
-    programs = [];
-    programSections = [];
-    programSkills = [];
-    programActivities = [];
     exercises = [];
     reports = [];
     clinicalAssessments = [];
@@ -333,15 +325,6 @@ class AppProvider extends ChangeNotifier {
     signResources = activeCenterId.isEmpty
         ? []
         : await _repository.signResources(activeCenterId);
-    if (activeCenterId.isEmpty) {
-      programs = [];
-      programSections = [];
-      programSkills = [];
-      programActivities = [];
-    } else {
-      programs = await _repository.programs(activeCenterId);
-      await _loadProgramTree();
-    }
     auditLogs = isOwner || isCenterManager
         ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId)
         : [];
@@ -360,12 +343,13 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> enterSupportMode(SanadCenter center) async {
-    _ensure(isSanadOwnerAccount, 'وضع المساعدة خاص بمالك سند فقط.');
+    _ensure(isSanadOwnerAccount,
+        'ظˆط¶ط¹ ط§ظ„ظ…ط³ط§ط¹ط¯ط© ط®ط§طµ ط¨ظ…ط§ظ„ظƒ ط³ظ†ط¯ ظپظ‚ط·.');
     supportModeCenter = center;
     currentCenter = center;
     selectedStudent = null;
     await _log(
-      action: 'دخل مالك سند وضع مساعدة مركز',
+      action: 'ط¯ط®ظ„ ظ…ط§ظ„ظƒ ط³ظ†ط¯ ظˆط¶ط¹ ظ…ط³ط§ط¹ط¯ط© ظ…ط±ظƒط²',
       entityType: 'center',
       entityId: center.id,
       centerId: center.id,
@@ -378,7 +362,7 @@ class AppProvider extends ChangeNotifier {
     final center = supportModeCenter;
     if (center == null) return;
     await _log(
-      action: 'خرج مالك سند من وضع مساعدة مركز',
+      action: 'ط®ط±ط¬ ظ…ط§ظ„ظƒ ط³ظ†ط¯ ظ…ظ† ظˆط¶ط¹ ظ…ط³ط§ط¹ط¯ط© ظ…ط±ظƒط²',
       entityType: 'center',
       entityId: center.id,
       centerId: center.id,
@@ -391,7 +375,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> switchCenter(SanadCenter center) async {
-    _ensure(canManageCenters, 'إدارة المراكز خاصة بمالك النظام فقط.');
+    _ensure(canManageCenters,
+        'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ط±ط§ظƒط² ط®ط§طµط© ط¨ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ظپظ‚ط·.');
     currentCenter = center;
     selectedStudent = null;
     await loadHome();
@@ -465,24 +450,13 @@ class AppProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadProgramTree() async {
-    programSections = [];
-    programSkills = [];
-    programActivities = [];
-    for (final program in programs) {
-      programSections.addAll(await _repository.programSections(program.id));
-      programSkills.addAll(await _repository.programSkills(program.id));
-      programActivities.addAll(await _repository.programActivities(program.id));
-    }
-  }
-
   Future<void> saveCenter(SanadCenter center) async {
     _ensure(
         canManageCenters || (isCenterManager && center.id == activeCenterId),
-        'لا تملك صلاحية تعديل هذا المركز.');
+        'ظ„ط§ طھظ…ظ„ظƒ طµظ„ط§ط­ظٹط© طھط¹ط¯ظٹظ„ ظ‡ط°ط§ ط§ظ„ظ…ط±ظƒط².');
     await _repository.saveCenter(center);
     await _log(
-        action: 'حفظ مركز',
+        action: 'ط­ظپط¸ ظ…ط±ظƒط²',
         entityType: 'center',
         entityId: center.id,
         centerId: center.id,
@@ -491,35 +465,43 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> deleteCenter(String id) async {
-    _ensure(canManageCenters, 'حذف المراكز خاص بمالك النظام فقط.');
+    _ensure(canManageCenters,
+        'ط­ط°ظپ ط§ظ„ظ…ط±ط§ظƒط² ط®ط§طµ ط¨ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ظپظ‚ط·.');
     await _repository.deleteCenter(id);
     if (currentCenter?.id == id) currentCenter = null;
     await _log(
-        action: 'حذف مركز', entityType: 'center', entityId: id, centerId: id);
+        action: 'ط­ط°ظپ ظ…ط±ظƒط²',
+        entityType: 'center',
+        entityId: id,
+        centerId: id);
     await loadHome();
   }
 
   Future<void> saveStaffUser(AppUser account) async {
-    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    _ensure(canManageStaff,
+        'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظˆط¸ظپظٹظ† ط؛ظٹط± ظ…طھط§ط­ط© ظ„ظ‡ط°ط§ ط§ظ„ط­ط³ط§ط¨.');
     if (!isOwner && account.centerId != activeCenterId) {
-      throw StateError('لا يمكن إنشاء موظف خارج مركزك.');
+      throw StateError(
+          'ظ„ط§ ظٹظ…ظƒظ† ط¥ظ†ط´ط§ط، ظ…ظˆط¸ظپ ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     }
     if (!isOwner && account.role == UserRole.sanadOwner) {
-      throw StateError('مالك النظام لا ينشأ إلا من مالك النظام.');
+      throw StateError(
+          'ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ظ„ط§ ظٹظ†ط´ط£ ط¥ظ„ط§ ظ…ظ† ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ….');
     }
     if (isOwner && account.role != UserRole.centerManager) {
-      throw StateError('مالك النظام ينشئ مدير مركز فقط.');
+      throw StateError(
+          'ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ظٹظ†ط´ط¦ ظ…ط¯ظٹط± ظ…ط±ظƒط² ظپظ‚ط·.');
     }
     if (isCenterManager &&
         account.role != UserRole.specialist &&
         account.role != UserRole.dataEntry &&
         account.role != UserRole.programEntry) {
       throw StateError(
-          'مدير المركز ينشئ أخصائي أو مدخل بيانات أو مدخل برامج فقط.');
+          'ظ…ط¯ظٹط± ط§ظ„ظ…ط±ظƒط² ظٹظ†ط´ط¦ ط£ط®طµط§ط¦ظٹ ط£ظˆ ظ…ط¯ط®ظ„ ط¨ظٹط§ظ†ط§طھ ط£ظˆ ظ…ط¯ط®ظ„ ط¨ط±ط§ظ…ط¬ ظپظ‚ط·.');
     }
     await _repository.saveUser(account);
     await _log(
-        action: 'حفظ موظف',
+        action: 'ط­ظپط¸ ظ…ظˆط¸ظپ',
         entityType: 'user',
         entityId: account.id,
         centerId: account.centerId,
@@ -528,9 +510,11 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> setStaffUserActive(AppUser account, bool isActive) async {
-    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    _ensure(canManageStaff,
+        'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظˆط¸ظپظٹظ† ط؛ظٹط± ظ…طھط§ط­ط© ظ„ظ‡ط°ط§ ط§ظ„ط­ط³ط§ط¨.');
     if (!isOwner && account.centerId != activeCenterId) {
-      throw StateError('لا يمكن تعديل موظف خارج مركزك.');
+      throw StateError(
+          'ظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ ظ…ظˆط¸ظپ ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     }
     await _repository.saveUser(AppUser(
       id: account.id,
@@ -550,32 +534,37 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> changeStaffPassword(AppUser account, String newPassword) async {
-    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    _ensure(canManageStaff,
+        'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظˆط¸ظپظٹظ† ط؛ظٹط± ظ…طھط§ط­ط© ظ„ظ‡ط°ط§ ط§ظ„ط­ط³ط§ط¨.');
     if (newPassword.length < 8) {
-      throw StateError('كلمة المرور يجب ألا تقل عن 8 أحرف.');
+      throw StateError(
+          'ظƒظ„ظ…ط© ط§ظ„ظ…ط±ظˆط± ظٹط¬ط¨ ط£ظ„ط§ طھظ‚ظ„ ط¹ظ† 8 ط£ط­ط±ظپ.');
     }
     if (!isOwner && account.centerId != activeCenterId) {
-      throw StateError('لا يمكن تعديل حساب خارج مركزك.');
+      throw StateError(
+          'ظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ ط­ط³ط§ط¨ ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     }
     if (isOwner && account.role != UserRole.centerManager) {
       throw StateError(
-          'مالك النظام يغير كلمة مرور مدراء المراكز فقط من هذه الشاشة.');
+          'ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ظٹط؛ظٹط± ظƒظ„ظ…ط© ظ…ط±ظˆط± ظ…ط¯ط±ط§ط، ط§ظ„ظ…ط±ط§ظƒط² ظپظ‚ط· ظ…ظ† ظ‡ط°ظ‡ ط§ظ„ط´ط§ط´ط©.');
     }
     await _repository.changeUserPassword(account.id, newPassword);
     await loadHome();
   }
 
   Future<void> deleteStaffUser(AppUser account) async {
-    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    _ensure(canManageStaff,
+        'ط¥ط¯ط§ط±ط© ط§ظ„ظ…ظˆط¸ظپظٹظ† ط؛ظٹط± ظ…طھط§ط­ط© ظ„ظ‡ط°ط§ ط§ظ„ط­ط³ط§ط¨.');
     if (!isOwner && account.centerId != activeCenterId) {
-      throw StateError('لا يمكن حذف موظف خارج مركزك.');
+      throw StateError('ظ„ط§ ظٹظ…ظƒظ† ط­ط°ظپ ظ…ظˆط¸ظپ ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     }
     await _repository.deleteUser(account.id);
     await loadHome();
   }
 
   Future<Student> saveStudent(Student student) async {
-    _ensure(canManageStudents, 'لا تملك صلاحية حفظ الطلاب.');
+    _ensure(
+        canManageStudents, 'ظ„ط§ طھظ…ظ„ظƒ طµظ„ط§ط­ظٹط© ط­ظپط¸ ط§ظ„ط·ظ„ط§ط¨.');
     final centerStudent = Student(
       id: student.id,
       centerId: isOwner ? student.centerId : activeCenterId,
@@ -596,7 +585,7 @@ class AppProvider extends ChangeNotifier {
     );
     await _repository.saveStudent(centerStudent);
     await _log(
-        action: 'حفظ طالب',
+        action: 'ط­ظپط¸ ط·ط§ظ„ط¨',
         entityType: 'student',
         entityId: centerStudent.id,
         centerId: centerStudent.centerId,
@@ -610,10 +599,11 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> deleteStudent(String id) async {
-    _ensure(canDeleteStudents, 'لا تملك صلاحية حذف الطلاب.');
+    _ensure(
+        canDeleteStudents, 'ظ„ط§ طھظ…ظ„ظƒ طµظ„ط§ط­ظٹط© ط­ط°ظپ ط§ظ„ط·ظ„ط§ط¨.');
     await _repository.softDeleteStudent(id);
     await _log(
-        action: 'حذف طالب',
+        action: 'ط­ط°ظپ ط·ط§ظ„ط¨',
         entityType: 'student',
         entityId: id,
         centerId: activeCenterId);
@@ -623,12 +613,13 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> saveSession(TherapySession session,
       {bool autosave = false}) async {
-    _ensure(canWriteClinical, 'الجلسات يضيفها الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'ط§ظ„ط¬ظ„ط³ط§طھ ظٹط¶ظٹظپظ‡ط§ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(session.studentId, session.centerId);
     await _repository.saveSession(session);
     if (!autosave) {
       await _log(
-          action: 'إنشاء جلسة',
+          action: 'ط¥ظ†ط´ط§ط، ط¬ظ„ط³ط©',
           entityType: 'session',
           entityId: session.id,
           centerId: session.centerId,
@@ -636,10 +627,10 @@ class AppProvider extends ChangeNotifier {
               '${session.studentId} - ${session.sessionType} - ${session.cardTitle}');
       await _grantXp(
           session.studentId,
-          session.quickResult == 'صحيح' ||
-                  session.quickResult == 'ناجح' ||
-                  session.quickResult == 'أتقن' ||
-                  session.quickResult == 'يؤدي جيدًا'
+          session.quickResult == 'طµط­ظٹط­' ||
+                  session.quickResult == 'ظ†ط§ط¬ط­' ||
+                  session.quickResult == 'ط£طھظ‚ظ†' ||
+                  session.quickResult == 'ظٹط¤ط¯ظٹ ط¬ظٹط¯ظ‹ط§'
               ? 12
               : 6);
     }
@@ -647,27 +638,32 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveEvaluation(Evaluation evaluation) async {
-    _ensure(canWriteClinical, 'التقييم يضيفه الأخصائي فقط.');
+    _ensure(
+        canWriteClinical, 'ط§ظ„طھظ‚ظٹظٹظ… ظٹط¶ظٹظپظ‡ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(evaluation.studentId, evaluation.centerId);
     await _repository.saveEvaluation(evaluation);
     await _log(
-        action: 'حفظ تقييم',
+        action: 'ط­ظپط¸ طھظ‚ظٹظٹظ…',
         entityType: 'evaluation',
         entityId: evaluation.id,
         centerId: evaluation.centerId,
         details:
             '${evaluation.studentId} - ${evaluation.letter} - ${evaluation.errorType}');
-    await _grantXp(evaluation.studentId,
-        evaluation.score == 'صحيح' || evaluation.score == 'ناجح' ? 8 : 4);
+    await _grantXp(
+        evaluation.studentId,
+        evaluation.score == 'طµط­ظٹط­' || evaluation.score == 'ظ†ط§ط¬ط­'
+            ? 8
+            : 4);
     await selectStudent(selectedStudent);
   }
 
   Future<void> savePlan(TrainingPlan plan) async {
-    _ensure(canWriteClinical, 'الخطط يضيفها الأخصائي فقط.');
+    _ensure(
+        canWriteClinical, 'ط§ظ„ط®ط·ط· ظٹط¶ظٹظپظ‡ط§ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(plan.studentId, plan.centerId);
     await _repository.savePlan(plan);
     await _log(
-        action: 'حفظ خطة',
+        action: 'ط­ظپط¸ ط®ط·ط©',
         entityType: 'plan',
         entityId: plan.id,
         centerId: plan.centerId,
@@ -685,22 +681,23 @@ class AppProvider extends ChangeNotifier {
       final matches = plans.where((item) => item.id == goalId).toList();
       return matches.isEmpty ? 0 : matches.first.progress;
     }
-    final completed = steps.where((step) => step.status == 'متقن').length;
+    final completed = steps.where((step) => step.status == 'ظ…طھظ‚ظ†').length;
     return ((completed / steps.length) * 100).round();
   }
 
   String goalStatus(String goalId) {
     final progress = goalProgress(goalId);
-    if (progress >= 100) return 'مكتمل';
-    if (progress >= 70) return 'متحسن';
-    if (progress > 0) return 'قيد التدريب';
-    final hasStarted = stepsForGoal(goalId)
-        .any((step) => step.status != 'لم يبدأ' && step.status.isNotEmpty);
-    return hasStarted ? 'يحتاج متابعة' : 'جديد';
+    if (progress >= 100) return 'ظ…ظƒطھظ…ظ„';
+    if (progress >= 70) return 'ظ…طھط­ط³ظ†';
+    if (progress > 0) return 'ظ‚ظٹط¯ ط§ظ„طھط¯ط±ظٹط¨';
+    final hasStarted = stepsForGoal(goalId).any(
+        (step) => step.status != 'ظ„ظ… ظٹط¨ط¯ط£' && step.status.isNotEmpty);
+    return hasStarted ? 'ظٹط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©' : 'ط¬ط¯ظٹط¯';
   }
 
   Future<void> saveGoalSkillStep(GoalSkillStep step) async {
-    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'طھطھط¨ط¹ ط§ظ„ط£ظ‡ط¯ط§ظپ ظٹط­ط¯ظ‘ط«ظ‡ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step);
     await _syncGoalProgress(step.goalId);
@@ -713,7 +710,8 @@ class AppProvider extends ChangeNotifier {
     required String notes,
     String lastSessionId = '',
   }) async {
-    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'طھطھط¨ط¹ ط§ظ„ط£ظ‡ط¯ط§ظپ ظٹط­ط¯ظ‘ط«ظ‡ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step.copyWith(
       status: status,
@@ -729,7 +727,8 @@ class AppProvider extends ChangeNotifier {
     final matches = plans.where((plan) => plan.id == goalId).toList();
     if (matches.isEmpty || goalSteps.isEmpty) return;
     final plan = matches.first;
-    final completed = goalSteps.where((step) => step.status == 'متقن').length;
+    final completed =
+        goalSteps.where((step) => step.status == 'ظ…طھظ‚ظ†').length;
     final progress = ((completed / goalSteps.length) * 100).round();
     await _repository.savePlan(TrainingPlan(
       id: plan.id,
@@ -747,7 +746,8 @@ class AppProvider extends ChangeNotifier {
     required ClinicalAssessment assessment,
     required List<ClinicalFinding> findings,
   }) async {
-    _ensure(canWriteClinical, 'التقييم العلاجي يضيفه الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'ط§ظ„طھظ‚ظٹظٹظ… ط§ظ„ط¹ظ„ط§ط¬ظٹ ظٹط¶ظٹظپظ‡ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(assessment.studentId, assessment.centerId);
     await _repository.saveClinicalAssessment(assessment);
     for (final finding in findings) {
@@ -774,9 +774,9 @@ class AppProvider extends ChangeNotifier {
         final training =
             finding.training.trim().isEmpty ? finding.goal : finding.training;
         final stepTitles = [
-          'يشاهد الأخصائي ينفذ التدريب: $training',
-          'ينفذ التدريب بمساعدة: $training',
-          'ينفذ التدريب باستقلالية: $training',
+          'ظٹط´ط§ظ‡ط¯ ط§ظ„ط£ط®طµط§ط¦ظٹ ظٹظ†ظپط° ط§ظ„طھط¯ط±ظٹط¨: $training',
+          'ظٹظ†ظپط° ط§ظ„طھط¯ط±ظٹط¨ ط¨ظ…ط³ط§ط¹ط¯ط©: $training',
+          'ظٹظ†ظپط° ط§ظ„طھط¯ط±ظٹط¨ ط¨ط§ط³طھظ‚ظ„ط§ظ„ظٹط©: $training',
         ];
         for (var index = 0; index < stepTitles.length; index++) {
           await _repository.saveGoalSkillStep(GoalSkillStep(
@@ -793,95 +793,18 @@ class AppProvider extends ChangeNotifier {
       }
     }
     await _log(
-      action: 'حفظ تقييم علاجي نطقي',
+      action: 'ط­ظپط¸ طھظ‚ظٹظٹظ… ط¹ظ„ط§ط¬ظٹ ظ†ط·ظ‚ظٹ',
       entityType: 'clinical_assessment',
       entityId: assessment.id,
       centerId: assessment.centerId,
-      details: '${assessment.studentId} - ${findings.length} بنود',
+      details: '${assessment.studentId} - ${findings.length} ط¨ظ†ظˆط¯',
     );
     await selectStudent(selectedStudent);
   }
 
-  Future<void> saveProgram(TherapyProgram program) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(
-        program.centerId == activeCenterId, 'لا يمكن حفظ برنامج خارج مركزك.');
-    await _repository.saveProgram(program);
-    await _log(
-        action: 'حفظ برنامج',
-        entityType: 'program',
-        entityId: program.id,
-        centerId: program.centerId,
-        details: program.name);
-    programs = await _repository.programs(activeCenterId);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
-  Future<void> saveProgramSection(ProgramSection section) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(
-        section.centerId == activeCenterId, 'لا يمكن حفظ مرحلة خارج مركزك.');
-    await _repository.saveProgramSection(section);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
-  Future<void> saveProgramSkill(ProgramSkill skill) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(skill.centerId == activeCenterId, 'لا يمكن حفظ مهارة خارج مركزك.');
-    await _repository.saveProgramSkill(skill);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
-  Future<void> saveProgramActivity(ProgramActivity activity) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(
-        activity.centerId == activeCenterId, 'لا يمكن حفظ نشاط خارج مركزك.');
-    await _repository.saveProgramActivity(activity);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
-  Future<void> deleteProgramActivity(ProgramActivity activity) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(
-        activity.centerId == activeCenterId, 'لا يمكن حذف نشاط خارج مركزك.');
-    await _repository.deleteProgramActivity(activity.id);
-    await _log(
-        action: 'حذف نشاط برنامج',
-        entityType: 'program_activity',
-        entityId: activity.id,
-        centerId: activity.centerId,
-        details: activity.title);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
-  Future<void> deleteProgramContent(TherapyProgram program) async {
-    _ensure(canManagePrograms,
-        'إدارة البرامج متاحة لمدير المركز أو مدخل البرامج فقط.');
-    _ensure(program.centerId == activeCenterId,
-        'لا يمكن تعديل محتوى برنامج خارج مركزك.');
-    await _repository.deleteProgramContent(program.id);
-    await _log(
-        action: 'إعادة بناء محتوى برنامج',
-        entityType: 'program',
-        entityId: program.id,
-        centerId: program.centerId,
-        details: program.name);
-    await _loadProgramTree();
-    notifyListeners();
-  }
-
   Future<void> saveExercise(Exercise exercise) async {
-    _ensure(canWriteParentArea, 'لا تملك صلاحية تعديل واجبات هذا الطالب.');
+    _ensure(canWriteParentArea,
+        'ظ„ط§ طھظ…ظ„ظƒ طµظ„ط§ط­ظٹط© طھط¹ط¯ظٹظ„ ظˆط§ط¬ط¨ط§طھ ظ‡ط°ط§ ط§ظ„ط·ط§ظ„ط¨.');
     _ensureStudentEntityAccess(exercise.studentId, exercise.centerId);
     await _repository.saveExercise(exercise);
     notifications = [
@@ -892,7 +815,7 @@ class AppProvider extends ChangeNotifier {
       ...notifications,
     ];
     await _log(
-        action: 'حفظ واجب',
+        action: 'ط­ظپط¸ ظˆط§ط¬ط¨',
         entityType: 'exercise',
         entityId: exercise.id,
         centerId: exercise.centerId,
@@ -901,19 +824,21 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveReward(Reward reward) async {
-    _ensure(canWriteClinical, 'المكافآت يعدلها الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'ط§ظ„ظ…ظƒط§ظپط¢طھ ظٹط¹ط¯ظ„ظ‡ط§ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     _ensureClinicalAccess(reward.studentId, reward.centerId);
     await _repository.saveReward(reward);
     await selectStudent(selectedStudent);
   }
 
   Future<void> saveSignResource(SignResource resource) async {
-    _ensure(canWriteClinical, 'مكتبة الإشارة يعدلها الأخصائي فقط.');
-    _ensure(
-        resource.centerId == activeCenterId, 'لا يمكن تعديل إشارة خارج مركزك.');
+    _ensure(canWriteClinical,
+        'ظ…ظƒطھط¨ط© ط§ظ„ط¥ط´ط§ط±ط© ظٹط¹ط¯ظ„ظ‡ط§ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
+    _ensure(resource.centerId == activeCenterId,
+        'ظ„ط§ ظٹظ…ظƒظ† طھط¹ط¯ظٹظ„ ط¥ط´ط§ط±ط© ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     await _repository.saveSignResource(resource);
     await _log(
-        action: 'حفظ إشارة',
+        action: 'ط­ظپط¸ ط¥ط´ط§ط±ط©',
         entityType: 'sign_resource',
         entityId: resource.id,
         centerId: resource.centerId,
@@ -923,10 +848,11 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> deleteSignResource(String id) async {
-    _ensure(canWriteClinical, 'مكتبة الإشارة يعدلها الأخصائي فقط.');
+    _ensure(canWriteClinical,
+        'ظ…ظƒطھط¨ط© ط§ظ„ط¥ط´ط§ط±ط© ظٹط¹ط¯ظ„ظ‡ط§ ط§ظ„ط£ط®طµط§ط¦ظٹ ظپظ‚ط·.');
     await _repository.deleteSignResource(id);
     await _log(
-        action: 'حذف إشارة',
+        action: 'ط­ط°ظپ ط¥ط´ط§ط±ط©',
         entityType: 'sign_resource',
         entityId: id,
         centerId: activeCenterId);
@@ -936,13 +862,13 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> exportBackup(String targetPath) async {
     _ensure(isOwner || isCenterManager,
-        'النسخ الاحتياطي متاح لمالك النظام أو مدير المركز.');
+        'ط§ظ„ظ†ط³ط® ط§ظ„ط§ط­طھظٹط§ط·ظٹ ظ…طھط§ط­ ظ„ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ط£ظˆ ظ…ط¯ظٹط± ط§ظ„ظ…ط±ظƒط².');
     await _repository.exportBackup(targetPath);
   }
 
   Future<void> importBackup(String sourcePath) async {
     _ensure(isOwner || isCenterManager,
-        'استيراد النسخ الاحتياطي متاح لمالك النظام أو مدير المركز.');
+        'ط§ط³طھظٹط±ط§ط¯ ط§ظ„ظ†ط³ط® ط§ظ„ط§ط­طھظٹط§ط·ظٹ ظ…طھط§ط­ ظ„ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ… ط£ظˆ ظ…ط¯ظٹط± ط§ظ„ظ…ط±ظƒط².');
     await _repository.importBackup(sourcePath);
     await loadHome();
   }
@@ -951,8 +877,9 @@ class AppProvider extends ChangeNotifier {
     final current = await _repository.reward(studentId);
     if (current == null) return;
     final xp = current.xp + value;
-    final badges =
-        current.badges.isEmpty && xp >= 50 ? 'بداية قوية' : current.badges;
+    final badges = current.badges.isEmpty && xp >= 50
+        ? 'ط¨ط¯ط§ظٹط© ظ‚ظˆظٹط©'
+        : current.badges;
     await _repository.saveReward(
       Reward(
         id: current.id,
@@ -971,7 +898,8 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> printReport(
       String type, String specialistSignature, String managerSignature) async {
-    _ensure(canViewReports, 'التقارير الرسمية يصدرها المركز فقط.');
+    _ensure(canViewReports,
+        'ط§ظ„طھظ‚ط§ط±ظٹط± ط§ظ„ط±ط³ظ…ظٹط© ظٹطµط¯ط±ظ‡ط§ ط§ظ„ظ…ط±ظƒط² ظپظ‚ط·.');
     final student = selectedStudent;
     if (student == null) return;
     final report = ReportRecord(
@@ -991,7 +919,7 @@ class AppProvider extends ChangeNotifier {
       ...notifications,
     ];
     await _log(
-        action: 'طباعة تقرير',
+        action: 'ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط±',
         entityType: 'report',
         entityId: report.id,
         centerId: report.centerId,
@@ -1016,7 +944,8 @@ class AppProvider extends ChangeNotifier {
     required String specialistSignature,
     required String managerSignature,
   }) async {
-    _ensure(canViewReports, 'التقارير الرسمية يصدرها المركز فقط.');
+    _ensure(canViewReports,
+        'ط§ظ„طھظ‚ط§ط±ظٹط± ط§ظ„ط±ط³ظ…ظٹط© ظٹطµط¯ط±ظ‡ط§ ط§ظ„ظ…ط±ظƒط² ظپظ‚ط·.');
     final student = selectedStudent;
     if (student == null) return;
     final report = ReportRecord(
@@ -1031,7 +960,7 @@ class AppProvider extends ChangeNotifier {
     );
     await _repository.saveReport(report);
     await _log(
-        action: 'طباعة تقرير',
+        action: 'ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط±',
         entityType: 'report',
         entityId: report.id,
         centerId: report.centerId,
@@ -1050,71 +979,20 @@ class AppProvider extends ChangeNotifier {
     await selectStudent(student);
   }
 
-  Future<void> printSessionReport({
-    required List<ProgramActivity> activities,
-    required Map<String, String> results,
-    required int successRate,
-    required int durationSeconds,
-    required int homeworkSentCount,
-    required String notes,
-    required String programName,
-    required String skillTitle,
-  }) async {
-    _ensure(canWriteClinical, 'تقرير الجلسة يصدره الأخصائي فقط.');
-    final student = selectedStudent;
-    if (student == null) return;
-    if (activities.isEmpty || results.isEmpty) {
-      throw StateError('قيّم نشاطًا واحدًا على الأقل قبل إنشاء التقرير.');
-    }
-    final report = ReportRecord(
-      id: 'report_session_${DateTime.now().millisecondsSinceEpoch}',
-      centerId: student.centerId,
-      studentId: student.id,
-      type: 'تقرير جلسة',
-      createdAt: DateTime.now().toIso8601String(),
-      improvementRate: successRate,
-      specialistSignature: user?.name ?? '',
-      managerSignature: currentCenter?.managerName ?? '',
-    );
-    await _repository.saveReport(report);
-    await _log(
-        action: 'طباعة تقرير جلسة',
-        entityType: 'report',
-        entityId: report.id,
-        centerId: report.centerId,
-        details: '${report.studentId} - $programName');
-    await _pdfService.printSessionReport(
-      center: currentCenter,
-      student: student,
-      specialistName: user?.name ?? 'الأخصائي',
-      programName: programName,
-      skillTitle: skillTitle,
-      activities: activities,
-      results: results,
-      successRate: successRate,
-      durationSeconds: durationSeconds,
-      homeworkSentCount: homeworkSentCount,
-      notes: notes,
-      specialistSignature: user?.name ?? '',
-      managerSignature: currentCenter?.managerName ?? '',
-    );
-    await selectStudent(student);
-  }
-
   String recommendationFor({required String errorType, required int severity}) {
     if (severity >= 4) {
-      return 'يوصى بتكثيف التدريب السمعي والبصري وتقسيم الهدف إلى خطوات قصيرة.';
+      return 'ظٹظˆطµظ‰ ط¨طھظƒط«ظٹظپ ط§ظ„طھط¯ط±ظٹط¨ ط§ظ„ط³ظ…ط¹ظٹ ظˆط§ظ„ط¨طµط±ظٹ ظˆطھظ‚ط³ظٹظ… ط§ظ„ظ‡ط¯ظپ ط¥ظ„ظ‰ ط®ط·ظˆط§طھ ظ‚طµظٹط±ط©.';
     }
-    if (errorType == 'إبدال') {
-      return 'يوصى بتمييز صوت الحرف المستهدف عن الحرف البديل داخل كلمات قصيرة.';
+    if (errorType == 'ط¥ط¨ط¯ط§ظ„') {
+      return 'ظٹظˆطµظ‰ ط¨طھظ…ظٹظٹط² طµظˆطھ ط§ظ„ط­ط±ظپ ط§ظ„ظ…ط³طھظ‡ط¯ظپ ط¹ظ† ط§ظ„ط­ط±ظپ ط§ظ„ط¨ط¯ظٹظ„ ط¯ط§ط®ظ„ ظƒظ„ظ…ط§طھ ظ‚طµظٹط±ط©.';
     }
-    if (errorType == 'حذف') {
-      return 'يوصى بتمارين إطالة الصوت وتثبيت موضع الحرف في الكلمة.';
+    if (errorType == 'ط­ط°ظپ') {
+      return 'ظٹظˆطµظ‰ ط¨طھظ…ط§ط±ظٹظ† ط¥ط·ط§ظ„ط© ط§ظ„طµظˆطھ ظˆطھط«ط¨ظٹطھ ظ…ظˆط¶ط¹ ط§ظ„ط­ط±ظپ ظپظٹ ط§ظ„ظƒظ„ظ…ط©.';
     }
-    if (errorType == 'تشويه') {
-      return 'يوصى بتدريب موضع اللسان والشفاه أمام مرآة مع تغذية راجعة فورية.';
+    if (errorType == 'طھط´ظˆظٹظ‡') {
+      return 'ظٹظˆطµظ‰ ط¨طھط¯ط±ظٹط¨ ظ…ظˆط¶ط¹ ط§ظ„ظ„ط³ط§ظ† ظˆط§ظ„ط´ظپط§ظ‡ ط£ظ…ط§ظ… ظ…ط±ط¢ط© ظ…ط¹ طھط؛ط°ظٹط© ط±ط§ط¬ط¹ط© ظپظˆط±ظٹط©.';
     }
-    return 'يوصى بتكرار الهدف داخل جمل وظيفية قصيرة.';
+    return 'ظٹظˆطµظ‰ ط¨طھظƒط±ط§ط± ط§ظ„ظ‡ط¯ظپ ط¯ط§ط®ظ„ ط¬ظ…ظ„ ظˆط¸ظٹظپظٹط© ظ‚طµظٹط±ط©.';
   }
 
   int _sessionImprovement(List<TherapySession> selectedSessions) {
@@ -1127,16 +1005,17 @@ class AppProvider extends ChangeNotifier {
   int get _improvementRate {
     if (evaluations.isEmpty) return 0;
     final good = evaluations
-        .where((item) => item.score == 'صحيح' || item.score == 'ناجح')
+        .where((item) => item.score == 'طµط­ظٹط­' || item.score == 'ظ†ط§ط¬ط­')
         .length;
-    final partial = evaluations.where((item) => item.score == 'جزئي').length;
+    final partial =
+        evaluations.where((item) => item.score == 'ط¬ط²ط¦ظٹ').length;
     return (((good + partial * .5) / evaluations.length) * 100).round();
   }
 
   AppUser _requireUser() {
     final current = user;
     if (current == null) {
-      throw StateError('يجب تسجيل الدخول أولًا.');
+      throw StateError('ظٹط¬ط¨ طھط³ط¬ظٹظ„ ط§ظ„ط¯ط®ظˆظ„ ط£ظˆظ„ظ‹ط§.');
     }
     return current;
   }
@@ -1146,7 +1025,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   void _ensureClinicalAccess(String studentId, String centerId) {
-    _ensure(centerId == activeCenterId, 'لا يمكن تنفيذ العملية خارج مركزك.');
+    _ensure(centerId == activeCenterId,
+        'ظ„ط§ ظٹظ…ظƒظ† طھظ†ظپظٹط° ط§ظ„ط¹ظ…ظ„ظٹط© ط®ط§ط±ط¬ ظ…ط±ظƒط²ظƒ.');
     _ensureStudentEntityAccess(studentId, centerId);
   }
 
@@ -1160,12 +1040,14 @@ class AppProvider extends ChangeNotifier {
     }
     if (student != null) _ensureStudentAccess(student);
     if (!isOwner && !isParent) {
-      _ensure(centerId == activeCenterId, 'لا يمكن الوصول لبيانات مركز آخر.');
+      _ensure(centerId == activeCenterId,
+          'ظ„ط§ ظٹظ…ظƒظ† ط§ظ„ظˆطµظˆظ„ ظ„ط¨ظٹط§ظ†ط§طھ ظ…ط±ظƒط² ط¢ط®ط±.');
     }
     if (isParent) {
       final allowed = user?.studentId == studentId ||
           students.any((item) => item.id == studentId);
-      _ensure(allowed, 'ولي الأمر يرى بيانات أطفاله فقط.');
+      _ensure(allowed,
+          'ظˆظ„ظٹ ط§ظ„ط£ظ…ط± ظٹط±ظ‰ ط¨ظٹط§ظ†ط§طھ ط£ط·ظپط§ظ„ظ‡ ظپظ‚ط·.');
     }
   }
 
@@ -1185,7 +1067,8 @@ class AppProvider extends ChangeNotifier {
         current.centerId == student.centerId) {
       return;
     }
-    throw StateError('لا تملك صلاحية الوصول لهذا الطالب.');
+    throw StateError(
+        'ظ„ط§ طھظ…ظ„ظƒ طµظ„ط§ط­ظٹط© ط§ظ„ظˆطµظˆظ„ ظ„ظ‡ط°ط§ ط§ظ„ط·ط§ظ„ط¨.');
   }
 
   Future<void> _log({
