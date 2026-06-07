@@ -356,6 +356,36 @@ class SanadRepository {
   Future<void> saveClinicalFinding(ClinicalFinding finding) =>
       _db.upsert('clinical_findings', finding.toMap());
 
+  Future<List<TherapyProgramTemplate>> therapyProgramTemplates(
+      String centerId) async {
+    final rows = await _db.where(
+      'therapy_program_templates',
+      where: centerId.isEmpty
+          ? 'center_id = ?'
+          : '(center_id = ? OR center_id = ?)',
+      whereArgs: centerId.isEmpty ? [''] : ['', centerId],
+      orderBy: 'center_id, sort_order, created_at',
+    );
+    return rows.map(TherapyProgramTemplate.fromMap).toList();
+  }
+
+  Future<void> saveTherapyProgramTemplate(TherapyProgramTemplate program) =>
+      _db.upsert('therapy_program_templates', program.toMap());
+
+  Future<void> deleteTherapyProgramTemplate(String id) async {
+    final sections = await _db.where('assessment_section_templates',
+        where: 'program_id = ?', whereArgs: [id]);
+    for (final section in sections) {
+      await deleteAssessmentSectionTemplate(section['id'] as String);
+    }
+    final sounds = await _db.where('speech_sound_trigger_templates',
+        where: 'program_id = ?', whereArgs: [id]);
+    for (final sound in sounds) {
+      await deleteSpeechSoundTriggerTemplate(sound['id'] as String);
+    }
+    await _db.delete('therapy_program_templates', id);
+  }
+
   Future<List<AssessmentSectionTemplate>> assessmentSectionTemplates(
       String centerId) async {
     final rows = await _db.where(

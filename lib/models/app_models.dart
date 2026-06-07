@@ -913,10 +913,56 @@ class ClinicalFinding {
       };
 }
 
+class TherapyProgramTemplate {
+  const TherapyProgramTemplate({
+    required this.id,
+    required this.centerId,
+    required this.name,
+    this.description = '',
+    this.usesSpeechSounds = false,
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String name;
+  final String description;
+  final bool usesSpeechSounds;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static TherapyProgramTemplate fromMap(Map<String, Object?> row) =>
+      TherapyProgramTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        name: row['name'] as String,
+        description: (row['description'] ?? '') as String,
+        usesSpeechSounds: ((row['uses_speech_sounds'] ?? 0) as int) == 1,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'name': name,
+        'description': description,
+        'uses_speech_sounds': usesSpeechSounds ? 1 : 0,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
 class AssessmentSectionTemplate {
   const AssessmentSectionTemplate({
     required this.id,
     required this.centerId,
+    required this.programId,
     required this.title,
     this.description = '',
     required this.sortOrder,
@@ -926,6 +972,7 @@ class AssessmentSectionTemplate {
 
   final String id;
   final String centerId;
+  final String programId;
   final String title;
   final String description;
   final int sortOrder;
@@ -936,6 +983,7 @@ class AssessmentSectionTemplate {
       AssessmentSectionTemplate(
         id: row['id'] as String,
         centerId: (row['center_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
         title: row['title'] as String,
         description: (row['description'] ?? '') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
@@ -946,6 +994,7 @@ class AssessmentSectionTemplate {
   Map<String, Object?> toMap() => {
         'id': id,
         'center_id': centerId,
+        'program_id': programId,
         'title': title,
         'description': description,
         'sort_order': sortOrder,
@@ -960,6 +1009,7 @@ class AssessmentItemTemplate {
     required this.centerId,
     required this.sectionId,
     required this.title,
+    this.responseType = 'custom',
     this.prompt = '',
     required this.sortOrder,
     this.createdAt = '',
@@ -970,6 +1020,7 @@ class AssessmentItemTemplate {
   final String centerId;
   final String sectionId;
   final String title;
+  final String responseType;
   final String prompt;
   final int sortOrder;
   final String createdAt;
@@ -981,6 +1032,7 @@ class AssessmentItemTemplate {
         centerId: (row['center_id'] ?? '') as String,
         sectionId: row['section_id'] as String,
         title: row['title'] as String,
+        responseType: (row['response_type'] ?? 'custom') as String,
         prompt: (row['prompt'] ?? '') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         createdAt: (row['created_at'] ?? '') as String,
@@ -992,6 +1044,7 @@ class AssessmentItemTemplate {
         'center_id': centerId,
         'section_id': sectionId,
         'title': title,
+        'response_type': responseType,
         'prompt': prompt,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -1105,6 +1158,7 @@ class SpeechSoundTriggerTemplate {
   const SpeechSoundTriggerTemplate({
     required this.id,
     required this.centerId,
+    required this.programId,
     required this.letter,
     required this.errorType,
     required this.position,
@@ -1119,6 +1173,7 @@ class SpeechSoundTriggerTemplate {
 
   final String id;
   final String centerId;
+  final String programId;
   final String letter;
   final String errorType;
   final String position;
@@ -1134,6 +1189,7 @@ class SpeechSoundTriggerTemplate {
       SpeechSoundTriggerTemplate(
         id: row['id'] as String,
         centerId: (row['center_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
         letter: row['letter'] as String,
         errorType: row['error_type'] as String,
         position: row['position'] as String,
@@ -1149,6 +1205,7 @@ class SpeechSoundTriggerTemplate {
   Map<String, Object?> toMap() => {
         'id': id,
         'center_id': centerId,
+        'program_id': programId,
         'letter': letter,
         'error_type': errorType,
         'position': position,

@@ -27,6 +27,7 @@ class AppProvider extends ChangeNotifier {
   List<ReportRecord> reports = [];
   List<ClinicalAssessment> clinicalAssessments = [];
   Map<String, List<ClinicalFinding>> clinicalFindingsByAssessment = {};
+  List<TherapyProgramTemplate> therapyPrograms = [];
   List<AssessmentSectionTemplate> assessmentSections = [];
   List<AssessmentItemTemplate> assessmentItems = [];
   List<AssessmentOptionTemplate> assessmentOptions = [];
@@ -289,6 +290,7 @@ class AppProvider extends ChangeNotifier {
     reports = [];
     clinicalAssessments = [];
     clinicalFindingsByAssessment = {};
+    therapyPrograms = [];
     assessmentSections = [];
     assessmentItems = [];
     assessmentOptions = [];
@@ -369,6 +371,7 @@ class AppProvider extends ChangeNotifier {
   Future<void> _loadTherapyStructure() async {
     if (!isGlobalTherapyStructureMode && activeCenterId.isEmpty) {
       assessmentSections = [];
+      therapyPrograms = [];
       assessmentItems = [];
       assessmentOptions = [];
       skillStepTemplates = [];
@@ -376,6 +379,7 @@ class AppProvider extends ChangeNotifier {
       return;
     }
     final scopeCenterId = isGlobalTherapyStructureMode ? '' : activeCenterId;
+    therapyPrograms = await _repository.therapyProgramTemplates(scopeCenterId);
     assessmentSections =
         await _repository.assessmentSectionTemplates(scopeCenterId);
     assessmentItems = await _repository.assessmentItemTemplates(scopeCenterId);
@@ -834,6 +838,7 @@ class AppProvider extends ChangeNotifier {
     final normalized = AssessmentSectionTemplate(
       id: section.id,
       centerId: writeCenterId,
+      programId: section.programId,
       title: section.title,
       description: section.description,
       sortOrder: section.sortOrder,
@@ -843,6 +848,40 @@ class AppProvider extends ChangeNotifier {
     await _repository.saveAssessmentSectionTemplate(normalized);
     await _logTherapyStructureChange('حفظ قسم تقييم', normalized.id,
         centerId: writeCenterId, details: normalized.title);
+    await _loadTherapyStructure();
+    notifyListeners();
+  }
+
+  Future<void> saveTherapyProgramTemplate(
+      TherapyProgramTemplate program) async {
+    _ensure(canManageTherapyStructure,
+        'بناء البرامج العلاجية متاح للصلاحيات العلاجية المعتمدة فقط.');
+    final writeCenterId = therapyStructureWriteCenterId;
+    final normalized = TherapyProgramTemplate(
+      id: program.id,
+      centerId: writeCenterId,
+      name: program.name,
+      description: program.description,
+      usesSpeechSounds: program.usesSpeechSounds,
+      sortOrder: program.sortOrder,
+      createdAt: program.createdAt,
+      updatedAt: program.updatedAt,
+    );
+    await _repository.saveTherapyProgramTemplate(normalized);
+    await _logTherapyStructureChange('حفظ برنامج علاجي', normalized.id,
+        centerId: writeCenterId, details: normalized.name);
+    await _loadTherapyStructure();
+    notifyListeners();
+  }
+
+  Future<void> deleteTherapyProgramTemplate(String id) async {
+    _ensure(canManageTherapyStructure,
+        'بناء البرامج العلاجية متاح للصلاحيات العلاجية المعتمدة فقط.');
+    final program = therapyPrograms.firstWhere((entry) => entry.id == id);
+    _ensureCanWriteTherapyTemplate(program.centerId);
+    await _repository.deleteTherapyProgramTemplate(id);
+    await _logTherapyStructureChange('حذف برنامج علاجي', id,
+        centerId: program.centerId, details: program.name);
     await _loadTherapyStructure();
     notifyListeners();
   }
@@ -859,6 +898,7 @@ class AppProvider extends ChangeNotifier {
       centerId: writeCenterId,
       sectionId: item.sectionId,
       title: item.title,
+      responseType: item.responseType,
       prompt: item.prompt,
       sortOrder: item.sortOrder,
       createdAt: item.createdAt,
@@ -929,6 +969,7 @@ class AppProvider extends ChangeNotifier {
     final normalized = SpeechSoundTriggerTemplate(
       id: trigger.id,
       centerId: writeCenterId,
+      programId: trigger.programId,
       letter: trigger.letter,
       errorType: trigger.errorType,
       position: trigger.position,

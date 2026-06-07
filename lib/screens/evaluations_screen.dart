@@ -100,41 +100,50 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
 
   List<_AssessmentStep> _buildSteps(AppProvider app) {
     final steps = <_AssessmentStep>[];
-    for (final section in app.assessmentSections) {
-      final items = app.assessmentItems
-          .where((item) => item.sectionId == section.id)
+    for (final program in app.therapyPrograms) {
+      final sections = app.assessmentSections
+          .where((section) => section.programId == program.id)
           .toList();
-      for (final item in items) {
-        final options = app.assessmentOptions
-            .where((option) => option.itemId == item.id)
-            .map((option) => _AssessmentChoice(
-                  label: option.label,
-                  isNormal: !option.generatesTherapy,
-                  weakness: option.weaknessTemplate,
-                  goal: option.goalTemplate,
-                  training: option.therapyTemplate,
-                ))
+      for (final section in sections) {
+        final items = app.assessmentItems
+            .where((item) => item.sectionId == section.id)
             .toList();
-        if (options.isEmpty) continue;
-        steps.add(_AssessmentStep(
-          id: item.id,
-          domain: section.title,
-          title: item.title,
-          question: item.prompt.isEmpty
-              ? 'اختر نتيجة البند حسب ملاحظة الأخصائي.'
-              : item.prompt,
-          options: options,
-        ));
+        for (final item in items) {
+          final options = app.assessmentOptions
+              .where((option) => option.itemId == item.id)
+              .map((option) => _AssessmentChoice(
+                    label: option.label,
+                    isNormal: !option.generatesTherapy,
+                    weakness: option.weaknessTemplate,
+                    goal: option.goalTemplate,
+                    training: option.therapyTemplate,
+                  ))
+              .toList();
+          if (options.isEmpty) continue;
+          steps.add(_AssessmentStep(
+            id: item.id,
+            domain: '${program.name} - ${section.title}',
+            title: item.title,
+            question: item.prompt.isEmpty
+                ? 'اختر نتيجة البند حسب ملاحظة الأخصائي.'
+                : item.prompt,
+            options: options,
+          ));
+        }
       }
-    }
-    if (app.speechSoundTriggers.isNotEmpty) {
+
+      if (!program.usesSpeechSounds) continue;
+      final soundTriggers = app.speechSoundTriggers
+          .where((trigger) => trigger.programId == program.id)
+          .toList();
+      if (soundTriggers.isEmpty) continue;
       steps.add(_AssessmentStep(
-        id: 'speech_sound_matrix',
-        domain: 'الحروف',
-        title: 'Speech Sound Matrix Assessment',
+        id: 'speech_sound_matrix_${program.id}',
+        domain: '${program.name} - الحروف',
+        title: 'تقييم الحروف',
         question:
             'اختر الخلية السريرية المناسبة: الحرف، نوع الخطأ، وموقعه داخل الكلمة.',
-        options: app.speechSoundTriggers
+        options: soundTriggers
             .map((trigger) => _AssessmentChoice(
                   label:
                       '${trigger.letter} - ${trigger.errorType} - ${trigger.position}',

@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 13;
+  static const currentVersion = 14;
 
   mobile.Database? _database;
 
@@ -352,6 +352,9 @@ class DatabaseService {
     }
     if (oldVersion < 13) {
       await _resetAccountsForRoleRebuild(db);
+    }
+    if (oldVersion < 14) {
+      await _ensureTherapyProgramTables(db);
     }
   }
 
@@ -715,9 +718,22 @@ class DatabaseService {
 
   Future<void> _createTherapyStructureTables(mobile.Database db) async {
     await db.execute('''
+      CREATE TABLE therapy_program_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        uses_speech_sounds INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
       CREATE TABLE assessment_section_templates (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
         title TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
@@ -731,6 +747,7 @@ class DatabaseService {
         center_id TEXT NOT NULL DEFAULT '',
         section_id TEXT NOT NULL,
         title TEXT NOT NULL,
+        response_type TEXT NOT NULL DEFAULT 'custom',
         prompt TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -770,6 +787,7 @@ class DatabaseService {
       CREATE TABLE speech_sound_trigger_templates (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
         letter TEXT NOT NULL,
         error_type TEXT NOT NULL,
         position TEXT NOT NULL,
@@ -785,10 +803,23 @@ class DatabaseService {
   }
 
   Future<void> _ensureTherapyStructureTables(mobile.Database db) async {
+    await _ensureTable(db, 'therapy_program_templates', '''
+      CREATE TABLE therapy_program_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        name TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        uses_speech_sounds INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
     await _ensureTable(db, 'assessment_section_templates', '''
       CREATE TABLE assessment_section_templates (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
         title TEXT NOT NULL,
         description TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
@@ -802,6 +833,7 @@ class DatabaseService {
         center_id TEXT NOT NULL DEFAULT '',
         section_id TEXT NOT NULL,
         title TEXT NOT NULL,
+        response_type TEXT NOT NULL DEFAULT 'custom',
         prompt TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -839,6 +871,7 @@ class DatabaseService {
       CREATE TABLE speech_sound_trigger_templates (
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
         letter TEXT NOT NULL,
         error_type TEXT NOT NULL,
         position TEXT NOT NULL,
@@ -851,6 +884,21 @@ class DatabaseService {
         updated_at TEXT NOT NULL
       )
     ''');
+    await _addColumns(db, {
+      'assessment_section_templates': {
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+      },
+      'assessment_item_templates': {
+        'response_type': "TEXT NOT NULL DEFAULT 'custom'",
+      },
+      'speech_sound_trigger_templates': {
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+      },
+    });
+  }
+
+  Future<void> _ensureTherapyProgramTables(mobile.Database db) async {
+    await _ensureTherapyStructureTables(db);
   }
 
   Future<void> _ensureClinicalAssessmentTables(mobile.Database db) async {
