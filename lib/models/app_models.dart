@@ -11,17 +11,17 @@ extension UserRoleX on UserRole {
   String get label {
     switch (this) {
       case UserRole.sanadOwner:
-        return 'ظ…ط§ظ„ظƒ ط§ظ„ظ†ط¸ط§ظ…';
+        return 'مالك النظام';
       case UserRole.centerManager:
-        return 'ظ…ط¯ظٹط± ظ…ط±ظƒط²';
+        return 'مدير مركز';
       case UserRole.specialist:
-        return 'ط£ط®طµط§ط¦ظٹ';
+        return 'أخصائي';
       case UserRole.dataEntry:
-        return 'ظ…ط¯ط®ظ„ ط¨ظٹط§ظ†ط§طھ';
+        return 'مدخل بيانات';
       case UserRole.programEntry:
-        return 'ظ…ط¯ط®ظ„ ط¨ط±ط§ظ…ط¬';
+        return 'مدخل برامج';
       case UserRole.parent:
-        return 'ظˆظ„ظٹ ط£ظ…ط±';
+        return 'ولي أمر';
     }
   }
 
@@ -150,7 +150,7 @@ class Student {
     required this.age,
     required this.status,
     required this.diagnosis,
-    this.programType = 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
+    this.programType = 'نطق وتخاطب',
     required this.parentName,
     required this.parentPhone,
     required this.portalEmail,
@@ -186,7 +186,7 @@ class Student {
         age: row['age'] as int,
         status: row['status'] as String,
         diagnosis: row['diagnosis'] as String,
-        programType: (row['program_type'] ?? 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨') as String,
+        programType: (row['program_type'] ?? 'نطق وتخاطب') as String,
         parentName: row['parent_name'] as String,
         parentPhone: row['parent_phone'] as String,
         portalEmail: row['portal_email'] as String,
@@ -263,7 +263,7 @@ class TherapySession {
     this.programId = '',
     this.skillId = '',
     this.activityResults = '',
-    this.sessionType = 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
+    this.sessionType = 'نطق وتخاطب',
     this.targetLetter = '',
     this.letterPosition = '',
     this.errorType = '',
@@ -311,7 +311,7 @@ class TherapySession {
         programId: (row['program_id'] ?? '') as String,
         skillId: (row['skill_id'] ?? '') as String,
         activityResults: (row['activity_results'] ?? '') as String,
-        sessionType: (row['session_type'] ?? 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨') as String,
+        sessionType: (row['session_type'] ?? 'نطق وتخاطب') as String,
         targetLetter: (row['target_letter'] ?? '') as String,
         letterPosition: (row['letter_position'] ?? '') as String,
         errorType: (row['error_type'] ?? '') as String,
@@ -465,7 +465,7 @@ class GoalSkillStep {
     required this.studentId,
     required this.goalId,
     required this.title,
-    this.status = 'ظ„ظ… ظٹط¨ط¯ط£',
+    this.status = 'لم يبدأ',
     this.sortOrder = 0,
     this.notes = '',
     this.lastSessionId = '',
@@ -491,7 +491,7 @@ class GoalSkillStep {
         studentId: row['student_id'] as String,
         goalId: row['goal_id'] as String,
         title: row['title'] as String,
-        status: (row['status'] ?? 'ظ„ظ… ظٹط¨ط¯ط£') as String,
+        status: (row['status'] ?? 'لم يبدأ') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         notes: (row['notes'] ?? '') as String,
         lastSessionId: (row['last_session_id'] ?? '') as String,
@@ -820,7 +820,7 @@ class SignResource {
     required this.mediaType,
     required this.mediaPath,
     this.notes = '',
-    this.level = 'ظ…ط¨طھط¯ط¦',
+    this.level = 'مبتدئ',
     this.isFavorite = false,
   });
 
@@ -842,7 +842,7 @@ class SignResource {
         mediaType: row['media_type'] as String,
         mediaPath: row['media_path'] as String,
         notes: row['notes'] as String,
-        level: (row['level'] ?? 'ظ…ط¨طھط¯ط¦') as String,
+        level: (row['level'] ?? 'مبتدئ') as String,
         isFavorite: ((row['is_favorite'] ?? 0) as int) == 1,
       );
 
@@ -914,7 +914,7 @@ class TrainingItem {
     required this.title,
     this.letter = '',
     this.position = '',
-    this.level = 'ظ…ط¨طھط¯ط¦',
+    this.level = 'مبتدئ',
     this.category = '',
   });
 

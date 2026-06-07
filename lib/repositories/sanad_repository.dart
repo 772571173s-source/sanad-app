@@ -15,7 +15,7 @@ class SanadRepository {
     required String password,
   }) async {
     if (await hasUsers()) {
-      throw StateError('طھظ… ط¥ط¹ط¯ط§ط¯ ط§ظ„ظ†ط¸ط§ظ… ظ…ط³ط¨ظ‚ظ‹ط§.');
+      throw StateError('تم إعداد النظام مسبقًا.');
     }
     await saveUser(
       AppUser(
@@ -43,7 +43,7 @@ class SanadRepository {
       final center = centerRow == null ? null : SanadCenter.fromMap(centerRow);
       if (center == null || !center.isActive) {
         throw StateError(
-            'طھظ… ط¥ظٹظ‚ط§ظپ ط®ط¯ظ…ط§طھ ظ‡ط°ط§ ط§ظ„ظ…ط±ظƒط² ظ…ط¤ظ‚طھظ‹ط§.\nظٹط±ط¬ظ‰ ط§ظ„طھظˆط§طµظ„ ظ…ط¹ ط®ط¯ظ…ط© ط§ظ„ط¹ظ…ظ„ط§ط، ط£ظˆ ط¥ط¯ط§ط±ط© ط³ظ†ط¯.');
+            'تم إيقاف خدمات هذا المركز مؤقتًا.\nيرجى التواصل مع خدمة العملاء أو إدارة سند.');
       }
     }
     return user;
@@ -150,7 +150,7 @@ class SanadRepository {
     if (existingEmailUser != null &&
         existingEmailUser.role != UserRole.parent) {
       throw StateError(
-          'ط±ظ‚ظ… ظˆظ„ظٹ ط§ظ„ط£ظ…ط± ظ…ط³طھط®ط¯ظ… ظ…ط³ط¨ظ‚ظ‹ط§ ظ„ط­ط³ط§ط¨ ط؛ظٹط± ظˆظ„ظٹ ط£ظ…ط±طŒ ظ„ط°ظ„ظƒ ظ„ط§ ظٹظ…ظƒظ† ط¥ظ†ط´ط§ط، ط¨ط±ظٹط¯ ظ…ظƒط±ط±.');
+          'رقم ولي الأمر مستخدم مسبقًا لحساب غير ولي أمر، لذلك لا يمكن إنشاء بريد مكرر.');
     }
     await _db.upsert(
       'students',
@@ -190,8 +190,7 @@ class SanadRepository {
         ? existingEmailUser
         : AppUser.fromMap(existingParentUser);
     if (existingAccount == null && student.portalPassword.isEmpty) {
-      throw StateError(
-          'ظƒظ„ظ…ط© ظ…ط±ظˆط± ظˆظ„ظٹ ط§ظ„ط£ظ…ط± ظ…ط·ظ„ظˆط¨ط© ط¹ظ†ط¯ ط¥ظ†ط´ط§ط، ط­ط³ط§ط¨ ط¬ط¯ظٹط¯.');
+      throw StateError('كلمة مرور ولي الأمر مطلوبة عند إنشاء حساب جديد.');
     }
     if (existingAccount == null || student.portalPassword.isNotEmpty) {
       await _db.upsert(
@@ -245,7 +244,7 @@ class SanadRepository {
       'students',
       {
         'deleted_at': DateTime.now().toIso8601String(),
-        'status': 'ظ…ط­ط°ظˆظپ',
+        'status': 'محذوف',
       },
       'id = ?',
       [id],

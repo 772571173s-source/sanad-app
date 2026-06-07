@@ -104,7 +104,7 @@ class DatabaseService {
         age INTEGER NOT NULL,
         status TEXT NOT NULL,
         diagnosis TEXT NOT NULL,
-        program_type TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
+        program_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
         parent_name TEXT NOT NULL,
         parent_phone TEXT NOT NULL,
         portal_email TEXT NOT NULL,
@@ -140,7 +140,7 @@ class DatabaseService {
         program_id TEXT NOT NULL DEFAULT '',
         skill_id TEXT NOT NULL DEFAULT '',
         activity_results TEXT NOT NULL DEFAULT '',
-        session_type TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨',
+        session_type TEXT NOT NULL DEFAULT 'نطق وتخاطب',
         target_letter TEXT NOT NULL DEFAULT '',
         letter_position TEXT NOT NULL DEFAULT '',
         error_type TEXT NOT NULL DEFAULT '',
@@ -251,7 +251,7 @@ class DatabaseService {
         media_type TEXT NOT NULL,
         media_path TEXT NOT NULL,
         notes TEXT NOT NULL,
-        level TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦',
+        level TEXT NOT NULL DEFAULT 'مبتدئ',
         is_favorite INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT '',
@@ -286,7 +286,7 @@ class DatabaseService {
           media_type TEXT NOT NULL,
           media_path TEXT NOT NULL,
           notes TEXT NOT NULL,
-          level TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦',
+          level TEXT NOT NULL DEFAULT 'مبتدئ',
           is_favorite INTEGER NOT NULL DEFAULT 0,
           created_at TEXT NOT NULL DEFAULT '',
           updated_at TEXT NOT NULL DEFAULT ''
@@ -318,7 +318,7 @@ class DatabaseService {
     if (oldVersion < 6) {
       await _addColumns(db, {
         'sign_resources': {
-          'level': "TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦'",
+          'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
           'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
         },
       });
@@ -371,7 +371,7 @@ class DatabaseService {
       },
       'students': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
-        'program_type': "TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨'",
+        'program_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
         'deleted_at': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
@@ -387,7 +387,7 @@ class DatabaseService {
         'program_id': "TEXT NOT NULL DEFAULT ''",
         'skill_id': "TEXT NOT NULL DEFAULT ''",
         'activity_results': "TEXT NOT NULL DEFAULT ''",
-        'session_type': "TEXT NOT NULL DEFAULT 'ظ†ط·ظ‚ ظˆطھط®ط§ط·ط¨'",
+        'session_type': "TEXT NOT NULL DEFAULT 'نطق وتخاطب'",
         'target_letter': "TEXT NOT NULL DEFAULT ''",
         'letter_position': "TEXT NOT NULL DEFAULT ''",
         'error_type': "TEXT NOT NULL DEFAULT ''",
@@ -429,7 +429,7 @@ class DatabaseService {
       },
       'sign_resources': {
         'center_id': "TEXT NOT NULL DEFAULT ''",
-        'level': "TEXT NOT NULL DEFAULT 'ظ…ط¨طھط¯ط¦'",
+        'level': "TEXT NOT NULL DEFAULT 'مبتدئ'",
         'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
@@ -462,8 +462,7 @@ class DatabaseService {
 
   Future<void> _removeDemoData(mobile.Database db) async {
     await db.delete('users', where: 'is_demo = 1');
-    await db
-        .delete('centers', where: 'name LIKE ?', whereArgs: ['%طھط¬ط±ظٹط¨ظٹ%']);
+    await db.delete('centers', where: 'name LIKE ?', whereArgs: ['%تجريبي%']);
   }
 
   Future<void> _dropLegacyProgramTables(mobile.Database db) async {
@@ -632,7 +631,7 @@ class DatabaseService {
         student_id TEXT NOT NULL,
         goal_id TEXT NOT NULL,
         title TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ظ„ظ… ظٹط¨ط¯ط£',
+        status TEXT NOT NULL DEFAULT 'لم يبدأ',
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',
@@ -653,7 +652,7 @@ class DatabaseService {
         student_id TEXT NOT NULL,
         goal_id TEXT NOT NULL,
         title TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'ظ„ظ… ظٹط¨ط¯ط£',
+        status TEXT NOT NULL DEFAULT 'لم يبدأ',
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',

@@ -15,62 +15,63 @@ class DashboardScreen extends StatelessWidget {
     final todaySessions = _todaySessions(app);
     final alerts = _alerts(app, todaySessions);
 
-    return AnimatedOpacity(
-      opacity: 1,
-      duration: const Duration(milliseconds: 220),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _DashboardHero(
-            app: app,
-            improvement: improvement,
-            todaySessions: todaySessions.length,
-            alerts: alerts.length,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          ResponsiveGrid(
-              children: _quickStats(app, improvement, todaySessions)),
-          const SizedBox(height: AppSpacing.md),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 980;
-              final timeline = _RecentActivityTimeline(app: app);
-              final attention = _AttentionCard(alerts: alerts);
-              if (!wide) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    timeline,
-                    const SizedBox(height: AppSpacing.md),
-                    attention,
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _DashboardHero(
+          app: app,
+          improvement: improvement,
+          todaySessions: todaySessions.length,
+          alerts: alerts.length,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        ResponsiveGrid(children: _quickStats(app, improvement, todaySessions)),
+        const SizedBox(height: AppSpacing.md),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 980;
+            final timeline = _RecentActivityTimeline(app: app);
+            final attention = _AttentionCard(alerts: alerts);
+            if (!wide) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(flex: 3, child: timeline),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(flex: 2, child: attention),
+                  timeline,
+                  const SizedBox(height: AppSpacing.md),
+                  attention,
                 ],
               );
-            },
-          ),
-        ],
-      ),
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: timeline),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(flex: 2, child: attention),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
 
   int _improvement(AppProvider app) {
+    final sessions =
+        app.centerSessions.isEmpty ? app.sessions : app.centerSessions;
+    if (sessions.isNotEmpty) {
+      final total =
+          sessions.fold<int>(0, (sum, session) => sum + session.successRate);
+      return (total / sessions.length).round();
+    }
     final evaluations =
         app.centerEvaluations.isEmpty ? app.evaluations : app.centerEvaluations;
-    final success = evaluations
-        .where((item) => item.score == 'ظ†ط§ط¬ط­' || item.score == 'طµط­ظٹط­')
-        .length;
-    final partial =
-        evaluations.where((item) => item.score == 'ط¬ط²ط¦ظٹ').length;
     if (evaluations.isEmpty) return 0;
-    return (((success + partial * .5) / evaluations.length) * 100).round();
+    final good = evaluations
+        .where((item) => item.score == 'ناجح' || item.score == 'صحيح')
+        .length;
+    final partial = evaluations.where((item) => item.score == 'جزئي').length;
+    return (((good + partial * .5) / evaluations.length) * 100).round();
   }
 
   List<TherapySession> _todaySessions(AppProvider app) {
@@ -95,9 +96,8 @@ class DashboardScreen extends StatelessWidget {
       if (stopped > 0) {
         items.add(_AlertItem(
           icon: Icons.pause_circle_outline,
-          title: 'ظ…ط±ط§ظƒط² ظ…ظˆظ‚ظˆظپط©',
-          message:
-              '$stopped ظ…ط±ظƒط² ظٹط­طھط§ط¬ ظ…طھط§ط¨ط¹ط© ط­ط§ظ„ط© ط§ظ„ط§ط´طھط±ط§ظƒ ط£ظˆ ط§ظ„ط¯ط¹ظ….',
+          title: 'مراكز موقوفة',
+          message: '$stopped مركز يحتاج متابعة حالة الاشتراك أو الدعم.',
           kind: SemanticAlertKind.warning,
         ));
       }
@@ -107,34 +107,34 @@ class DashboardScreen extends StatelessWidget {
       if (withoutManager > 0) {
         items.add(_AlertItem(
           icon: Icons.admin_panel_settings_outlined,
-          title: 'ظ…ط¯ط±ط§ط، ط؛ظٹط± ظ…ظƒطھظ…ظ„ظٹظ†',
-          message:
-              '$withoutManager ظ…ط±ظƒط² ط¨ط¯ظˆظ† ظ…ط¯ظٹط± ظ…ط±طھط¨ط· ط¨ظˆط¶ظˆط­.',
+          title: 'مدراء غير مكتملين',
+          message: '$withoutManager مركز بدون مدير مرتبط بوضوح.',
           kind: SemanticAlertKind.info,
         ));
       }
     }
+
     final exercises = app.isParent ? app.exercises : app.centerExercises;
     final overdue = exercises.where((exercise) {
       final due = DateTime.tryParse(exercise.dueDate);
       return due != null &&
           due.isBefore(DateTime.now()) &&
-          exercise.status != 'طھظ… ط§ظ„ط¥ظ†ط¬ط§ط²';
+          exercise.status != 'تم الإنجاز';
     }).length;
     if (overdue > 0) {
       items.add(_AlertItem(
         icon: Icons.assignment_late_outlined,
-        title: 'ظˆط§ط¬ط¨ط§طھ طھط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©',
-        message:
-            '$overdue ظˆط§ط¬ط¨ طھط¬ط§ظˆط² ظ…ظˆط¹ط¯ظ‡ ظˆظ„ظ… ظٹظƒطھظ…ظ„ ط¨ط¹ط¯.',
+        title: 'واجبات تحتاج متابعة',
+        message: '$overdue واجب تجاوز موعده ولم يكتمل بعد.',
         kind: SemanticAlertKind.error,
       ));
     }
+
     if (todaySessions.length >= 6) {
       items.add(_AlertItem(
         icon: Icons.event_available_outlined,
-        title: 'ظٹظˆظ… ط¹ظ„ط§ط¬ظٹ ظ…ط²ط¯ط­ظ…',
-        message: '${todaySessions.length} ط¬ظ„ط³ط§طھ ظ…ط³ط¬ظ„ط© ط§ظ„ظٹظˆظ….',
+        title: 'يوم علاجي نشط',
+        message: '${todaySessions.length} جلسات مسجلة اليوم.',
         kind: SemanticAlertKind.success,
       ));
     }
@@ -153,142 +153,132 @@ class DashboardScreen extends StatelessWidget {
           app.centers.where((center) => center.isActive).length;
       return [
         _PremiumStatCard(
-          label: 'ط§ظ„ظ…ط±ط§ظƒط² ط§ظ„ظ†ط´ط·ط©',
+          label: 'المراكز النشطة',
           value: '$activeCenters',
           icon: Icons.business_outlined,
           progress:
               app.centers.isEmpty ? 0 : activeCenters / app.centers.length,
-          trend: 'â†‘ ظ…طھط§ط¨ط¹ط© ظ…ط¨ط§ط´ط±ط©',
+          trend: 'متابعة مباشرة',
         ),
         _PremiumStatCard(
-          label: 'ظ…ط¯ط±ط§ط، ط§ظ„ظ…ط±ط§ظƒط²',
+          label: 'مدراء المراكز',
           value: '$managers',
           icon: Icons.admin_panel_settings_outlined,
           progress: managers == 0 ? 0 : .82,
-          trend: 'ظ…ط³طھظ‚ط±',
+          trend: 'مستقر',
         ),
         _PremiumStatCard(
-          label: 'ط§ظ„ط·ظ„ط§ط¨',
+          label: 'الطلاب',
           value: '${app.totalStudentsCount}',
           icon: Icons.groups_2_outlined,
           progress: .68,
-          trend: 'â†‘ ظ†ظ…ظˆ',
+          trend: 'نمو',
         ),
         _PremiumStatCard(
-          label: 'ط§ظ„ط¬ظ„ط³ط§طھ',
+          label: 'الجلسات',
           value: '${app.totalSessionsCount}',
           icon: Icons.timer_outlined,
           progress: .74,
-          trend: 'ظ†ط´ط§ط· ط¹ظ„ط§ط¬ظٹ',
-        ),
-        _PremiumStatCard(
-          label: 'ط¬ظ„ط³ط§طھ ط§ظ„ظٹظˆظ…',
-          value: '${todaySessions.length}',
-          icon: Icons.today_outlined,
-          progress: (todaySessions.length / 10).clamp(0, 1).toDouble(),
-          trend: 'ط§ظ„ظٹظˆظ…',
-        ),
-        _PremiumStatCard(
-          label: 'ط§ظ„ط³ط¬ظ„ ط§ظ„ط¥ط¯ط§ط±ظٹ',
-          value: '${app.auditLogs.length}',
-          icon: Icons.history_outlined,
-          progress: .55,
-          trend: 'ط¢ط®ط± ظ†ط´ط§ط·',
+          trend: 'نشاط علاجي',
         ),
       ];
     }
+
     if (app.isCenterManager) {
       final employees =
           app.staff.where((user) => user.role != UserRole.parent).length;
       return [
         _PremiumStatCard(
-          label: 'ط§ظ„ط·ظ„ط§ط¨',
+          label: 'الطلاب',
           value: '${app.students.length}',
           icon: Icons.groups_2_outlined,
           progress: .7,
-          trend: 'ط¯ط§ط®ظ„ ط§ظ„ظ…ط±ظƒط²',
+          trend: 'داخل المركز',
         ),
         _PremiumStatCard(
-          label: 'ط§ظ„ظ…ظˆط¸ظپظˆظ†',
+          label: 'الموظفون',
           value: '$employees',
           icon: Icons.badge_outlined,
           progress: .62,
-          trend: 'ظپط±ظٹظ‚ ط§ظ„ط¹ظ…ظ„',
+          trend: 'فريق العمل',
         ),
         _PremiumStatCard(
-          label: 'ط¬ظ„ط³ط§طھ ط§ظ„ظٹظˆظ…',
+          label: 'جلسات اليوم',
           value: '${todaySessions.length}',
           icon: Icons.today_outlined,
           progress: (todaySessions.length / 8).clamp(0, 1).toDouble(),
-          trend: 'ط¬ط¯ظˆظ„ ط§ظ„ظٹظˆظ…',
+          trend: 'جدول اليوم',
         ),
         _PremiumStatCard(
-          label: 'ظ†ط³ط¨ط© ط§ظ„طھط­ط³ظ†',
+          label: 'نسبة التحسن',
           value: '$improvement%',
           icon: Icons.trending_up,
           progress: improvement / 100,
-          trend: improvement >= 60 ? 'â†‘ ط¬ظٹط¯' : 'ظٹط­طھط§ط¬ ظ…طھط§ط¨ط¹ط©',
+          trend: improvement >= 60 ? 'تقدم جيد' : 'يحتاج متابعة',
         ),
       ];
     }
+
     if (app.isSpecialist) {
       return [
         _PremiumStatCard(
-          label: 'ط§ظ„ط·ظ„ط§ط¨',
+          label: 'الطلاب',
           value: '${app.students.length}',
           icon: Icons.groups_2_outlined,
           progress: .68,
-          trend: 'ظ…ظ„ظپط§طھ ظ…طھط§ط­ط©',
+          trend: 'ملفات متاحة',
         ),
         _PremiumStatCard(
-          label: 'ط¬ظ„ط³ط§طھ ط§ظ„ظٹظˆظ…',
+          label: 'جلسات اليوم',
           value: '${todaySessions.length}',
           icon: Icons.timer_outlined,
           progress: (todaySessions.length / 6).clamp(0, 1).toDouble(),
-          trend: 'ط®ط·ط© ط§ظ„ظٹظˆظ…',
+          trend: 'خطة اليوم',
         ),
         _PremiumStatCard(
-          label: 'ط§ظ„ظˆط§ط¬ط¨ط§طھ',
-          value: '${app.centerExercises.length}',
-          icon: Icons.assignment_outlined,
+          label: 'الأهداف العلاجية',
+          value: '${app.plans.length}',
+          icon: Icons.track_changes_outlined,
           progress: .58,
-          trend: 'ظ…طھط§ط¨ط¹ط© ظ…ظ†ط²ظ„ظٹط©',
+          trend: 'مسار سريري',
         ),
         _PremiumStatCard(
-          label: 'ظ†ط³ط¨ط© ط§ظ„طھط­ط³ظ†',
+          label: 'نسبة التحسن',
           value: '$improvement%',
           icon: Icons.trending_up,
           progress: improvement / 100,
-          trend: improvement >= 60 ? 'â†‘ طھظ‚ط¯ظ…' : 'ظ‚ظٹط¯ ط§ظ„ط¨ظ†ط§ط،',
+          trend: improvement >= 60 ? 'تقدم' : 'قيد البناء',
         ),
       ];
     }
+
     if (app.isDataEntry) {
       return [
         _PremiumStatCard(
-          label: 'ط§ظ„ط·ظ„ط§ط¨',
+          label: 'الطلاب',
           value: '${app.students.length}',
           icon: Icons.groups_2_outlined,
           progress: .62,
-          trend: 'ط¨ظٹط§ظ†ط§طھ ط§ظ„ظ…ط±ظƒط²',
+          trend: 'بيانات المركز',
         ),
         _PremiumStatCard(
-          label: 'ط£ظˆظ„ظٹط§ط، ط§ظ„ط£ظ…ظˆط±',
+          label: 'أولياء الأمور',
           value:
               '${app.students.map((student) => student.parentPhone).toSet().length}',
           icon: Icons.family_restroom_outlined,
           progress: .52,
-          trend: 'ط­ط³ط§ط¨ط§طھ ظ…ط±طھط¨ط·ط©',
+          trend: 'حسابات مرتبطة',
         ),
         _PremiumStatCard(
-          label: 'ط§ظ„ظ…ط±ظƒط²',
+          label: 'المركز',
           value: app.currentCenter?.name ?? '-',
           icon: Icons.business_outlined,
           progress: .8,
-          trend: 'ظ†ط·ط§ظ‚ ط§ظ„ط¹ظ…ظ„',
+          trend: 'نطاق العمل',
         ),
       ];
     }
+
     if (app.isProgramEntry) {
       return [
         _PremiumStatCard(
@@ -314,28 +304,29 @@ class DashboardScreen extends StatelessWidget {
         ),
       ];
     }
+
     return [
       _PremiumStatCard(
-        label: 'ط§ظ„ط£ط·ظپط§ظ„',
+        label: 'الأطفال',
         value: '${app.students.length}',
         icon: Icons.child_care_outlined,
         progress: app.students.isEmpty ? 0 : 1,
-        trend: 'ط¯ط§ط®ظ„ ط§ظ„ط­ط³ط§ط¨',
+        trend: 'داخل الحساب',
       ),
       _PremiumStatCard(
-        label: 'ط§ظ„ظˆط§ط¬ط¨ط§طھ ط§ظ„ط­ط§ظ„ظٹط©',
+        label: 'الواجبات الحالية',
         value:
-            '${app.exercises.where((item) => item.status != 'طھظ… ط§ظ„ط¥ظ†ط¬ط§ط²').length}',
+            '${app.exercises.where((item) => item.status != 'تم الإنجاز').length}',
         icon: Icons.assignment_outlined,
         progress: .55,
-        trend: 'ظ…ط·ظ„ظˆط¨ طھظ†ظپظٹط°ظ‡ط§',
+        trend: 'مطلوب تنفيذها',
       ),
       _PremiumStatCard(
-        label: 'ط§ظ„ظ…ظƒط§ظپط¢طھ',
+        label: 'المكافآت',
         value: '${app.reward?.xp ?? 0} XP',
         icon: Icons.emoji_events_outlined,
         progress: ((app.reward?.xp ?? 0) % 100) / 100,
-        trend: 'طھظ‚ط¯ظ… ظ…ظ†ط²ظ„ظٹ',
+        trend: 'تقدم منزلي',
       ),
     ];
   }
@@ -379,19 +370,17 @@ class _DashboardHero extends StatelessWidget {
             runSpacing: AppSpacing.sm,
             children: [
               _HeroMetric(
-                label: app.isOwner
-                    ? 'ظ…ط±ط§ظƒط² ظ†ط´ط·ط©'
-                    : 'ط¬ظ„ط³ط§طھ ط§ظ„ظٹظˆظ…',
+                label: app.isOwner ? 'مراكز نشطة' : 'جلسات اليوم',
                 value: app.isOwner ? '$activeCenters' : '$todaySessions',
                 icon: app.isOwner ? Icons.business : Icons.timer_outlined,
               ),
               _HeroMetric(
-                label: 'ظ†ط³ط¨ط© ط§ظ„طھط­ط³ظ†',
+                label: 'نسبة التحسن',
                 value: '$improvement%',
                 icon: Icons.trending_up,
               ),
               _HeroMetric(
-                label: 'طھظ†ط¨ظٹظ‡ط§طھ',
+                label: 'تنبيهات',
                 value: '$alerts',
                 icon: Icons.notifications_active_outlined,
               ),
@@ -440,22 +429,22 @@ class _DashboardHero extends StatelessWidget {
   }
 
   String _title(AppProvider app) {
-    if (app.isOwner) return 'ظ…ظ„ط®طµ ط³ظ†ط¯ ط§ظ„طھظ†ظپظٹط°ظٹ';
-    if (app.isCenterManager) return 'ظ†ط¨ط¶ ط§ظ„ظ…ط±ظƒط² ط§ظ„ظٹظˆظ…';
-    if (app.isSpecialist) return 'ظ…ط³ط§ط± ط¬ظ„ط³ط§طھظƒ ط§ظ„ط¹ظ„ط§ط¬ظٹط©';
-    if (app.isParent) return 'ظ…طھط§ط¨ط¹ط© ط§ظ„ط·ظپظ„ ظپظٹ ط§ظ„ظ…ظ†ط²ظ„';
-    if (app.isProgramEntry) return 'ظ…ظƒطھط¨ط© ط§ظ„ط¨ط±ط§ظ…ط¬ ط§ظ„ط¹ظ„ط§ط¬ظٹط©';
-    return 'ظ„ظˆط­ط© ط§ظ„ظٹظˆظ…';
+    if (app.isOwner) return 'ملخص سند التنفيذي';
+    if (app.isCenterManager) return 'نبض المركز اليوم';
+    if (app.isSpecialist) return 'مسار جلساتك العلاجية';
+    if (app.isParent) return 'متابعة الطفل في المنزل';
+    if (app.isProgramEntry) return 'النواة العلاجية';
+    return 'لوحة اليوم';
   }
 
   String _summary(AppProvider app, int todaySessions, int alerts) {
     if (app.isOwner) {
-      return 'ظ†ط¸ط±ط© ط³ط±ظٹط¹ط© ط¹ظ„ظ‰ ط§ظ„ظ…ط±ط§ظƒط² ظˆط§ظ„ط­ط³ط§ط¨ط§طھ ظˆط§ظ„ظ†ط´ط§ط· ط§ظ„ط¥ط¯ط§ط±ظٹ ظپظٹ ط³ظ†ط¯.';
+      return 'نظرة سريعة على المراكز والحسابات والنشاط الإداري في سند.';
     }
     if (app.isParent) {
-      return 'طھط§ط¨ط¹ ط§ظ„ظˆط§ط¬ط¨ط§طھ ط§ظ„ط­ط§ظ„ظٹط© ظˆط§ظ„طھظ‚ط¯ظ… ظˆط§ظ„ظ…ظƒط§ظپط¢طھ ظ…ظ† ظ…ظƒط§ظ† ظˆط§ط­ط¯.';
+      return 'تابع الواجبات الحالية والتقدم والمكافآت من مكان واحد.';
     }
-    return 'ظ„ط¯ظٹظƒ $todaySessions ط¬ظ„ط³ط§طھ ظ…ط³ط¬ظ„ط© ط§ظ„ظٹظˆظ… ظˆ$alerts طھظ†ط¨ظٹظ‡ط§طھ طھط­طھط§ط¬ ط§ظ†طھط¨ط§ظ‡.';
+    return 'لديك $todaySessions جلسات مسجلة اليوم و$alerts تنبيهات تحتاج انتباه.';
   }
 }
 
@@ -492,10 +481,8 @@ class _HeroMetric extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
           ),
-          Text(
-            label,
-            style: TextStyle(color: Colors.white.withValues(alpha: .82)),
-          ),
+          Text(label,
+              style: TextStyle(color: Colors.white.withValues(alpha: .82))),
         ],
       ),
     );
@@ -595,14 +582,13 @@ class _RecentActivityTimeline extends StatelessWidget {
     if (items.isEmpty) {
       return const EmptyState(
         icon: Icons.history_outlined,
-        title: 'ظ„ط§ ظٹظˆط¬ط¯ ظ†ط´ط§ط· ط­ط¯ظٹط«',
-        message:
-            'ط³طھط¸ظ‡ط± ظ‡ظ†ط§ ط§ظ„ط¹ظ…ظ„ظٹط§طھ ط§ظ„ظ…ظ‡ظ…ط© ظ…ط«ظ„ ط§ظ„ط¬ظ„ط³ط§طھ ظˆط§ظ„ظˆط§ط¬ط¨ط§طھ ظˆط§ظ„طھظ‚ط§ط±ظٹط±.',
+        title: 'لا يوجد نشاط حديث',
+        message: 'ستظهر هنا العمليات المهمة مثل الجلسات والواجبات والتقارير.',
       );
     }
     return TherapyCard(
       icon: Icons.timeline_outlined,
-      title: 'ط§ظ„ظ†ط´ط§ط· ط§ظ„ط£ط®ظٹط±',
+      title: 'النشاط الأخير',
       child: Column(
         children: [
           for (var i = 0; i < items.length; i++)
@@ -627,7 +613,7 @@ class _RecentActivityTimeline extends StatelessWidget {
     final sessionItems = sessions.map((session) {
       return _ActivityItem(
         icon: Icons.timer_outlined,
-        title: 'ط¬ظ„ط³ط© ط¹ظ„ط§ط¬ظٹط©',
+        title: 'جلسة علاجية',
         subtitle:
             session.cardTitle.isEmpty ? session.sessionType : session.cardTitle,
         time: _shortDate(session.startedAt),
@@ -739,38 +725,26 @@ class _AttentionCard extends StatelessWidget {
     if (alerts.isEmpty) {
       return const EmptyState(
         icon: Icons.verified_outlined,
-        title: 'ظƒظ„ ط´ظٹط، ظ…ط³طھظ‚ط±',
-        message:
-            'ظ„ط§ طھظˆط¬ط¯ طھظ†ط¨ظٹظ‡ط§طھ ظ…ظ‡ظ…ط© ط§ظ„ط¢ظ†. ط§ظ„ظ†ط¸ط§ظ… ظٹط¹ط·ظٹظƒ ظ…ط³ط§ط­ط© ظ‡ط§ط¯ط¦ط© ظ„ظ„ط¹ظ…ظ„.',
+        title: 'كل شيء مستقر',
+        message: 'لا توجد تنبيهات مهمة الآن.',
       );
     }
     return TherapyCard(
       icon: Icons.notifications_active_outlined,
-      title: 'طھط­طھط§ط¬ ط§ظ†طھط¨ط§ظ‡',
+      title: 'تحتاج انتباه',
       child: Column(
         children: [
           for (final alert in alerts) ...[
-            _AlertTile(alert: alert),
+            SemanticAlertCard(
+              kind: alert.kind,
+              icon: alert.icon,
+              title: alert.title,
+              message: alert.message,
+            ),
             if (alert != alerts.last) const SizedBox(height: AppSpacing.sm),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _AlertTile extends StatelessWidget {
-  const _AlertTile({required this.alert});
-
-  final _AlertItem alert;
-
-  @override
-  Widget build(BuildContext context) {
-    return SemanticAlertCard(
-      kind: alert.kind,
-      icon: alert.icon,
-      title: alert.title,
-      message: alert.message,
     );
   }
 }

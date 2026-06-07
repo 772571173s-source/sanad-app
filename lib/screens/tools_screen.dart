@@ -27,22 +27,22 @@ class _ToolsScreenState extends State<ToolsScreen> {
           children: [
             _ToolCard(
               icon: Icons.search,
-              title: 'ط¨ط­ط« ط¹ظ† ط·ط§ظ„ط¨',
-              subtitle: '${app.students.length} ط·ط§ظ„ط¨ ظپظٹ ط§ظ„ظ…ط±ظƒط²',
+              title: 'بحث عن طالب',
+              subtitle: '${app.students.length} طالب في المركز',
               selected: selected == 'students',
               onTap: () => setState(() => selected = 'students'),
             ),
             _ToolCard(
               icon: Icons.picture_as_pdf_outlined,
-              title: 'ط·ط¨ط§ط¹ط© طھظ‚ط±ظٹط±',
-              subtitle: 'طھظ‚ط§ط±ظٹط± PDF ظ„ظ„ط·ظ„ط§ط¨',
+              title: 'طباعة تقرير',
+              subtitle: 'تقارير PDF للطلاب',
               selected: selected == 'reports',
               onTap: () => setState(() => selected = 'reports'),
             ),
             _ToolCard(
               icon: Icons.manage_accounts_outlined,
-              title: 'ط¥ظ†ط´ط§ط، ط­ط³ط§ط¨ط§طھ',
-              subtitle: '${app.staff.length} ط­ط³ط§ط¨ ظ…ظˆط¸ظپ ظˆظ…ط¯ظٹط±',
+              title: 'إنشاء حسابات',
+              subtitle: '${app.staff.length} حساب موظف ومدير',
               selected: selected == 'staff',
               onTap: () => setState(() => selected = 'staff'),
             ),

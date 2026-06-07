@@ -26,7 +26,7 @@ class PdfService {
               crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
                 pw.Text(
-                  'ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯ - ط·آ·ط¢آ¨ط·آ¸ط¸آ¹ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ·ط¢آ¯ط·آ·ط¢آ®ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چ ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±',
+                  'سند - بيانات دخول ولي الأمر',
                   style: pw.TextStyle(
                     font: font,
                     fontSize: 24,
@@ -34,20 +34,15 @@ class PdfService {
                   ),
                 ),
                 pw.SizedBox(height: 18),
-                pw.Text(
-                    'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨: ${student.name}',
+                pw.Text('الطالب: ${student.name}',
                     style: pw.TextStyle(font: font, fontSize: 16)),
                 pw.SizedBox(height: 12),
                 _credentialRow(
-                    font: font,
-                    label:
-                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ¯',
-                    value: student.portalEmail),
+                    font: font, label: 'البريد', value: student.portalEmail),
                 pw.SizedBox(height: 8),
                 _credentialRow(
                     font: font,
-                    label:
-                        'ط·آ¸ط¦â€™ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط«â€ ط·آ·ط¢آ±',
+                    label: 'كلمة المرور',
                     value: student.portalPassword),
               ],
             ),
@@ -84,60 +79,49 @@ class PdfService {
         build: (_) => [
           _reportHeader(font, center, _today()),
           pw.SizedBox(height: 14),
-          _sectionTitle(font,
-              'ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯ - $type'),
+          _sectionTitle(font, 'تقرير سند - $type'),
           pw.SizedBox(height: 10),
           _infoBox(font, [
-            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨: ${student.name}',
-            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±: ${student.age}',
-            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ·ط¢آ´ط·آ·ط¢آ®ط·آ¸ط¸آ¹ط·آ·ط¢آµ: ${student.diagnosis}',
-            'ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±: ${student.parentName}',
-            'ط·آ·ط¢آ±ط·آ¸أ¢â‚¬ع‘ط·آ¸أ¢â‚¬آ¦ ط·آ¸ط«â€ ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±: ${student.parentPhone}',
+            'الطالب: ${student.name}',
+            'العمر: ${student.age}',
+            'التشخيص: ${student.diagnosis}',
+            'ولي الأمر: ${student.parentName}',
+            'رقم ولي الأمر: ${student.parentPhone}',
           ]),
           pw.SizedBox(height: 14),
           _performanceSummary(font, sessions, improvement),
           pw.SizedBox(height: 14),
-          _sectionTitle(font,
-              'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ±'),
+          _sectionTitle(font, 'الجلسات داخل التقرير'),
           if (sessions.isEmpty)
-            pw.Text(
-                'ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ·ط¢آ¬ط·آ·ط¢آ¯ ط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ© ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¾ط·آ·ط¹آ¾ط·آ·ط¢آ±ط·آ·ط¢آ©.',
+            pw.Text('لا توجد جلسات مسجلة داخل الفترة.',
                 style: pw.TextStyle(font: font))
           else
             _sessionsTable(font, sessions),
           pw.SizedBox(height: 14),
-          _sectionTitle(font,
-              'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ®ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ·ط¢آ¯ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ¨ط·آ¸ط¸آ¹ط·آ·ط¢آ©'),
+          _sectionTitle(font, 'الخطة التدريبية'),
           if (plans.isEmpty)
-            pw.Text(
-                'ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ·ط¢آ¬ط·آ·ط¢آ¯ ط·آ·ط¢آ£ط·آ¸أ¢â‚¬طŒط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ¸ط¸آ¾ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ©.',
-                style: pw.TextStyle(font: font)),
+            pw.Text('لا توجد أهداف مسجلة.', style: pw.TextStyle(font: font)),
           ...plans.map((plan) => pw.Bullet(
-                text:
-                    '${plan.goal} - ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ¯ط·آ¸أ¢â‚¬آ¦ ${plan.progress}%',
+                text: '${plan.goal} - تقدم ${plan.progress}%',
                 style: pw.TextStyle(font: font),
               )),
           pw.SizedBox(height: 14),
-          _sectionTitle(font,
-              'ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¹ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬آ¦ ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ·ط·آ¸أ¢â‚¬ع‘ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ­ط·آ·ط¢آ±ط·آ¸ط«â€ ط·آ¸ط¸آ¾'),
+          _sectionTitle(font, 'تقييم نطق الحروف'),
           if (evaluations.isEmpty)
-            pw.Text(
-                'ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ·ط¢آ¬ط·آ·ط¢آ¯ ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¹ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ³ط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ©.',
-                style: pw.TextStyle(font: font)),
+            pw.Text('لا توجد تقييمات مسجلة.', style: pw.TextStyle(font: font)),
           ...evaluations.take(18).map((evaluation) => pw.Bullet(
                 text:
                     '${evaluation.letter} - ${evaluation.position} - ${evaluation.errorType} - ${evaluation.score}',
                 style: pw.TextStyle(font: font),
               )),
           pw.SizedBox(height: 14),
-          _sectionTitle(font,
-              'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ·ط¢آµط·آ¸ط¸آ¹ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ®ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ©'),
+          _sectionTitle(font, 'التوصيات والخطة القادمة'),
           _infoBox(font, [
             sessions.isEmpty
-                ? 'ط·آ¸ط¸آ¹ط·آ¸ط«â€ ط·آ·ط¢آµط·آ¸أ¢â‚¬آ° ط·آ·ط¢آ¨ط·آ·ط¢آ¨ط·آ·ط¢آ¯ط·آ·ط·إ’ ط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬آ ط·آ·ط¹آ¾ط·آ·ط¢آ¸ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ© ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸ط¦â€™ط·آ¸ط«â€ ط·آ¸ط¸آ¹ط·آ¸أ¢â‚¬آ  ط·آ·ط¢آ®ط·آ·ط¢آ· ط·آ·ط¢آ£ط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ³ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ·ط¢آ¶ط·آ·ط¢آ­.'
-                : 'ط·آ¸ط¸آ¹ط·آ¸ط«â€ ط·آ·ط¢آµط·آ¸أ¢â‚¬آ° ط·آ·ط¢آ¨ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ³ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ·ط¢آ± ط·آ·ط¢آ¹ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ° ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ¹ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ° ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¬ط·آ·ط¢آ§ط·آ·ط¢آ­ط·آ¸أ¢â‚¬آ¹ط·آ·ط¢آ§ط·آ·ط¥â€™ ط·آ¸ط«â€ ط·آ·ط¢آ¥ط·آ·ط¢آ¹ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ·ط¢آ© ط·آ·ط¹آ¾ط·آ·ط¢آ¯ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ¨ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬ع‘ط·آ¸أ¢â‚¬â€چ ط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط·إ’ ط·آ·ط¢آ¨ط·آ·ط¢آ®ط·آ·ط¢آ·ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ·ط¢آ£ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آµط·آ·ط¢آ±.',
-            'ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ¯ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¢آ¨ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ© ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ®ط·آ¸أ¢â‚¬â€چ ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ·ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨: ${reports.length}',
-            'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ®ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ§ط·آ·ط¢آ¯ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ©: ط·آ¸أ¢â‚¬آ¦ط·آ·ط¹آ¾ط·آ·ط¢آ§ط·آ·ط¢آ¨ط·آ·ط¢آ¹ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬طŒط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ¸ط¸آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ­ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸ط¸آ¹ط·آ·ط¢آ© ط·آ¸ط«â€ ط·آ·ط¹آ¾ط·آ·ط¢آ­ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ« ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ®ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯ ط·آ·ط¢آ«ط·آ·ط¢آ¨ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط·إ’.',
+                ? 'يوصى ببدء جلسات منتظمة لتكوين خط أساس واضح.'
+                : 'يوصى بالاستمرار على الأنشطة الأعلى نجاحًا، وإعادة تدريب الأنشطة الأقل أداء بخطوات أقصر.',
+            'عدد التقارير السابقة داخل ملف الطالب: ${reports.length}',
+            'الخطة القادمة: متابعة الأهداف الحالية وتحديث الخطة عند ثبات الأداء.',
           ]),
           pw.SizedBox(height: 24),
           _signatures(font, specialistSignature, managerSignature),
@@ -188,7 +172,7 @@ class PdfService {
               border: pw.Border.all(color: _primary),
               borderRadius: pw.BorderRadius.circular(8),
             ),
-            child: pw.Text('ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯',
+            child: pw.Text('سند',
                 style: pw.TextStyle(
                     font: font,
                     fontSize: 22,
@@ -200,18 +184,14 @@ class PdfService {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                    center?.name ??
-                        'ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ±ط·آ¸ط¦â€™ط·آ·ط¢آ² ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯',
+                pw.Text(center?.name ?? 'مركز سند',
                     style: pw.TextStyle(
                         font: font,
                         fontSize: 21,
                         color: _text,
                         fontWeight: pw.FontWeight.bold)),
                 pw.SizedBox(height: 4),
-                pw.Text(
-                    center?.address ??
-                        'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ  ط·آ·ط·â€؛ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ­ط·آ·ط¢آ¯ط·آ·ط¢آ¯',
+                pw.Text(center?.address ?? 'العنوان غير محدد',
                     style: pw.TextStyle(font: font, color: _text)),
                 pw.Directionality(
                   textDirection: pw.TextDirection.ltr,
@@ -219,8 +199,7 @@ class PdfService {
                       style: pw.TextStyle(font: font),
                       textAlign: pw.TextAlign.left),
                 ),
-                pw.Text(
-                    'ط·آ·ط¹آ¾ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ® ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ±: $date',
+                pw.Text('تاريخ التقرير: $date',
                     style: pw.TextStyle(font: font)),
               ],
             ),
@@ -272,25 +251,13 @@ class PdfService {
         sessions.where((session) => session.successRate < 60).length;
     return pw.Row(
       children: [
-        _metricBox(
-            font,
-            'ط·آ·ط¢آ¹ط·آ·ط¢آ¯ط·آ·ط¢آ¯ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾',
-            '$count'),
+        _metricBox(font, 'عدد الجلسات', '$count'),
         pw.SizedBox(width: 8),
-        _metricBox(
-            font,
-            'ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ³ط·آ·ط¢آ¨ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط·إ’',
-            '$improvement%'),
+        _metricBox(font, 'نسبة الأداء', '$improvement%'),
         pw.SizedBox(width: 8),
-        _metricBox(
-            font,
-            'ط·آ·ط¢آ£ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط·إ’ ط·آ¸أ¢â‚¬ع‘ط·آ¸ط«â€ ط·آ¸ط¸آ¹',
-            '$strong'),
+        _metricBox(font, 'أداء قوي', '$strong'),
         pw.SizedBox(width: 8),
-        _metricBox(
-            font,
-            'ط·آ¸ط¸آ¹ط·آ·ط¢آ­ط·آ·ط¹آ¾ط·آ·ط¢آ§ط·آ·ط¢آ¬ ط·آ·ط¢آ¯ط·آ·ط¢آ¹ط·آ¸أ¢â‚¬آ¦',
-            '$needsSupport'),
+        _metricBox(font, 'يحتاج دعم', '$needsSupport'),
       ],
     );
   }
@@ -329,18 +296,10 @@ class PdfService {
         pw.TableRow(
           decoration: const pw.BoxDecoration(color: _accentBlue),
           children: [
-            _cell(font,
-                'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ®',
-                bold: true),
-            _cell(font,
-                'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬طŒط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ·ط¢آ©',
-                bold: true),
-            _cell(font,
-                'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ·ط·آ·ط¢آ©',
-                bold: true),
-            _cell(
-                font, 'ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¬ط·آ·ط¢آ§ط·آ·ط¢آ­',
-                bold: true),
+            _cell(font, 'التاريخ', bold: true),
+            _cell(font, 'المهارة', bold: true),
+            _cell(font, 'الأنشطة', bold: true),
+            _cell(font, 'النجاح', bold: true),
           ],
         ),
         ...sessions.map((session) => pw.TableRow(children: [
@@ -372,11 +331,9 @@ class PdfService {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        pw.Text(
-            'ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¹ط·آ·ط¢آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ£ط·آ·ط¢آ®ط·آ·ط¢آµط·آ·ط¢آ§ط·آ·ط¢آ¦ط·آ¸ط¸آ¹: $specialistSignature',
+        pw.Text('توقيع الأخصائي: $specialistSignature',
             style: pw.TextStyle(font: font, fontSize: 14)),
-        pw.Text(
-            'ط·آ·ط¹آ¾ط·آ¸ط«â€ ط·آ¸أ¢â‚¬ع‘ط·آ¸ط¸آ¹ط·آ·ط¢آ¹ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¯ط·آ¸ط¸آ¹ط·آ·ط¢آ±: $managerSignature',
+        pw.Text('توقيع المدير: $managerSignature',
             style: pw.TextStyle(font: font, fontSize: 14)),
       ],
     );
@@ -387,7 +344,7 @@ class PdfService {
       padding: const pw.EdgeInsets.only(top: 18),
       child: pw.Center(
         child: pw.Text(
-          'ط·آ·ط¹آ¾ط·آ¸أ¢â‚¬آ¦ ط·آ·ط¢آ¥ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ´ط·آ·ط¢آ§ط·آ·ط·إ’ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¹آ¾ط·آ¸أ¢â‚¬ع‘ط·آ·ط¢آ±ط·آ¸ط¸آ¹ط·آ·ط¢آ± ط·آ·ط¢آ¨ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ·ط¢آ³ط·آ·ط¢آ·ط·آ·ط¢آ© ط·آ¸أ¢â‚¬آ¦ط·آ¸أ¢â‚¬آ ط·آ·ط¢آµط·آ·ط¢آ© ط·آ·ط¢آ³ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ¯ ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¥ط·آ·ط¢آ¯ط·آ·ط¢آ§ط·آ·ط¢آ±ط·آ·ط¢آ© ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¬ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ³ط·آ·ط¢آ§ط·آ·ط¹آ¾ ط·آ¸ط«â€ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¨ط·آ·ط¢آ±ط·آ·ط¢آ§ط·آ¸أ¢â‚¬آ¦ط·آ·ط¢آ¬ ط·آ·ط¢آ§ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ¹ط·آ¸أ¢â‚¬â€چط·آ·ط¢آ§ط·آ·ط¢آ¬ط·آ¸ط¸آ¹ط·آ·ط¢آ©',
+          'تم إنشاء التقرير بواسطة منصة سند لإدارة الجلسات والبرامج العلاجية',
           style:
               pw.TextStyle(font: font, fontSize: 9, color: PdfColors.grey600),
         ),
@@ -398,13 +355,9 @@ class PdfService {
   int _improvementRate(List<Evaluation> evaluations) {
     if (evaluations.isEmpty) return 0;
     final good = evaluations
-        .where((item) =>
-            item.score == 'ط·آ¸أ¢â‚¬آ ط·آ·ط¢آ§ط·آ·ط¢آ¬ط·آ·ط¢آ­' ||
-            item.score == 'ط·آ·ط¢آµط·آ·ط¢آ­ط·آ¸ط¸آ¹ط·آ·ط¢آ­')
+        .where((item) => item.score == 'ناجح' || item.score == 'صحيح')
         .length;
-    final partial = evaluations
-        .where((item) => item.score == 'ط·آ·ط¢آ¬ط·آ·ط¢آ²ط·آ·ط¢آ¦ط·آ¸ط¸آ¹')
-        .length;
+    final partial = evaluations.where((item) => item.score == 'جزئي').length;
     return (((good + partial * .5) / evaluations.length) * 100).round();
   }
 
