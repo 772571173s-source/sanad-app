@@ -113,8 +113,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             },
                             icon: const Icon(Icons.folder_shared_outlined),
                             label: const Text('فتح الملف')),
-                        if (app.canWriteClinical &&
-                            widget.onStartSession != null)
+                        if (app.canRunSessions && widget.onStartSession != null)
                           FilledButton.tonalIcon(
                               onPressed: () async {
                                 await app.selectStudent(student);
@@ -342,7 +341,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('البريد'),
+            const Text('اسم المستخدم'),
             const SizedBox(height: 4),
             SelectableText(
               student.portalEmail,
@@ -369,7 +368,7 @@ class _StudentsScreenState extends State<StudentsScreen> {
             onPressed: () async {
               await Clipboard.setData(ClipboardData(
                   text:
-                      'البريد: ${student.portalEmail}\nكلمة المرور: ${student.portalPassword}'));
+                      'اسم المستخدم: ${student.portalEmail}\nكلمة المرور: ${student.portalPassword}'));
               if (dialogContext.mounted) Navigator.pop(dialogContext);
             },
             icon: const Icon(Icons.copy),

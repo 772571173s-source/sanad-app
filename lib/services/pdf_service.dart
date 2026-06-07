@@ -38,7 +38,9 @@ class PdfService {
                     style: pw.TextStyle(font: font, fontSize: 16)),
                 pw.SizedBox(height: 12),
                 _credentialRow(
-                    font: font, label: 'البريد', value: student.portalEmail),
+                    font: font,
+                    label: 'اسم المستخدم',
+                    value: student.portalEmail),
                 pw.SizedBox(height: 8),
                 _credentialRow(
                     font: font,

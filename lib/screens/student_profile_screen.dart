@@ -295,7 +295,7 @@ class _StudentOverview extends StatelessWidget {
               _InfoTile('ولي الأمر', student.parentName),
               _InfoTile('رقم ولي الأمر', student.parentPhone),
               _InfoTile('نوع البرنامج', student.programType),
-              _InfoTile('البريد', student.portalEmail, ltr: true),
+              _InfoTile('اسم المستخدم', student.portalEmail, ltr: true),
             ],
           ),
           if (student.notes.isNotEmpty) ...[

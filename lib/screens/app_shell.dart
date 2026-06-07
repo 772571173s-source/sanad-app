@@ -179,6 +179,60 @@ class _AppShellState extends State<AppShell> {
       ];
     }
 
+    if (app.isClinicalSupervisor) {
+      return [
+        const _NavItem(
+            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
+          'الطلاب',
+          Icons.groups_2_outlined,
+          StudentsScreen(onOpenProfile: () => setState(() => index = 2)),
+        ),
+        const _NavItem(
+          'ملف الطالب',
+          Icons.folder_shared_outlined,
+          StudentProfileScreen(),
+        ),
+        const _NavItem(
+          'التقييم العلاجي',
+          Icons.fact_check_outlined,
+          EvaluationsScreen(),
+        ),
+        const _NavItem(
+          'بناء الهيكل العلاجي',
+          Icons.schema_outlined,
+          TherapyStructureBuilderScreen(),
+        ),
+        const _NavItem(
+          'الإعدادات',
+          Icons.settings_outlined,
+          SettingsHubScreen(),
+        ),
+      ];
+    }
+
+    if (app.isCoordinator) {
+      return [
+        const _NavItem(
+            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
+        _NavItem(
+          'الطلاب',
+          Icons.groups_2_outlined,
+          StudentsScreen(onOpenProfile: () => setState(() => index = 2)),
+        ),
+        const _NavItem(
+          'ملف الطالب',
+          Icons.folder_shared_outlined,
+          StudentProfileScreen(),
+        ),
+        const _NavItem(
+          'الإعدادات',
+          Icons.settings_outlined,
+          SettingsHubScreen(),
+        ),
+      ];
+    }
+
     if (app.isSpecialist) {
       return [
         const _NavItem(
@@ -223,11 +277,11 @@ class _AppShellState extends State<AppShell> {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
-          '???? ?????? ???????',
+          'بناء الهيكل العلاجي',
           Icons.schema_outlined,
           TherapyStructureBuilderScreen(),
         ),
-        _NavItem('?????????', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
 
@@ -391,6 +445,10 @@ class _Header extends StatelessWidget {
     if (app.isSpecialist) {
       return 'متابعة التقييمات والأهداف والجلسات العلاجية';
     }
+    if (app.isClinicalSupervisor) {
+      return 'مراجعة التقييمات وبناء الهيكل العلاجي ومتابعة الفريق';
+    }
+    if (app.isCoordinator) return 'تنظيم توزيع الحالات والجداول';
     if (app.isParent) return 'متابعة الواجبات والتقدم المنزلي';
     if (app.isDataEntry) return 'تنظيم إدخال الطلاب وبيانات أولياء الأمور';
     if (app.isProgramEntry) return 'تنظيم النواة العلاجية والأهداف السريرية';
@@ -400,15 +458,19 @@ class _Header extends StatelessWidget {
   String _roleLabel(UserRole? role) {
     switch (role) {
       case UserRole.sanadOwner:
-        return 'مالك النظام';
+        return 'مالك سند';
       case UserRole.centerManager:
         return 'مدير مركز';
+      case UserRole.clinicalSupervisor:
+        return 'مشرف فني';
+      case UserRole.therapyProgramEntry:
+        return 'مدخل البرامج العلاجية';
+      case UserRole.coordinator:
+        return 'منسق';
       case UserRole.specialist:
         return 'أخصائي';
       case UserRole.dataEntry:
-        return 'مدخل بيانات';
-      case UserRole.programEntry:
-        return 'منسق علاجي';
+        return 'مدخل بيانات / سكرتارية';
       case UserRole.parent:
         return 'ولي أمر';
       case null:

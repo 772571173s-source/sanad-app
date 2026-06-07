@@ -1,34 +1,136 @@
 enum UserRole {
   sanadOwner,
   centerManager,
+  clinicalSupervisor,
+  therapyProgramEntry,
+  coordinator,
   specialist,
   dataEntry,
-  programEntry,
   parent
+}
+
+enum AppPermission {
+  manageSystem,
+  manageCenters,
+  manageSubscriptions,
+  manageCenterStaff,
+  manageCenterPermissions,
+  viewStudents,
+  manageStudents,
+  assignStudents,
+  viewReports,
+  writeReports,
+  viewClinicalAssessments,
+  writeClinicalAssessments,
+  manageTherapyStructure,
+  runSessions,
+  updateGoalProgress,
+  createHomework,
+  parentFollowUp,
 }
 
 extension UserRoleX on UserRole {
   String get label {
     switch (this) {
       case UserRole.sanadOwner:
-        return 'مالك النظام';
+        return 'مالك سند';
       case UserRole.centerManager:
         return 'مدير مركز';
+      case UserRole.clinicalSupervisor:
+        return 'مشرف فني';
+      case UserRole.therapyProgramEntry:
+        return 'مدخل البرامج العلاجية';
+      case UserRole.coordinator:
+        return 'منسق';
       case UserRole.specialist:
         return 'أخصائي';
       case UserRole.dataEntry:
-        return 'مدخل بيانات';
-      case UserRole.programEntry:
-        return 'مدخل برامج';
+        return 'مدخل بيانات / سكرتارية';
       case UserRole.parent:
         return 'ولي أمر';
     }
   }
 
+  Set<AppPermission> get permissions {
+    switch (this) {
+      case UserRole.sanadOwner:
+        return {
+          AppPermission.manageSystem,
+          AppPermission.manageCenters,
+          AppPermission.manageSubscriptions,
+          AppPermission.manageCenterStaff,
+          AppPermission.manageCenterPermissions,
+          AppPermission.viewStudents,
+          AppPermission.manageStudents,
+          AppPermission.assignStudents,
+          AppPermission.viewReports,
+          AppPermission.writeReports,
+          AppPermission.viewClinicalAssessments,
+          AppPermission.writeClinicalAssessments,
+          AppPermission.manageTherapyStructure,
+          AppPermission.runSessions,
+          AppPermission.updateGoalProgress,
+          AppPermission.createHomework,
+        };
+      case UserRole.centerManager:
+        return {
+          AppPermission.manageCenterStaff,
+          AppPermission.manageCenterPermissions,
+          AppPermission.viewStudents,
+          AppPermission.manageStudents,
+          AppPermission.viewReports,
+          AppPermission.viewClinicalAssessments,
+          AppPermission.manageTherapyStructure,
+        };
+      case UserRole.clinicalSupervisor:
+        return {
+          AppPermission.viewStudents,
+          AppPermission.viewReports,
+          AppPermission.viewClinicalAssessments,
+          AppPermission.writeClinicalAssessments,
+          AppPermission.manageTherapyStructure,
+          AppPermission.assignStudents,
+        };
+      case UserRole.therapyProgramEntry:
+        return {AppPermission.manageTherapyStructure};
+      case UserRole.coordinator:
+        return {
+          AppPermission.viewStudents,
+          AppPermission.assignStudents,
+        };
+      case UserRole.dataEntry:
+        return {
+          AppPermission.viewStudents,
+          AppPermission.manageStudents,
+        };
+      case UserRole.specialist:
+        return {
+          AppPermission.viewStudents,
+          AppPermission.viewReports,
+          AppPermission.writeReports,
+          AppPermission.viewClinicalAssessments,
+          AppPermission.writeClinicalAssessments,
+          AppPermission.runSessions,
+          AppPermission.updateGoalProgress,
+          AppPermission.createHomework,
+        };
+      case UserRole.parent:
+        return {
+          AppPermission.parentFollowUp,
+          AppPermission.viewReports,
+        };
+    }
+  }
+
+  bool can(AppPermission permission) => permissions.contains(permission);
+
   static UserRole fromDb(String value) {
     if (value == 'systemOwner') return UserRole.sanadOwner;
     if (value == 'owner') return UserRole.sanadOwner;
     if (value == 'admin') return UserRole.centerManager;
+    if (value == 'programEntry') return UserRole.therapyProgramEntry;
+    if (value == 'therapyBuilder') return UserRole.therapyProgramEntry;
+    if (value == 'supervisor') return UserRole.clinicalSupervisor;
     return UserRole.values.firstWhere((role) => role.name == value,
         orElse: () => UserRole.parent);
   }

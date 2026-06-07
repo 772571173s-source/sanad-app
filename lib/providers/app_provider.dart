@@ -56,21 +56,31 @@ class AppProvider extends ChangeNotifier {
   bool get isOwner => isSanadOwnerAccount && !isSupportMode;
   bool get isCenterManager =>
       user?.role == UserRole.centerManager || isSupportMode;
+  bool get isClinicalSupervisor => user?.role == UserRole.clinicalSupervisor;
   bool get isSpecialist => user?.role == UserRole.specialist;
   bool get isDataEntry => user?.role == UserRole.dataEntry;
-  bool get isProgramEntry => user?.role == UserRole.programEntry;
+  bool get isProgramEntry => user?.role == UserRole.therapyProgramEntry;
+  bool get isCoordinator => user?.role == UserRole.coordinator;
   bool get isParent => user?.role == UserRole.parent;
-  bool get canManageCenters => isOwner;
-  bool get canManageStaff => isOwner || isCenterManager;
+  bool hasPermission(AppPermission permission) =>
+      isSupportMode || user?.role.can(permission) == true;
+  bool get canManageCenters => hasPermission(AppPermission.manageCenters);
+  bool get canManageStaff => hasPermission(AppPermission.manageCenterStaff);
   bool get canViewStudents =>
-      isCenterManager || isSpecialist || isDataEntry || isParent;
-  bool get canManageStudents => isCenterManager || isDataEntry;
+      hasPermission(AppPermission.viewStudents) || isParent;
+  bool get canManageStudents => hasPermission(AppPermission.manageStudents);
   bool get canDeleteStudents => isCenterManager;
-  bool get canWriteClinical => isSpecialist;
+  bool get canWriteClinical =>
+      hasPermission(AppPermission.writeClinicalAssessments);
+  bool get canRunSessions => hasPermission(AppPermission.runSessions);
+  bool get canUpdateGoalProgress =>
+      hasPermission(AppPermission.updateGoalProgress);
+  bool get canCreateHomework => hasPermission(AppPermission.createHomework);
   bool get canManageTherapyStructure =>
-      isCenterManager || isProgramEntry || isSupportMode;
-  bool get canWriteParentArea => isParent || canWriteClinical;
-  bool get canViewReports => isCenterManager || isSpecialist;
+      hasPermission(AppPermission.manageTherapyStructure);
+  bool get canWriteParentArea =>
+      isParent || hasPermission(AppPermission.createHomework);
+  bool get canViewReports => hasPermission(AppPermission.viewReports);
   String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
 
   int get completedHomeworkCount =>
@@ -339,8 +349,8 @@ class AppProvider extends ChangeNotifier {
     auditLogs = isOwner || isCenterManager
         ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId)
         : [];
-    students = current.role == UserRole.parent && current.studentId != null
-        ? await _repository.studentsForParent(current.studentId!, current.email)
+    students = current.role == UserRole.parent
+        ? await _repository.studentsForParent(current)
         : activeCenterId.isEmpty
             ? []
             : await _repository.students(activeCenterId);
@@ -510,14 +520,18 @@ class AppProvider extends ChangeNotifier {
       throw StateError('مالك النظام لا ينشأ إلا من مالك النظام.');
     }
     if (isOwner && account.role != UserRole.centerManager) {
-      throw StateError('مالك النظام ينشئ مدير مركز فقط.');
+      throw StateError('مالك سند ينشئ مدراء المراكز فقط.');
     }
-    if (isCenterManager &&
-        account.role != UserRole.specialist &&
-        account.role != UserRole.dataEntry &&
-        account.role != UserRole.programEntry) {
+    if (!isOwner &&
+        !{
+          UserRole.clinicalSupervisor,
+          UserRole.therapyProgramEntry,
+          UserRole.coordinator,
+          UserRole.dataEntry,
+          UserRole.specialist,
+        }.contains(account.role)) {
       throw StateError(
-          'مدير المركز ينشئ أخصائي أو مدخل بيانات أو مدخل برامج فقط.');
+          'مدير المركز ينشئ مشرفًا فنيًا أو مدخل برامج أو منسقًا أو سكرتارية أو أخصائيًا فقط.');
     }
     await _repository.saveUser(account);
     await _log(
@@ -625,7 +639,7 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> saveSession(TherapySession session,
       {bool autosave = false}) async {
-    _ensure(canWriteClinical, 'الجلسات يضيفها الأخصائي فقط.');
+    _ensure(canRunSessions, 'الجلسات ينفذها الأخصائي فقط.');
     _ensureClinicalAccess(session.studentId, session.centerId);
     await _repository.saveSession(session);
     if (!autosave) {
@@ -665,7 +679,8 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> savePlan(TrainingPlan plan) async {
-    _ensure(canWriteClinical, 'الخطط يضيفها الأخصائي فقط.');
+    _ensure(canWriteClinical || canUpdateGoalProgress,
+        'لا تملك صلاحية تعديل الخطط.');
     _ensureClinicalAccess(plan.studentId, plan.centerId);
     await _repository.savePlan(plan);
     await _log(
@@ -702,7 +717,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveGoalSkillStep(GoalSkillStep step) async {
-    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensure(canUpdateGoalProgress, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step);
     await _syncGoalProgress(step.goalId);
@@ -715,7 +730,7 @@ class AppProvider extends ChangeNotifier {
     required String notes,
     String lastSessionId = '',
   }) async {
-    _ensure(canWriteClinical, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
+    _ensure(canUpdateGoalProgress, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step.copyWith(
       status: status,
@@ -992,7 +1007,7 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> saveReward(Reward reward) async {
-    _ensure(canWriteClinical, 'المكافآت يعدلها الأخصائي فقط.');
+    _ensure(canUpdateGoalProgress, 'المكافآت يعدلها الأخصائي فقط.');
     _ensureClinicalAccess(reward.studentId, reward.centerId);
     await _repository.saveReward(reward);
     await selectStudent(selectedStudent);
@@ -1219,9 +1234,11 @@ class AppProvider extends ChangeNotifier {
       return;
     }
     if ((current.role == UserRole.centerManager ||
+            current.role == UserRole.clinicalSupervisor ||
             current.role == UserRole.specialist ||
             current.role == UserRole.dataEntry ||
-            current.role == UserRole.programEntry) &&
+            current.role == UserRole.therapyProgramEntry ||
+            current.role == UserRole.coordinator) &&
         current.centerId == student.centerId) {
       return;
     }

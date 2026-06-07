@@ -73,9 +73,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: email,
                               textDirection: TextDirection.ltr,
                               textAlign: TextAlign.left,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration:
-                                  const InputDecoration(labelText: 'البريد')),
+                              keyboardType: TextInputType.text,
+                              decoration: const InputDecoration(
+                                  labelText: 'اسم المستخدم أو رقم الجوال')),
                           const SizedBox(height: 12),
                           TextField(
                               controller: password,

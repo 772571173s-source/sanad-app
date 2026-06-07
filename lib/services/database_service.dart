@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 12;
+  static const currentVersion = 13;
 
   mobile.Database? _database;
 
@@ -350,6 +350,18 @@ class DatabaseService {
     if (oldVersion < 12) {
       await _ensureTherapyStructureTables(db);
     }
+    if (oldVersion < 13) {
+      await _resetAccountsForRoleRebuild(db);
+    }
+  }
+
+  Future<void> _resetAccountsForRoleRebuild(mobile.Database db) async {
+    await db.delete('users');
+    await db.delete('audit_logs');
+    await db.update('students', {
+      'portal_password': '',
+      'updated_at': DateTime.now().toIso8601String(),
+    });
   }
 
   Future<void> _repairStoredArabicText(mobile.Database db) async {

@@ -136,22 +136,25 @@ class SanadRepository {
     return rows.map(Student.fromMap).toList();
   }
 
-  Future<List<Student>> studentsForParent(
-      String studentId, String email) async {
+  Future<List<Student>> studentsForParent(AppUser parent) async {
     final rows = await _db.where('students',
-        where: '(id = ? OR portal_email = ?) AND deleted_at = ?',
-        whereArgs: [studentId, email, ''],
+        where:
+            'center_id = ? AND (parent_phone = ? OR portal_email = ?) AND deleted_at = ?',
+        whereArgs: [parent.centerId, parent.email, parent.email, ''],
         orderBy: 'name');
     return rows.map(Student.fromMap).toList();
   }
 
   Future<void> saveStudent(Student student) async {
-    final existingEmailUser = await userByEmail(student.portalEmail);
-    if (existingEmailUser != null &&
-        existingEmailUser.role != UserRole.parent) {
-      throw StateError(
-          'رقم ولي الأمر مستخدم مسبقًا لحساب غير ولي أمر، لذلك لا يمكن إنشاء بريد مكرر.');
+    final parentUsername = student.parentPhone.trim().isNotEmpty
+        ? student.parentPhone.trim()
+        : student.portalEmail.trim();
+    final existingParentAccount = await userByEmail(parentUsername);
+    if (existingParentAccount != null &&
+        existingParentAccount.role != UserRole.parent) {
+      throw StateError('رقم ولي الأمر مستخدم مسبقًا لحساب غير ولي أمر.');
     }
+
     await _db.upsert(
       'students',
       Student(
@@ -164,7 +167,7 @@ class SanadRepository {
         programType: student.programType,
         parentName: student.parentName,
         parentPhone: student.parentPhone,
-        portalEmail: student.portalEmail,
+        portalEmail: parentUsername,
         portalPassword: '',
         photoPath: student.photoPath,
         notes: student.notes,
@@ -181,30 +184,27 @@ class SanadRepository {
         studentId: student.id,
         name: student.parentName,
         phone: student.parentPhone,
-        email: student.portalEmail,
+        email: parentUsername,
       ).toMap(),
     );
-    final existingParentUser = await _db
-        .first('users', where: 'student_id = ?', whereArgs: [student.id]);
-    final existingAccount = existingParentUser == null
-        ? existingEmailUser
-        : AppUser.fromMap(existingParentUser);
-    if (existingAccount == null && student.portalPassword.isEmpty) {
-      throw StateError('كلمة مرور ولي الأمر مطلوبة عند إنشاء حساب جديد.');
-    }
-    if (existingAccount == null || student.portalPassword.isNotEmpty) {
+
+    final initialPassword = student.portalPassword.trim().isNotEmpty
+        ? student.portalPassword.trim()
+        : parentUsername;
+    if (existingParentAccount == null || student.portalPassword.isNotEmpty) {
       await _db.upsert(
         'users',
         AppUser(
-          id: existingAccount?.id ?? 'user_${student.id}',
+          id: existingParentAccount?.id ??
+              'parent_${parentUsername.hashCode.abs()}',
           centerId: student.centerId,
-          email: student.portalEmail,
-          passwordHash: AuthService.hashPassword(student.portalPassword),
+          email: parentUsername,
+          passwordHash: AuthService.hashPassword(initialPassword),
           name: student.parentName.isEmpty
-              ? 'Parent ${student.name}'
+              ? '??? ??? ${student.name}'
               : student.parentName,
           role: UserRole.parent,
-          studentId: existingAccount?.studentId ?? student.id,
+          studentId: null,
           forcePasswordChange: true,
           isDemo: false,
         ).toMap(),
@@ -214,15 +214,17 @@ class SanadRepository {
         'users',
         {
           'center_id': student.centerId,
-          'email': student.portalEmail,
+          'email': parentUsername,
           'name': student.parentName.isEmpty
-              ? 'Parent ${student.name}'
+              ? '??? ??? ${student.name}'
               : student.parentName,
+          'student_id': null,
         },
         'id = ?',
-        [existingAccount.id],
+        [existingParentAccount.id],
       );
     }
+
     if (await reward(student.id) == null) {
       await _db.upsert(
         'rewards',

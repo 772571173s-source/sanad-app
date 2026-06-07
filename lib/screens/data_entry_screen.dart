@@ -44,7 +44,7 @@ class _DataEntryScreenState extends State<DataEntryScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final phone = _normalizePhone(parentPhone.text);
-    final email = phone.isEmpty ? 'رقم_الجوال@sanad.com' : '$phone@sanad.com';
+    final username = phone.isEmpty ? 'رقم الجوال' : phone;
     final familyChildren = phone.isEmpty
         ? <Student>[]
         : app.students
@@ -92,11 +92,11 @@ class _DataEntryScreenState extends State<DataEntryScreen> {
                   SizedBox(
                     width: 260,
                     child: InputDecorator(
-                      decoration:
-                          const InputDecoration(labelText: 'حساب ولي الأمر'),
+                      decoration: const InputDecoration(
+                          labelText: 'اسم دخول ولي الأمر'),
                       child: Directionality(
                         textDirection: TextDirection.ltr,
-                        child: Text(email, textAlign: TextAlign.left),
+                        child: Text(username, textAlign: TextAlign.left),
                       ),
                     ),
                   ),
@@ -196,7 +196,7 @@ class _DataEntryScreenState extends State<DataEntryScreen> {
         programType: diagnosis == 'إعاقة سمعية' ? 'لغة إشارة' : 'نطق وتخاطب',
         parentName: parent,
         parentPhone: phone,
-        portalEmail: '$phone@sanad.com',
+        portalEmail: phone,
         portalPassword: phone,
         createdAt: DateTime.now().toIso8601String(),
       ));

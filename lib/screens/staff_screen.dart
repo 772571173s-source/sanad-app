@@ -19,9 +19,11 @@ class StaffScreen extends StatelessWidget {
             .toList()
         : app.staff
             .where((account) =>
+                account.role == UserRole.clinicalSupervisor ||
                 account.role == UserRole.specialist ||
                 account.role == UserRole.dataEntry ||
-                account.role == UserRole.programEntry)
+                account.role == UserRole.therapyProgramEntry ||
+                account.role == UserRole.coordinator)
             .toList();
     final title = app.isOwner ? 'مدراء المراكز' : 'الموظفون';
     final addLabel = app.isOwner ? 'إنشاء مدير' : 'إضافة موظف';
@@ -96,7 +98,8 @@ class StaffScreen extends StatelessWidget {
                   controller: email,
                   keyboardType: TextInputType.emailAddress,
                   textDirection: TextDirection.ltr,
-                  decoration: const InputDecoration(labelText: 'البريد'),
+                  decoration: const InputDecoration(
+                      labelText: 'اسم المستخدم أو البريد'),
                 ),
                 if (account == null) ...[
                   const SizedBox(height: AppSpacing.sm),
@@ -117,7 +120,9 @@ class StaffScreen extends StatelessWidget {
                           : [
                               UserRole.specialist,
                               UserRole.dataEntry,
-                              UserRole.programEntry,
+                              UserRole.therapyProgramEntry,
+                              UserRole.clinicalSupervisor,
+                              UserRole.coordinator,
                             ])
                       .map((item) => DropdownMenuItem(
                           value: item, child: Text(item.label)))

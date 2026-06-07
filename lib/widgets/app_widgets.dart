@@ -452,6 +452,15 @@ class RoleAvatar extends StatelessWidget {
       case UserRole.centerManager:
         return _avatarData(
             context, SemanticAlertKind.info, Icons.business_center_outlined);
+      case UserRole.clinicalSupervisor:
+        return _avatarData(
+            context, SemanticAlertKind.success, Icons.psychology_outlined);
+      case UserRole.therapyProgramEntry:
+        return _avatarData(
+            context, SemanticAlertKind.info, Icons.schema_outlined);
+      case UserRole.coordinator:
+        return _avatarData(
+            context, SemanticAlertKind.warning, Icons.event_available_outlined);
       case UserRole.specialist:
         return _avatarData(
             context, SemanticAlertKind.success, Icons.healing_outlined);
@@ -459,7 +468,6 @@ class RoleAvatar extends StatelessWidget {
         return _avatarData(
             context, SemanticAlertKind.error, Icons.favorite_border);
       case UserRole.dataEntry:
-      case UserRole.programEntry:
         return _avatarData(
             context, SemanticAlertKind.info, Icons.badge_outlined);
       case null:
