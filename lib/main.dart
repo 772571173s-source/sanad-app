@@ -149,7 +149,8 @@ class SanadApp extends StatelessWidget {
               colorScheme: lightScheme,
               scaffoldBackgroundColor: SanadPalette.background,
               visualDensity: VisualDensity.standard,
-              fontFamily: 'Arial',
+              fontFamily: 'Segoe UI',
+              fontFamilyFallback: const ['Tahoma', 'Arial'],
               textTheme: _sanadTextTheme(
                 ThemeData.light().textTheme,
                 SanadPalette.text,
@@ -237,7 +238,8 @@ class SanadApp extends StatelessWidget {
               colorScheme: darkScheme,
               scaffoldBackgroundColor: const Color(0xFF0F172A),
               visualDensity: VisualDensity.standard,
-              fontFamily: 'Arial',
+              fontFamily: 'Segoe UI',
+              fontFamilyFallback: const ['Tahoma', 'Arial'],
               textTheme: _sanadTextTheme(
                 ThemeData.dark().textTheme,
                 const Color(0xFFF8FAFC),

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
@@ -10,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 10;
+  static const currentVersion = 11;
 
   mobile.Database? _database;
 
@@ -27,6 +28,7 @@ class DatabaseService {
           await _createSchema(db);
         },
         onUpgrade: _upgrade,
+        onOpen: _repairStoredArabicText,
       ),
     );
     return _database!;
@@ -341,6 +343,114 @@ class DatabaseService {
     if (oldVersion < 10) {
       await _dropLegacyProgramTables(db);
     }
+    if (oldVersion < 11) {
+      await _repairStoredArabicText(db);
+    }
+  }
+
+  Future<void> _repairStoredArabicText(mobile.Database db) async {
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+    for (final tableRow in tables) {
+      final table = tableRow['name'] as String?;
+      if (table == null || table.isEmpty) continue;
+      final columnsInfo =
+          await db.rawQuery('PRAGMA table_info(${_quote(table)})');
+      final textColumns = columnsInfo
+          .where((column) => ((column['type'] as String?) ?? '')
+              .toUpperCase()
+              .contains('TEXT'))
+          .map((column) => column['name'] as String?)
+          .whereType<String>()
+          .toList();
+      if (textColumns.isEmpty) continue;
+
+      final selectColumns = [
+        'rowid AS _rowid',
+        ...textColumns.map(_quote),
+      ].join(', ');
+      final rows =
+          await db.rawQuery('SELECT $selectColumns FROM ${_quote(table)}');
+      for (final row in rows) {
+        final updates = <String, Object?>{};
+        for (final column in textColumns) {
+          final value = row[column];
+          if (value is! String || value.isEmpty) continue;
+          final repaired = _repairMojibake(value);
+          if (repaired != value) updates[column] = repaired;
+        }
+        if (updates.isNotEmpty) {
+          await db.update(
+            table,
+            updates,
+            where: 'rowid = ?',
+            whereArgs: [row['_rowid']],
+          );
+        }
+      }
+    }
+  }
+
+  String _quote(String identifier) => '"${identifier.replaceAll('"', '""')}"';
+
+  String _repairMojibake(String value) {
+    if (!_looksLikeBrokenArabic(value)) return value;
+    final bytes = <int>[];
+    for (final unit in value.runes) {
+      final byte = _mojibakeByte(unit);
+      if (byte == null) return value;
+      bytes.add(byte);
+    }
+    try {
+      final repaired = utf8.decode(bytes, allowMalformed: false);
+      return repaired.contains('\uFFFD') ? value : repaired;
+    } on FormatException {
+      return value;
+    }
+  }
+
+  bool _looksLikeBrokenArabic(String value) {
+    return RegExp(
+      r'[طظ][\u0080-\u00ff\u0152\u0153\u0160\u0161\u0178\u017d\u017e\u0192\u02c6\u02dc\u2018-\u201e\u2020-\u2022\u2030\u2039\u203a\u20ac]',
+    ).hasMatch(value);
+  }
+
+  int? _mojibakeByte(int unit) {
+    if (unit <= 0x7F) return unit;
+    if (unit >= 0xA0 && unit <= 0xBF) return unit;
+    if (unit == 0x0637) return 0xD8;
+    if (unit == 0x0638) return 0xD9;
+    const cp1252 = {
+      0x20AC: 0x80,
+      0x201A: 0x82,
+      0x0192: 0x83,
+      0x201E: 0x84,
+      0x2026: 0x85,
+      0x2020: 0x86,
+      0x2021: 0x87,
+      0x02C6: 0x88,
+      0x2030: 0x89,
+      0x0160: 0x8A,
+      0x2039: 0x8B,
+      0x0152: 0x8C,
+      0x017D: 0x8E,
+      0x2018: 0x91,
+      0x2019: 0x92,
+      0x201C: 0x93,
+      0x201D: 0x94,
+      0x2022: 0x95,
+      0x2013: 0x96,
+      0x2014: 0x97,
+      0x02DC: 0x98,
+      0x2122: 0x99,
+      0x0161: 0x9A,
+      0x203A: 0x9B,
+      0x0153: 0x9C,
+      0x017E: 0x9E,
+      0x0178: 0x9F,
+    };
+    return cp1252[unit];
   }
 
   Future<void> _migrateToVersion3(mobile.Database db) async {
