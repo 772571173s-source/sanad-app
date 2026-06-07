@@ -1,4 +1,4 @@
-﻿enum UserRole {
+enum UserRole {
   sanadOwner,
   centerManager,
   specialist,
@@ -806,6 +806,255 @@ class ClinicalFinding {
         'weakness': weakness,
         'goal': goal,
         'training': training,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class AssessmentSectionTemplate {
+  const AssessmentSectionTemplate({
+    required this.id,
+    required this.centerId,
+    required this.title,
+    this.description = '',
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String title;
+  final String description;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static AssessmentSectionTemplate fromMap(Map<String, Object?> row) =>
+      AssessmentSectionTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        title: row['title'] as String,
+        description: (row['description'] ?? '') as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'title': title,
+        'description': description,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class AssessmentItemTemplate {
+  const AssessmentItemTemplate({
+    required this.id,
+    required this.centerId,
+    required this.sectionId,
+    required this.title,
+    this.prompt = '',
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String sectionId;
+  final String title;
+  final String prompt;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static AssessmentItemTemplate fromMap(Map<String, Object?> row) =>
+      AssessmentItemTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        sectionId: row['section_id'] as String,
+        title: row['title'] as String,
+        prompt: (row['prompt'] ?? '') as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'section_id': sectionId,
+        'title': title,
+        'prompt': prompt,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class AssessmentOptionTemplate {
+  const AssessmentOptionTemplate({
+    required this.id,
+    required this.centerId,
+    required this.itemId,
+    required this.label,
+    required this.generatesTherapy,
+    this.weaknessTemplate = '',
+    this.goalTemplate = '',
+    this.therapyTemplate = '',
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String itemId;
+  final String label;
+  final bool generatesTherapy;
+  final String weaknessTemplate;
+  final String goalTemplate;
+  final String therapyTemplate;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static AssessmentOptionTemplate fromMap(Map<String, Object?> row) =>
+      AssessmentOptionTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        itemId: row['item_id'] as String,
+        label: row['label'] as String,
+        generatesTherapy: ((row['generates_therapy'] ?? 0) as int) == 1,
+        weaknessTemplate: (row['weakness_template'] ?? '') as String,
+        goalTemplate: (row['goal_template'] ?? '') as String,
+        therapyTemplate: (row['therapy_template'] ?? '') as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'item_id': itemId,
+        'label': label,
+        'generates_therapy': generatesTherapy ? 1 : 0,
+        'weakness_template': weaknessTemplate,
+        'goal_template': goalTemplate,
+        'therapy_template': therapyTemplate,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class SkillStepTemplate {
+  const SkillStepTemplate({
+    required this.id,
+    required this.centerId,
+    required this.ownerType,
+    required this.ownerId,
+    required this.title,
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String ownerType;
+  final String ownerId;
+  final String title;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static SkillStepTemplate fromMap(Map<String, Object?> row) =>
+      SkillStepTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        ownerType: row['owner_type'] as String,
+        ownerId: row['owner_id'] as String,
+        title: row['title'] as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'owner_type': ownerType,
+        'owner_id': ownerId,
+        'title': title,
+        'sort_order': sortOrder,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
+class SpeechSoundTriggerTemplate {
+  const SpeechSoundTriggerTemplate({
+    required this.id,
+    required this.centerId,
+    required this.letter,
+    required this.errorType,
+    required this.position,
+    required this.generatesTherapy,
+    this.weaknessTemplate = '',
+    this.goalTemplate = '',
+    this.therapyTemplate = '',
+    required this.sortOrder,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String letter;
+  final String errorType;
+  final String position;
+  final bool generatesTherapy;
+  final String weaknessTemplate;
+  final String goalTemplate;
+  final String therapyTemplate;
+  final int sortOrder;
+  final String createdAt;
+  final String updatedAt;
+
+  static SpeechSoundTriggerTemplate fromMap(Map<String, Object?> row) =>
+      SpeechSoundTriggerTemplate(
+        id: row['id'] as String,
+        centerId: (row['center_id'] ?? '') as String,
+        letter: row['letter'] as String,
+        errorType: row['error_type'] as String,
+        position: row['position'] as String,
+        generatesTherapy: ((row['generates_therapy'] ?? 0) as int) == 1,
+        weaknessTemplate: (row['weakness_template'] ?? '') as String,
+        goalTemplate: (row['goal_template'] ?? '') as String,
+        therapyTemplate: (row['therapy_template'] ?? '') as String,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'letter': letter,
+        'error_type': errorType,
+        'position': position,
+        'generates_therapy': generatesTherapy ? 1 : 0,
+        'weakness_template': weaknessTemplate,
+        'goal_template': goalTemplate,
+        'therapy_template': therapyTemplate,
+        'sort_order': sortOrder,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };

@@ -19,91 +19,6 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
   bool saved = false;
   final selections = <String, _AssessmentChoice>{};
 
-  List<_AssessmentStep> get steps => const [
-        _AssessmentStep(
-          id: 'face_symmetry',
-          domain: 'الوجه',
-          title: 'تماثل الوجه',
-          question: 'راقب تماثل الوجه أثناء الراحة والحركة.',
-          options: [
-            _AssessmentChoice.normal('طبيعي'),
-            _AssessmentChoice(
-              label: 'مائل لليمين',
-              weakness: 'عدم تماثل الوجه مع ميلان لليمين.',
-              goal: 'تحسين تماثل الوجه وتقليل الميلان لليمين.',
-              training:
-                  'تمارين تنبيه عضلات الوجه وتماثل الابتسامة أمام المرآة.',
-            ),
-            _AssessmentChoice(
-              label: 'مائل لليسار',
-              weakness: 'عدم تماثل الوجه مع ميلان لليسار.',
-              goal: 'تحسين تماثل الوجه وتقليل الميلان لليسار.',
-              training: 'تمارين تنبيه عضلات الوجه وتماثل الحركة أمام المرآة.',
-            ),
-            _AssessmentChoice(
-              label: 'شد واضح',
-              weakness: 'شد في عضلات الوجه يؤثر على الحركة الطبيعية.',
-              goal: 'خفض الشد بعضلات الوجه وتحسين مرونة الحركة.',
-              training: 'تدليك لطيف لعضلات الوجه وتمارين استرخاء قصيرة.',
-            ),
-          ],
-        ),
-        _AssessmentStep(
-          id: 'jaw_movement',
-          domain: 'الفك',
-          title: 'حركة الفك',
-          question: 'قيّم فتح وإغلاق الفك والتحكم بالحركة.',
-          options: [
-            _AssessmentChoice.normal('طبيعي'),
-            _AssessmentChoice(
-              label: 'فتح محدود',
-              weakness: 'محدودية في فتح الفك تؤثر على وضوح النطق.',
-              goal: 'زيادة مدى فتح الفك بشكل تدريجي وآمن.',
-              training: 'تمارين فتح وإغلاق الفك ببطء أمام المرآة.',
-            ),
-            _AssessmentChoice(
-              label: 'انحراف أثناء الحركة',
-              weakness: 'انحراف الفك أثناء الفتح أو الإغلاق.',
-              goal: 'تحسين استقامة حركة الفك أثناء النطق.',
-              training: 'تمارين فتح الفك بخط مستقيم مع تغذية راجعة بصرية.',
-            ),
-            _AssessmentChoice(
-              label: 'ضعف التحكم',
-              weakness: 'ضعف التحكم في حركة الفك أثناء الكلام.',
-              goal: 'تحسين التحكم الحركي للفك خلال الأصوات والكلمات.',
-              training: 'تدريبات إيقاعية للفك مع كلمات قصيرة وبطيئة.',
-            ),
-          ],
-        ),
-        _AssessmentStep(
-          id: 'lips_control',
-          domain: 'الشفاه',
-          title: 'حركة الشفاه',
-          question: 'قيّم الإغلاق، البروز، الابتسامة، والتحكم بحركة الشفاه.',
-          options: [
-            _AssessmentChoice.normal('طبيعي'),
-            _AssessmentChoice(
-              label: 'ضعف الإغلاق',
-              weakness: 'ضعف إغلاق الشفاه يؤثر على الأصوات الشفوية.',
-              goal: 'تحسين قوة إغلاق الشفاه أثناء النطق.',
-              training: 'تمارين ضغط الشفاه ونطق أصوات ب، م، ف بشكل قصير.',
-            ),
-            _AssessmentChoice(
-              label: 'ضعف البروز',
-              weakness: 'ضعف بروز الشفاه يؤثر على المد وبعض الأصوات.',
-              goal: 'تحسين بروز الشفاه والتحكم في شكل الفم.',
-              training: 'تمارين تدوير الشفاه ونفخ خفيف مع مراقبة المرآة.',
-            ),
-            _AssessmentChoice(
-              label: 'عدم تناسق الحركة',
-              weakness: 'عدم تناسق حركة الشفاه أثناء الكلام.',
-              goal: 'تحسين تناسق حركة الشفاه أثناء الأصوات والكلمات.',
-              training: 'تبديل الابتسامة والبروز ببطء ثم تطبيقه داخل كلمات.',
-            ),
-          ],
-        ),
-      ];
-
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
@@ -112,16 +27,29 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
       return const EmptyState(
         icon: Icons.fact_check_outlined,
         title: 'اختر طالبًا قبل التقييم',
-        message: 'افتح شاشة الطلاب واختر الطالب، ثم ابدأ التقييم العلاجي.',
+        message:
+            'افتح شاشة الطلاب واختر الطالب، ثم ابدأ التقييم العلاجي من ملفه.',
       );
     }
+
+    final steps = _buildSteps(app);
+    if (steps.isEmpty) {
+      return const EmptyState(
+        icon: Icons.schema_outlined,
+        title: 'لا توجد قوالب تقييم جاهزة',
+        message:
+            'هذه الشاشة تستخدم قوالب Therapy Structure Builder. افتح شاشة بناء الهيكل العلاجي وأدخل الأقسام والبنود والاحتمالات أولًا.',
+      );
+    }
+    if (stepIndex >= steps.length) stepIndex = 0;
     final complete = selections.length == steps.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TherapyCard(
           icon: Icons.psychology_alt_outlined,
-          title: 'التقييم العلاجي النطقي',
+          title: 'Clinical Assessment Wizard',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -137,7 +65,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                   selections: selections,
                   saved: saved,
                   onBack: () => setState(() => summaryMode = false),
-                  onSave: saved ? null : () => _save(app, student),
+                  onSave: saved ? null : () => _save(app, student, steps),
                 )
               else
                 _AssessmentStepCard(
@@ -170,23 +98,84 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
     );
   }
 
-  Future<void> _save(AppProvider app, Student student) async {
+  List<_AssessmentStep> _buildSteps(AppProvider app) {
+    final steps = <_AssessmentStep>[];
+    for (final section in app.assessmentSections) {
+      final items = app.assessmentItems
+          .where((item) => item.sectionId == section.id)
+          .toList();
+      for (final item in items) {
+        final options = app.assessmentOptions
+            .where((option) => option.itemId == item.id)
+            .map((option) => _AssessmentChoice(
+                  label: option.label,
+                  isNormal: !option.generatesTherapy,
+                  weakness: option.weaknessTemplate,
+                  goal: option.goalTemplate,
+                  training: option.therapyTemplate,
+                ))
+            .toList();
+        if (options.isEmpty) continue;
+        steps.add(_AssessmentStep(
+          id: item.id,
+          domain: section.title,
+          title: item.title,
+          question: item.prompt.isEmpty
+              ? 'اختر نتيجة البند حسب ملاحظة الأخصائي.'
+              : item.prompt,
+          options: options,
+        ));
+      }
+    }
+    if (app.speechSoundTriggers.isNotEmpty) {
+      steps.add(_AssessmentStep(
+        id: 'speech_sound_matrix',
+        domain: 'الحروف',
+        title: 'Speech Sound Matrix Assessment',
+        question:
+            'اختر الخلية السريرية المناسبة: الحرف، نوع الخطأ، وموقعه داخل الكلمة.',
+        options: app.speechSoundTriggers
+            .map((trigger) => _AssessmentChoice(
+                  label:
+                      '${trigger.letter} - ${trigger.errorType} - ${trigger.position}',
+                  isNormal: !trigger.generatesTherapy,
+                  weakness: trigger.weaknessTemplate,
+                  goal: trigger.goalTemplate,
+                  training: trigger.therapyTemplate,
+                ))
+            .toList(),
+      ));
+    }
+    return steps;
+  }
+
+  Future<void> _save(
+    AppProvider app,
+    Student student,
+    List<_AssessmentStep> steps,
+  ) async {
     final now = DateTime.now().toIso8601String();
     final assessmentId = 'clinical_${DateTime.now().millisecondsSinceEpoch}';
-    final strengths =
-        _normalSteps().map((step) => '${step.title}: طبيعي').join('\n');
-    final weakChoices = _weakChoices();
+    final strengths = steps
+        .where((step) => selections[step.id]?.isNormal == true)
+        .map((step) => '${step.title}: طبيعي')
+        .join('\n');
+    final weakChoices = steps
+        .where((step) => selections[step.id]?.isNormal == false)
+        .map((step) => MapEntry(step, selections[step.id]!))
+        .toList();
     final weaknesses = weakChoices
         .map((entry) => '${entry.key.title}: ${entry.value.weakness}')
         .join('\n');
     final goals = weakChoices
         .map((entry) => entry.value.goal)
-        .where(_notBlank)
+        .where((value) => value.trim().isNotEmpty)
         .join('\n');
     final trainings = weakChoices
         .map((entry) => entry.value.training)
-        .where(_notBlank)
+        .where((value) => value.trim().isNotEmpty)
         .join('\n');
+
     await runWithFeedback(
       context,
       () async {
@@ -224,20 +213,10 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
         );
         setState(() => saved = true);
       },
-      loading: 'جار حفظ التقييم العلاجي...',
+      loading: 'جاري حفظ التقييم العلاجي...',
       success: 'تم حفظ التقييم وتوليد الأهداف العلاجية.',
     );
   }
-
-  List<_AssessmentStep> _normalSteps() =>
-      steps.where((step) => selections[step.id]?.isNormal == true).toList();
-
-  List<MapEntry<_AssessmentStep, _AssessmentChoice>> _weakChoices() => steps
-      .where((step) => selections[step.id]?.isNormal == false)
-      .map((step) => MapEntry(step, selections[step.id]!))
-      .toList();
-
-  bool _notBlank(String value) => value.trim().isNotEmpty;
 }
 
 class _ProgressHeader extends StatelessWidget {
@@ -268,8 +247,8 @@ class _ProgressHeader extends StatelessWidget {
               selected: true,
             ),
             const AppPill(
-              label: 'الوجه - الفك - الشفاه',
-              icon: Icons.record_voice_over_outlined,
+              label: 'يستخدم القوالب العلاجية الجاهزة',
+              icon: Icons.schema_outlined,
             ),
           ],
         ),
@@ -338,7 +317,7 @@ class _AssessmentStepCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (!choice.isNormal) ...[
+                    if (!choice.isNormal && choice.goal.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.sm),
                       Text(choice.goal, style: SanadText.secondary(context)),
                     ],
@@ -408,7 +387,7 @@ class _AssessmentSummary extends StatelessWidget {
         _SummaryPanel(
           title: 'جوانب القوة',
           icon: Icons.verified_outlined,
-          empty: 'لا توجد بنود طبيعية في هذا التقييم.',
+          empty: 'لا توجد بنود قوة في هذا التقييم.',
           items: strengths,
         ),
         const SizedBox(height: AppSpacing.md),
@@ -424,7 +403,7 @@ class _AssessmentSummary extends StatelessWidget {
         _SummaryPanel(
           title: 'الأهداف والتدريبات المقترحة',
           icon: Icons.track_changes_outlined,
-          empty: 'لا توجد أهداف لأن كل البنود طبيعية.',
+          empty: 'لا توجد أهداف لأن كل البنود المحددة لا تولد علاجًا.',
           items: weaknesses
               .map((entry) =>
                   '${entry.value.goal}\nالتدريب: ${entry.value.training}')
@@ -519,7 +498,7 @@ class _PreviousClinicalAssessments extends StatelessWidget {
                 Text('تقييم نطقي - ${assessment.createdAt.split('T').first}'),
             subtitle: Text(
               assessment.weaknessesSummary.isEmpty
-                  ? 'كل البنود المحددة طبيعية.'
+                  ? 'كل البنود المحددة لا تولد علاجًا.'
                   : assessment.weaknessesSummary,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
@@ -550,16 +529,11 @@ class _AssessmentStep {
 class _AssessmentChoice {
   const _AssessmentChoice({
     required this.label,
+    required this.isNormal,
     this.weakness = '',
     this.goal = '',
     this.training = '',
-  }) : isNormal = false;
-
-  const _AssessmentChoice.normal(this.label)
-      : isNormal = true,
-        weakness = '',
-        goal = '',
-        training = '';
+  });
 
   final String label;
   final bool isNormal;

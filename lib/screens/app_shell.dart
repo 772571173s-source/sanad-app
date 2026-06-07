@@ -15,6 +15,7 @@ import 'settings_hub_screen.dart';
 import 'staff_screen.dart';
 import 'student_profile_screen.dart';
 import 'students_screen.dart';
+import 'therapy_structure_builder_screen.dart';
 import 'tools_screen.dart';
 
 class AppShell extends StatefulWidget {
@@ -222,11 +223,11 @@ class _AppShellState extends State<AppShell> {
       return const [
         _NavItem('Dashboard', Icons.dashboard_outlined, DashboardScreen()),
         _NavItem(
-          'التقييم العلاجي',
-          Icons.fact_check_outlined,
-          EvaluationsScreen(),
+          '???? ?????? ???????',
+          Icons.schema_outlined,
+          TherapyStructureBuilderScreen(),
         ),
-        _NavItem('الإعدادات', Icons.settings_outlined, SettingsHubScreen()),
+        _NavItem('?????????', Icons.settings_outlined, SettingsHubScreen()),
       ];
     }
 

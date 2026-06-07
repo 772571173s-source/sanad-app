@@ -354,6 +354,110 @@ class SanadRepository {
   Future<void> saveClinicalFinding(ClinicalFinding finding) =>
       _db.upsert('clinical_findings', finding.toMap());
 
+  Future<List<AssessmentSectionTemplate>> assessmentSectionTemplates(
+      String centerId) async {
+    final rows = await _db.where(
+      'assessment_section_templates',
+      where: 'center_id = ?',
+      whereArgs: [centerId],
+      orderBy: 'sort_order, created_at',
+    );
+    return rows.map(AssessmentSectionTemplate.fromMap).toList();
+  }
+
+  Future<List<AssessmentItemTemplate>> assessmentItemTemplates(
+      String centerId) async {
+    final rows = await _db.where(
+      'assessment_item_templates',
+      where: 'center_id = ?',
+      whereArgs: [centerId],
+      orderBy: 'sort_order, created_at',
+    );
+    return rows.map(AssessmentItemTemplate.fromMap).toList();
+  }
+
+  Future<List<AssessmentOptionTemplate>> assessmentOptionTemplates(
+      String centerId) async {
+    final rows = await _db.where(
+      'assessment_option_templates',
+      where: 'center_id = ?',
+      whereArgs: [centerId],
+      orderBy: 'sort_order, created_at',
+    );
+    return rows.map(AssessmentOptionTemplate.fromMap).toList();
+  }
+
+  Future<List<SkillStepTemplate>> skillStepTemplates(String centerId) async {
+    final rows = await _db.where(
+      'skill_step_templates',
+      where: 'center_id = ?',
+      whereArgs: [centerId],
+      orderBy: 'owner_type, owner_id, sort_order, created_at',
+    );
+    return rows.map(SkillStepTemplate.fromMap).toList();
+  }
+
+  Future<List<SpeechSoundTriggerTemplate>> speechSoundTriggerTemplates(
+      String centerId) async {
+    final rows = await _db.where(
+      'speech_sound_trigger_templates',
+      where: 'center_id = ?',
+      whereArgs: [centerId],
+      orderBy: 'sort_order, letter, error_type, position',
+    );
+    return rows.map(SpeechSoundTriggerTemplate.fromMap).toList();
+  }
+
+  Future<void> saveAssessmentSectionTemplate(
+          AssessmentSectionTemplate section) =>
+      _db.upsert('assessment_section_templates', section.toMap());
+
+  Future<void> saveAssessmentItemTemplate(AssessmentItemTemplate item) =>
+      _db.upsert('assessment_item_templates', item.toMap());
+
+  Future<void> saveAssessmentOptionTemplate(AssessmentOptionTemplate option) =>
+      _db.upsert('assessment_option_templates', option.toMap());
+
+  Future<void> saveSkillStepTemplate(SkillStepTemplate step) =>
+      _db.upsert('skill_step_templates', step.toMap());
+
+  Future<void> saveSpeechSoundTriggerTemplate(
+          SpeechSoundTriggerTemplate trigger) =>
+      _db.upsert('speech_sound_trigger_templates', trigger.toMap());
+
+  Future<void> deleteAssessmentSectionTemplate(String id) async {
+    final items = await _db.where('assessment_item_templates',
+        where: 'section_id = ?', whereArgs: [id]);
+    for (final item in items) {
+      await deleteAssessmentItemTemplate(item['id'] as String);
+    }
+    await _db.delete('assessment_section_templates', id);
+  }
+
+  Future<void> deleteAssessmentItemTemplate(String id) async {
+    final options = await _db.where('assessment_option_templates',
+        where: 'item_id = ?', whereArgs: [id]);
+    for (final option in options) {
+      await deleteAssessmentOptionTemplate(option['id'] as String);
+    }
+    await _db.delete('assessment_item_templates', id);
+  }
+
+  Future<void> deleteAssessmentOptionTemplate(String id) async {
+    await _db.deleteWhere('skill_step_templates',
+        'owner_type = ? AND owner_id = ?', ['option', id]);
+    await _db.delete('assessment_option_templates', id);
+  }
+
+  Future<void> deleteSkillStepTemplate(String id) =>
+      _db.delete('skill_step_templates', id);
+
+  Future<void> deleteSpeechSoundTriggerTemplate(String id) async {
+    await _db.deleteWhere('skill_step_templates',
+        'owner_type = ? AND owner_id = ?', ['sound', id]);
+    await _db.delete('speech_sound_trigger_templates', id);
+  }
+
   Future<List<SignResource>> signResources(String centerId) async {
     final rows = await _db.where('sign_resources',
         where: 'center_id = ?',

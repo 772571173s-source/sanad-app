@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 11;
+  static const currentVersion = 12;
 
   mobile.Database? _database;
 
@@ -244,6 +244,7 @@ class DatabaseService {
       )
     ''');
     await _createClinicalAssessmentTables(db);
+    await _createTherapyStructureTables(db);
     await db.execute('''
       CREATE TABLE sign_resources (
         id TEXT PRIMARY KEY,
@@ -345,6 +346,9 @@ class DatabaseService {
     }
     if (oldVersion < 11) {
       await _repairStoredArabicText(db);
+    }
+    if (oldVersion < 12) {
+      await _ensureTherapyStructureTables(db);
     }
   }
 
@@ -693,6 +697,146 @@ class DatabaseService {
         FOREIGN KEY(assessment_id) REFERENCES clinical_assessments(id),
         FOREIGN KEY(center_id) REFERENCES centers(id),
         FOREIGN KEY(student_id) REFERENCES students(id)
+      )
+    ''');
+  }
+
+  Future<void> _createTherapyStructureTables(mobile.Database db) async {
+    await db.execute('''
+      CREATE TABLE assessment_section_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE assessment_item_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        section_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(section_id) REFERENCES assessment_section_templates(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE assessment_option_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        item_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        generates_therapy INTEGER NOT NULL DEFAULT 0,
+        weakness_template TEXT NOT NULL DEFAULT '',
+        goal_template TEXT NOT NULL DEFAULT '',
+        therapy_template TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(item_id) REFERENCES assessment_item_templates(id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE skill_step_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        owner_type TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE speech_sound_trigger_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        letter TEXT NOT NULL,
+        error_type TEXT NOT NULL,
+        position TEXT NOT NULL,
+        generates_therapy INTEGER NOT NULL DEFAULT 1,
+        weakness_template TEXT NOT NULL DEFAULT '',
+        goal_template TEXT NOT NULL DEFAULT '',
+        therapy_template TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _ensureTherapyStructureTables(mobile.Database db) async {
+    await _ensureTable(db, 'assessment_section_templates', '''
+      CREATE TABLE assessment_section_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'assessment_item_templates', '''
+      CREATE TABLE assessment_item_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        section_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        prompt TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'assessment_option_templates', '''
+      CREATE TABLE assessment_option_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        item_id TEXT NOT NULL,
+        label TEXT NOT NULL,
+        generates_therapy INTEGER NOT NULL DEFAULT 0,
+        weakness_template TEXT NOT NULL DEFAULT '',
+        goal_template TEXT NOT NULL DEFAULT '',
+        therapy_template TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'skill_step_templates', '''
+      CREATE TABLE skill_step_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        owner_type TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await _ensureTable(db, 'speech_sound_trigger_templates', '''
+      CREATE TABLE speech_sound_trigger_templates (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        letter TEXT NOT NULL,
+        error_type TEXT NOT NULL,
+        position TEXT NOT NULL,
+        generates_therapy INTEGER NOT NULL DEFAULT 1,
+        weakness_template TEXT NOT NULL DEFAULT '',
+        goal_template TEXT NOT NULL DEFAULT '',
+        therapy_template TEXT NOT NULL DEFAULT '',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
       )
     ''');
   }
