@@ -4,15 +4,20 @@ import 'package:provider/provider.dart';
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
+import 'assignment_management_screen.dart';
 import 'centers_screen.dart';
+import 'clinical_assessment_wizard_screen.dart';
+import 'coordinator_dashboard_screen.dart';
 import 'dashboard_screen.dart';
 import 'data_entry_screen.dart';
-import 'evaluations_screen.dart';
 import 'owner_support_screen.dart';
 import 'parent_dashboard_screen.dart';
+import 'homework_screen.dart';
 import 'sessions_screen.dart';
 import 'settings_hub_screen.dart';
+import 'specialist_dashboard_screen.dart';
 import 'staff_screen.dart';
+import 'student_distribution_screen.dart';
 import 'student_profile_screen.dart';
 import 'students_screen.dart';
 import 'therapy_structure_builder_screen.dart';
@@ -201,7 +206,7 @@ class _AppShellState extends State<AppShell> {
         const _NavItem(
           'التقييم العلاجي',
           Icons.fact_check_outlined,
-          EvaluationsScreen(),
+          ClinicalAssessmentWizardScreen(),
         ),
         const _NavItem(
           'بناء الهيكل العلاجي',
@@ -219,16 +224,19 @@ class _AppShellState extends State<AppShell> {
     if (app.isCoordinator) {
       return [
         const _NavItem(
-            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem(
-          'الطلاب',
-          Icons.groups_2_outlined,
-          StudentsScreen(onOpenProfile: () => setState(() => index = 2)),
+          'لوحة التنسيق',
+          Icons.dashboard_outlined,
+          CoordinatorDashboardScreen(),
         ),
         const _NavItem(
-          'ملف الطالب',
-          Icons.folder_shared_outlined,
-          StudentProfileScreen(),
+          'توزيع الطلاب',
+          Icons.person_add_alt_1_outlined,
+          StudentDistributionScreen(),
+        ),
+        const _NavItem(
+          'إدارة الارتباطات',
+          Icons.people_outline,
+          AssignmentManagementScreen(),
         ),
         const _NavItem(
           'الإعدادات',
@@ -241,26 +249,28 @@ class _AppShellState extends State<AppShell> {
     if (app.isSpecialist) {
       return [
         const _NavItem(
-            'Dashboard', Icons.dashboard_outlined, DashboardScreen()),
-        _NavItem(
-          'الطلاب',
-          Icons.groups_2_outlined,
-          StudentsScreen(
-            onOpenProfile: () => setState(() => index = 2),
-            onStartSession: () => setState(() => index = 4),
-          ),
+          'لوحة الأخصائي',
+          Icons.dashboard_outlined,
+          SpecialistDashboardScreen(),
         ),
-        const _NavItem(
+        _NavItem(
           'ملف الطالب',
           Icons.folder_shared_outlined,
-          StudentProfileScreen(),
+          StudentProfileScreen(
+            onOpenSession: () => setState(() => index = 3),
+          ),
         ),
         const _NavItem(
           'التقييم العلاجي',
           Icons.fact_check_outlined,
-          EvaluationsScreen(),
+          ClinicalAssessmentWizardScreen(),
         ),
         const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
+        const _NavItem(
+          'الواجبات',
+          Icons.assignment_outlined,
+          HomeworkScreen(),
+        ),
         const _NavItem(
           'الإعدادات',
           Icons.settings_outlined,
@@ -353,6 +363,8 @@ class _Header extends StatelessWidget {
             children: [
               Text(
                 _greeting(name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall
@@ -361,6 +373,8 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 _subtitle(app, title),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
@@ -647,24 +661,24 @@ class _SidebarTileState extends State<_SidebarTile> {
     return MouseRegion(
       onEnter: (_) => setState(() => hovered = true),
       onExit: (_) => setState(() => hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: active
-              ? colorScheme.primaryContainer
-              : hovered
-                  ? colorScheme.surfaceContainerHigh
-                  : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          border: Border.all(
-            color: active
-                ? colorScheme.primary.withValues(alpha: .25)
+      child: Material(
+        color: active
+            ? colorScheme.primaryContainer
+            : hovered
+                ? colorScheme.surfaceContainerHigh
                 : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadii.control),
+            border: Border.all(
+              color: active
+                  ? colorScheme.primary.withValues(alpha: .25)
+                  : Colors.transparent,
+            ),
           ),
-        ),
-        child: Material(
-          color: Colors.transparent,
           child: ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

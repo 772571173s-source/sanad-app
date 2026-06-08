@@ -1,0 +1,57 @@
+Launching lib\main.dart on Windows in debug mode...
+Building Windows application...                                    20.2s
+√ Built build\windows\x64\runner\Debug\sanad_app.exe
+Syncing files to device Windows...                                 181ms
+
+Flutter run key commands.
+r Hot reload. 
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on Windows is available at: http://127.0.0.1:51253/-4EpUUtVCL0=/
+The Flutter DevTools debugger and profiler on Windows is available at: http://127.0.0.1:51253/-4EpUUtVCL0=/devtools/?uri=ws://127.0.0.1:51253/-4EpUUtVCL0=/ws
+
+══╡ EXCEPTION CAUGHT BY RENDERING LIBRARY ╞═════════════════════════════════════════════════════════
+The following assertion was thrown during layout:
+A RenderFlex overflowed by 5.0 pixels on the bottom.
+
+The relevant error-causing widget was:
+  Column Column:file:///C:/Users/Ali/Documents/Projects/sanad_app/lib/screens/login_screen.dart:45:36
+
+To inspect this widget in Flutter DevTools, visit:
+http://127.0.0.1:51253/-4EpUUtVCL0=/devtools//#/inspector?uri=http%3A%2F%2F127.0.0.1%3A51253%2F-4EpUUtVCL0%3D%2F&inspectorRef=inspector-0
+
+The overflowing RenderFlex has an orientation of Axis.vertical.
+The edge of the RenderFlex that is overflowing has been marked in the rendering with a yellow and
+black striped pattern. This is usually caused by the contents being too big for the RenderFlex.
+Consider applying a flex factor (e.g. using an Expanded widget) to force the children of the
+RenderFlex to fit within the available space instead of being sized to their natural size.
+This is considered an error condition because it indicates that there is content that cannot be
+seen. If the content is legitimately bigger than the available space, consider clipping it with a
+ClipRect widget before putting it in the flex, or using a scrollable container rather than a Flex,
+like a ListView.
+The specific RenderFlex in question is: RenderFlex#9d9d6 relayoutBoundary=up29 OVERFLOWING:
+  creator: Column ← Padding ← ColoredBox ← ConstrainedBox ← Container ← Column ← LayoutBuilder ←
+    Semantics ← DefaultTextStyle ← AnimatedDefaultTextStyle ← _InkFeatures-[GlobalKey#c6479 ink
+    renderer] ← NotificationListener<LayoutChangedNotification> ← ⋯
+  parentData: offset=Offset(28.0, 28.0) (can use size)
+  constraints: BoxConstraints(0.0<=w<=176.0, h=164.0)
+  size: Size(176.0, 164.0)
+  direction: vertical
+  mainAxisAlignment: center
+  mainAxisSize: max
+  crossAxisAlignment: start
+  textDirection: rtl
+  verticalDirection: down
+  spacing: 0.0
+◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤◢◤
+════════════════════════════════════════════════════════════════════════════════════════════════════
+
+Another exception was thrown: A RenderFlex overflowed by 6.0 pixels on the right.
+Another exception was thrown: A RenderFlex overflowed by 5.0 pixels on the bottom.
+Another exception was thrown: A RenderFlex overflowed by 5.0 pixels on the bottom.
+Another exception was thrown: A RenderFlex overflowed by 2.8 pixels on the right.
+Lost connection to device.

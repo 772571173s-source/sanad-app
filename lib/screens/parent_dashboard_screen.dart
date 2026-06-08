@@ -89,7 +89,7 @@ class _ChildCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(student.programType),
+                    Text(student.programType, maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                     AppPill(label: student.status),
                   ],
@@ -148,13 +148,15 @@ class _SelectedChildHeader extends StatelessWidget {
               children: [
                 Text(
                   student.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context)
                       .textTheme
                       .titleLarge
                       ?.copyWith(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 4),
-                Text('${student.programType} - ${student.status}'),
+                Text('${student.programType} - ${student.status}', maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),

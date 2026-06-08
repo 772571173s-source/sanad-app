@@ -38,29 +38,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final narrow = constraints.maxWidth < 720;
+                    final pad = narrow ? 16.0 : 28.0;
                     final banner = Container(
-                      height: narrow ? 220 : 420,
+                      constraints: BoxConstraints(minHeight: narrow ? 200 : 420),
                       color: const Color(0xFF123E3A),
-                      padding: const EdgeInsets.all(28),
-                      child: const Column(
+                      padding: EdgeInsets.all(pad),
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text('سند',
                               style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 42,
+                                  fontSize: narrow ? 34 : 42,
                                   fontWeight: FontWeight.w900)),
-                          SizedBox(height: 10),
-                          Text(
+                          const SizedBox(height: 10),
+                          const Text(
                               'نظام إدارة التخاطب والتأهيل للمراكز: مراكز، موظفون، طلاب، جلسات، واجبات، وتقارير.',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                   color: Color(0xFFD8ECE8), height: 1.7)),
                         ],
                       ),
                     );
                     final form = Padding(
-                      padding: const EdgeInsets.all(28),
+                      padding: EdgeInsets.all(pad),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,

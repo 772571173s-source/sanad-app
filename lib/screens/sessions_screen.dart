@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../models/app_models.dart';
@@ -17,760 +14,1037 @@ class SessionsScreen extends StatefulWidget {
 }
 
 class _SessionsScreenState extends State<SessionsScreen> {
-  final selectedStepIds = <String>{};
-  final stepResults = <String, String>{};
-  final notes = TextEditingController();
-  final sessionFocus = FocusNode();
-  Timer? timer;
-  int seconds = 0;
-  int stepIndex = 0;
-  int homeworkSentCount = 0;
-  bool sessionStarted = false;
-  bool autoMoveToNext = true;
-  _ClinicalSessionSummary? lastSummary;
+  String query = '';
+  TherapyProgramTemplate? _selectedProgram;
+  String? _selectedSourceType;
+  TrainingPlan? _currentGoal;
+  GoalSkillStep? _currentStep;
+  bool _allDone = false;
+  int _stepsDone = 0;
 
   @override
-  void dispose() {
-    timer?.cancel();
-    notes.dispose();
-    sessionFocus.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reset());
   }
+
+  void _applyPreselect() {
+    final app = context.read<AppProvider>();
+    final preselect = app.sessionPreselect;
+    if (preselect == null) return;
+    final programId = preselect['programId'] ?? '';
+    final sourceType = preselect['sourceType'] ?? '';
+    final planId = preselect['planId'] ?? '';
+    final stepId = preselect['stepId'] ?? '';
+    final program =
+        app.therapyPrograms.where((p) => p.id == programId).toList();
+    if (program.isEmpty) return;
+    app.clearSessionPreselect();
+    setState(() {
+      _selectedProgram = program.first;
+      _selectedSourceType = sourceType;
+      _currentGoal = null;
+      _currentStep = null;
+      _allDone = false;
+      _stepsDone = 0;
+    });
+    if (stepId.isNotEmpty) {
+      final step = app.goalSkillSteps.where((s) => s.id == stepId).toList();
+      final plan =
+          app.plans.where((p) => p.id == (planId.isNotEmpty ? planId : step.isNotEmpty ? step.first.goalId : '')).toList();
+      if (step.isNotEmpty && plan.isNotEmpty) {
+        setState(() {
+          _currentGoal = plan.first;
+          _currentStep = step.first;
+        });
+        return;
+      }
+    }
+    if (planId.isNotEmpty) {
+      final plan = app.plans.where((p) => p.id == planId).toList();
+      if (plan.isNotEmpty) {
+        setState(() => _currentGoal = plan.first);
+        _findCurrent();
+        return;
+      }
+    }
+    _findCurrent();
+  }
+
+  void _reset() {
+    setState(() {
+      _selectedProgram = null;
+      _selectedSourceType = null;
+      _currentGoal = null;
+      _currentStep = null;
+      _allDone = false;
+      _stepsDone = 0;
+    });
+  }
+
+  List<TrainingPlan> _filteredPlans(AppProvider app) {
+    final pid = _selectedProgram?.id ?? '';
+    final st = _selectedSourceType ?? '';
+    if (pid.isEmpty || st.isEmpty) return [];
+    return app.plans
+        .where((p) => p.programId == pid && p.sourceType == st)
+        .toList()
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+  }
+
+  List<GoalSkillStep> _filteredSteps(AppProvider app, String goalId) =>
+      app.stepsForGoal(goalId)
+          .where((s) =>
+              s.programId == (_selectedProgram?.id ?? '') &&
+              s.sourceType == (_selectedSourceType ?? ''))
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  void _findCurrent() {
+    final app = context.read<AppProvider>();
+    final student = app.selectedStudent;
+    if (student == null) {
+      _reset();
+      return;
+    }
+    for (final plan in _filteredPlans(app)) {
+      final steps = _filteredSteps(app, plan.id);
+      final remaining = steps
+          .where((s) =>
+              s.status != 'متقن' &&
+              s.status != 'بمساعدة' &&
+              s.status != 'يحتاج إعادة')
+          .toList();
+      if (remaining.isNotEmpty) {
+        setState(() {
+          _currentGoal = plan;
+          _currentStep = remaining.first;
+          _allDone = false;
+        });
+        return;
+      }
+      if (steps.isEmpty && plan.progress < 100) {
+        setState(() {
+          _currentGoal = plan;
+          _currentStep = null;
+          _allDone = false;
+        });
+        return;
+      }
+    }
+    setState(() {
+      _currentGoal = null;
+      _currentStep = null;
+      _allDone = true;
+    });
+  }
+
+  Future<void> _evaluate(String status) async {
+    final app = context.read<AppProvider>();
+    final step = _currentStep;
+    final goal = _currentGoal;
+    final student = app.selectedStudent;
+    if (student == null || goal == null) return;
+
+    if (step == null) {
+      await runWithFeedback(context, () async {
+        await app.updatePlanProgress(
+          planId: goal.id,
+          progress: 100,
+        );
+        await _recordSession(app, student, goal, null, status);
+        setState(() => _stepsDone++);
+        _findCurrent();
+      });
+      return;
+    }
+
+    await runWithFeedback(context, () async {
+      await app.updateGoalSkillStepStatus(
+        step: step,
+        status: status,
+        notes: status == 'متقن'
+            ? ''
+            : (status == 'بمساعدة'
+                ? 'تمت بمساعدة وتحتاج متابعة منزلية'
+                : 'تحتاج إعادة في جلسة لاحقة'),
+      );
+      await _recordSession(app, student, goal, step, status);
+      setState(() => _stepsDone++);
+      _findCurrent();
+    });
+  }
+
+  Future<void> _recordSession(
+    AppProvider app,
+    Student student,
+    TrainingPlan goal,
+    GoalSkillStep? step,
+    String status,
+  ) async {
+    final now = DateTime.now();
+    final session = TherapySession(
+      id: 'session_${now.millisecondsSinceEpoch}_$_stepsDone',
+      centerId: student.centerId,
+      studentId: student.id,
+      specialistId: app.user?.id ?? '',
+      planId: goal.id,
+      programId: _selectedProgram?.id ?? '',
+      skillId: step?.id ?? '',
+      sessionType: _selectedProgram?.name ?? 'جلسة علاجية',
+      startedAt: now.toIso8601String(),
+      durationSeconds: 0,
+      cardTitle: step?.title ?? goal.goal,
+      quickResult: status,
+      notes: step != null
+          ? 'تقييم مهارة: ${step.title} - النتيجة: $status'
+          : 'تقييم هدف: ${goal.goal} - النتيجة: $status',
+    );
+    // Save directly to avoid selectStudent reload on every step
+    await app.saveSession(session, autosave: true);
+  }
+
+  // ─── Build ────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final student = app.selectedStudent;
-    final selectedSteps = _selectedSteps(app);
-    if (stepIndex >= selectedSteps.length) stepIndex = 0;
+
+    if (_selectedProgram == null && app.selectedStudent != null) {
+      _applyPreselect();
+    }
+
+    if (app.selectedStudent == null) return _buildStudentPicker(app);
+    if (app.plans.isEmpty && _selectedProgram == null) return _buildNoPlans();
+    if (_selectedProgram == null) return _buildProgramPicker(app);
+    if (_selectedProgram!.usesSpeechSounds && _selectedSourceType == null) {
+      return _buildSourceTypePicker();
+    }
+    if (_allDone) {
+      return _buildPathComplete();
+    }
+    return _buildSessionView(app);
+  }
+
+  // ─── Phase 1: Student picker ────────────────────────────
+
+  Widget _buildStudentPicker(AppProvider app) {
+    final textTheme = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!sessionStarted) ...[
-          _ClinicalSetupCard(
-            app: app,
-            selectedStepIds: selectedStepIds,
-            onStudentChanged: (student) async {
-              await app.selectStudent(student);
-              setState(_resetForStudent);
-            },
-            onStepChanged: (stepId, selected) {
-              setState(() {
-                if (selected) {
-                  selectedStepIds.add(stepId);
-                } else {
-                  selectedStepIds.remove(stepId);
-                  stepResults.remove(stepId);
-                }
-                stepIndex = 0;
-                lastSummary = null;
-              });
-            },
-            onStart: selectedSteps.isEmpty ? null : _startSession,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (lastSummary != null) ...[
-            _ClinicalSessionSummaryCard(summary: lastSummary!),
-            const SizedBox(height: AppSpacing.md),
-          ],
-          _PreviousGoalSessions(app: app),
-        ] else if (student != null && selectedSteps.isNotEmpty) ...[
-          Focus(
-            focusNode: sessionFocus,
-            autofocus: true,
-            onKeyEvent: (node, event) => _handleKey(event, selectedSteps),
-            child: _GoalFocusSessionCard(
-              step: selectedSteps[stepIndex],
-              goal: _goalForStep(app, selectedSteps[stepIndex]),
-              index: stepIndex,
-              total: selectedSteps.length,
-              completedCount: stepResults.length,
-              selectedValue: stepResults[selectedSteps[stepIndex].id],
-              elapsedSeconds: seconds,
-              masteryRate: _masteryRate(selectedSteps),
-              homeworkSentCount: homeworkSentCount,
-              autoMoveToNext: autoMoveToNext,
-              notes: notes,
-              onEvaluate: (value) => _evaluateStep(value, selectedSteps),
-              onPrevious:
-                  stepIndex == 0 ? null : () => setState(() => stepIndex--),
-              onNext: stepIndex >= selectedSteps.length - 1
-                  ? null
-                  : () => setState(() => stepIndex++),
-              onToggleAutoMove: (value) =>
-                  setState(() => autoMoveToNext = value),
-              onQuickNote: _addQuickNote,
-              onSendHomework: () => _sendSmartHomework(app, selectedSteps),
-              onSave: () => _saveClinicalSession(app, selectedSteps),
-              onStop: _stopSession,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  List<GoalSkillStep> _selectedSteps(AppProvider app) => app.goalSkillSteps
-      .where((step) => selectedStepIds.contains(step.id))
-      .toList()
-    ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-
-  void _resetForStudent() {
-    selectedStepIds.clear();
-    stepResults.clear();
-    stepIndex = 0;
-    homeworkSentCount = 0;
-    sessionStarted = false;
-    lastSummary = null;
-    notes.clear();
-  }
-
-  void _startSession() {
-    setState(() {
-      sessionStarted = true;
-      stepIndex = 0;
-      seconds = 0;
-      homeworkSentCount = 0;
-      stepResults.clear();
-    });
-    timer?.cancel();
-    timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => setState(() => seconds++),
-    );
-  }
-
-  void _stopSession() {
-    timer?.cancel();
-    setState(() => sessionStarted = false);
-  }
-
-  void _evaluateStep(String value, List<GoalSkillStep> steps) {
-    if (steps.isEmpty) return;
-    setState(() {
-      stepResults[steps[stepIndex].id] = value;
-      if (autoMoveToNext && stepIndex < steps.length - 1) {
-        stepIndex++;
-      }
-    });
-  }
-
-  KeyEventResult _handleKey(KeyEvent event, List<GoalSkillStep> steps) {
-    if (event is! KeyDownEvent || steps.isEmpty) {
-      return KeyEventResult.ignored;
-    }
-    final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.digit1 || key == LogicalKeyboardKey.numpad1) {
-      _evaluateStep('بمساعدة', steps);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.digit2 || key == LogicalKeyboardKey.numpad2) {
-      _evaluateStep('جزئي', steps);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.digit3 || key == LogicalKeyboardKey.numpad3) {
-      _evaluateStep('مستقل', steps);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.digit4 || key == LogicalKeyboardKey.numpad4) {
-      _evaluateStep('متقن', steps);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowRight && stepIndex > 0) {
-      setState(() => stepIndex--);
-      return KeyEventResult.handled;
-    }
-    if (key == LogicalKeyboardKey.arrowLeft && stepIndex < steps.length - 1) {
-      setState(() => stepIndex++);
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
-
-  TrainingPlan? _goalForStep(AppProvider app, GoalSkillStep step) {
-    for (final plan in app.plans) {
-      if (plan.id == step.goalId) return plan;
-    }
-    return null;
-  }
-
-  int _masteryRate(List<GoalSkillStep> steps) {
-    if (steps.isEmpty) return 0;
-    final mastered =
-        stepResults.values.where((value) => value == 'متقن').length;
-    return ((mastered / steps.length) * 100).round();
-  }
-
-  Future<void> _sendSmartHomework(
-      AppProvider app, List<GoalSkillStep> steps) async {
-    final student = app.selectedStudent;
-    final items = steps.where((step) {
-      final result = stepResults[step.id] ?? step.status;
-      return result != 'متقن';
-    }).toList();
-    if (student == null || items.isEmpty) return;
-    await runWithFeedback(context, () async {
-      await app.saveExercise(Exercise(
-        id: 'exercise_${DateTime.now().millisecondsSinceEpoch}',
-        centerId: student.centerId,
-        studentId: student.id,
-        title: 'واجب علاجي من أهداف الجلسة',
-        instructions: items
-            .map((step) => 'تدريب يومي: ${step.title} لمدة 5 دقائق.')
-            .join('\n'),
-        dueDate: DateTime.now()
-            .add(const Duration(days: 1))
-            .toIso8601String()
-            .split('T')
-            .first,
-        status: 'مرسل',
-      ));
-      setState(() => homeworkSentCount++);
-    }, success: 'تم إرسال واجب ذكي من المهارات غير المكتملة.');
-  }
-
-  Future<void> _saveClinicalSession(
-      AppProvider app, List<GoalSkillStep> steps) async {
-    final student = app.selectedStudent;
-    if (student == null) return;
-    await runWithFeedback(context, () async {
-      if (stepResults.isEmpty) {
-        throw StateError('حدّث حالة مهارة واحدة على الأقل قبل حفظ الجلسة.');
-      }
-      final sessionId = 'session_${DateTime.now().millisecondsSinceEpoch}';
-      final now = DateTime.now().toIso8601String();
-      final rate = _masteryRate(steps);
-      final summary = _ClinicalSessionSummary(
-        stepsCount: steps.length,
-        updatedCount: stepResults.length,
-        masteryRate: rate,
-        homeworkSentCount: homeworkSentCount,
-        notes: notes.text.trim(),
-      );
-      await app.saveSession(TherapySession(
-        id: sessionId,
-        centerId: student.centerId,
-        studentId: student.id,
-        planId: steps.first.goalId,
-        activityResults:
-            stepResults.entries.map((e) => '${e.key}:${e.value}').join('|'),
-        sessionType: 'جلسة علاجية مبنية على هدف',
-        practiceItems: steps.map((step) => step.title).join('، '),
-        attempts: stepResults.length,
-        successRate: rate,
-        startedAt: now,
-        durationSeconds: seconds,
-        cardTitle: 'تتبع هدف علاجي',
-        quickResult: stepResults.values.last,
-        notes: notes.text.trim(),
-        summary:
-            'تم تحديث ${stepResults.length} من ${steps.length} مهارات. نسبة الإتقان داخل الجلسة $rate%.',
-        createdAt: now,
-        updatedAt: now,
-      ));
-      for (final step in steps) {
-        final status = stepResults[step.id];
-        if (status == null) continue;
-        await app.updateGoalSkillStepStatus(
-          step: step,
-          status: status,
-          notes: notes.text.trim(),
-          lastSessionId: sessionId,
-        );
-      }
-      await app.selectStudent(student);
-      timer?.cancel();
-      setState(() {
-        sessionStarted = false;
-        stepIndex = 0;
-        seconds = 0;
-        stepResults.clear();
-        selectedStepIds.clear();
-        homeworkSentCount = 0;
-        lastSummary = summary;
-        notes.clear();
-      });
-    }, success: 'تم حفظ الجلسة وتحديث رحلة الهدف.');
-  }
-
-  void _addQuickNote(String value) {
-    final current = notes.text.trim();
-    notes.text = current.isEmpty ? value : '$current، $value';
-    notes.selection = TextSelection.collapsed(offset: notes.text.length);
-  }
-}
-
-class _ClinicalSetupCard extends StatelessWidget {
-  const _ClinicalSetupCard({
-    required this.app,
-    required this.selectedStepIds,
-    required this.onStudentChanged,
-    required this.onStepChanged,
-    required this.onStart,
-  });
-
-  final AppProvider app;
-  final Set<String> selectedStepIds;
-  final ValueChanged<Student?> onStudentChanged;
-  final void Function(String stepId, bool selected) onStepChanged;
-  final VoidCallback? onStart;
-
-  @override
-  Widget build(BuildContext context) {
-    final student = app.selectedStudent;
-    return TherapyCard(
-      title: 'الجلسة العلاجية الموجهة بالأهداف',
-      icon: Icons.psychology_alt_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SemanticAlertCard(
-            kind: SemanticAlertKind.info,
-            icon: Icons.account_tree_outlined,
-            title: 'Clinical Core',
-            message:
-                'مسار الجلسة الآن يبدأ من التقييم ونقاط الضعف ثم الأهداف والمهارات، وليس من برامج وأنشطة عامة.',
-          ),
-          const SizedBox(height: AppSpacing.md),
-          DropdownButtonFormField<String>(
-            initialValue: student?.id,
-            decoration: const InputDecoration(labelText: 'الطالب'),
-            items: app.students
-                .map((item) => DropdownMenuItem(
-                      value: item.id,
-                      child: Text(item.name, overflow: TextOverflow.ellipsis),
-                    ))
-                .toList(),
-            onChanged: (value) {
-              final matches =
-                  app.students.where((item) => item.id == value).toList();
-              onStudentChanged(matches.isEmpty ? null : matches.first);
-            },
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (student == null)
-            const EmptyState(
-              icon: Icons.person_search_outlined,
-              title: 'اختر طالبًا أولًا',
-              message:
-                  'بعد اختيار الطالب ستظهر أهدافه العلاجية الحالية والمهارات التي تحتاج تدريب.',
-            )
-          else
-            _GoalStepPicker(
-              app: app,
-              selectedStepIds: selectedStepIds,
-              onStepChanged: onStepChanged,
-            ),
-          const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: onStart,
-              icon: const Icon(Icons.play_arrow),
-              label: Text('ابدأ جلسة هدف (${selectedStepIds.length})'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GoalStepPicker extends StatelessWidget {
-  const _GoalStepPicker({
-    required this.app,
-    required this.selectedStepIds,
-    required this.onStepChanged,
-  });
-
-  final AppProvider app;
-  final Set<String> selectedStepIds;
-  final void Function(String stepId, bool selected) onStepChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeGoals =
-        app.plans.where((plan) => app.goalStatus(plan.id) != 'مكتمل').toList();
-    if (activeGoals.isEmpty) {
-      return const EmptyState(
-        icon: Icons.track_changes_outlined,
-        title: 'لا توجد أهداف علاجية نشطة',
-        message:
-            'ابدأ من شاشة التقييم العلاجي. أي نتيجة غير طبيعية ستنشئ هدفًا ومهارات تدريب تلقائيًا.',
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text('الأهداف الحالية', style: SanadText.subtitle(context)),
+        Text(
+          'الجلسات العلاجية',
+          style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+        ),
         const SizedBox(height: AppSpacing.sm),
-        ...activeGoals.map((goal) {
-          final steps = app
-              .stepsForGoal(goal.id)
-              .where((step) => step.status != 'متقن')
-              .toList();
-          if (steps.isEmpty) return const SizedBox.shrink();
-          final progress = app.goalProgress(goal.id);
-          return Container(
-            margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
+        TextField(
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.search),
+            hintText: 'ابحث عن طالب',
+            isDense: true,
+          ),
+          onChanged: (value) => setState(() => query = value),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (app.students.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: EmptyState(
+              icon: Icons.child_care_outlined,
+              title: 'لا يوجد طلاب مرتبطون',
+              message:
+                  'لم يتم ربط أي طالب بحسابك بعد. تواصل مع المنسق لربط طلاب.',
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                        child: Text(goal.goal,
-                            style: SanadText.subtitle(context))),
-                    AppPill(label: app.goalStatus(goal.id)),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                LinearProgressIndicator(value: progress / 100),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  children: steps.map((step) {
-                    final selected = selectedStepIds.contains(step.id);
-                    return FilterChip(
-                      selected: selected,
-                      label: Text('${step.title} - ${step.status}'),
-                      onSelected: (value) => onStepChanged(step.id, value),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          );
-        }),
-      ],
-    );
-  }
-}
-
-class _GoalFocusSessionCard extends StatelessWidget {
-  const _GoalFocusSessionCard({
-    required this.step,
-    required this.goal,
-    required this.index,
-    required this.total,
-    required this.completedCount,
-    required this.selectedValue,
-    required this.elapsedSeconds,
-    required this.masteryRate,
-    required this.homeworkSentCount,
-    required this.autoMoveToNext,
-    required this.notes,
-    required this.onEvaluate,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onToggleAutoMove,
-    required this.onQuickNote,
-    required this.onSendHomework,
-    required this.onSave,
-    required this.onStop,
-  });
-
-  final GoalSkillStep step;
-  final TrainingPlan? goal;
-  final int index;
-  final int total;
-  final int completedCount;
-  final String? selectedValue;
-  final int elapsedSeconds;
-  final int masteryRate;
-  final int homeworkSentCount;
-  final bool autoMoveToNext;
-  final TextEditingController notes;
-  final ValueChanged<String> onEvaluate;
-  final VoidCallback? onPrevious;
-  final VoidCallback? onNext;
-  final ValueChanged<bool> onToggleAutoMove;
-  final ValueChanged<String> onQuickNote;
-  final VoidCallback onSendHomework;
-  final VoidCallback onSave;
-  final VoidCallback onStop;
-
-  @override
-  Widget build(BuildContext context) {
-    const options = ['بمساعدة', 'جزئي', 'مستقل', 'متقن'];
-    final progress = total == 0 ? 0.0 : (index + 1) / total;
-    return TherapyCard(
-      title: 'Focus Therapy Mode',
-      icon: Icons.center_focus_strong_outlined,
-      trailing: AppPill(
-        label: Duration(seconds: elapsedSeconds).toString().split('.').first,
-        icon: Icons.timer_outlined,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              AppPill(label: 'المهارة ${index + 1} من $total', selected: true),
-              AppPill(label: 'تم تحديث $completedCount'),
-              AppPill(label: 'الإتقان $masteryRate%'),
-              AppPill(label: 'واجبات $homeworkSentCount'),
-            ],
+          )
+        else ...[
+          Text(
+            'اختر طالبًا لبدء الجلسة',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: AppSpacing.sm),
-          LinearProgressIndicator(value: progress),
-          const SizedBox(height: AppSpacing.lg),
+          ...app.students
+              .where((s) => s.name.contains(query))
+              .map((student) => _StudentSessionCard(
+                    student: student,
+                    onTap: () async {
+                      await app.selectStudent(student);
+                      _reset();
+                      _applyPreselect();
+                    },
+                  )),
+        ],
+      ],
+    );
+  }
+
+  // ─── Phase 2: Program picker ───────────────────────────
+
+  Widget _buildNoPlans() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildPhase2Header(),
+        const SizedBox(height: AppSpacing.md),
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 40),
+          child: EmptyState(
+            icon: Icons.track_changes_outlined,
+            title: 'لا توجد أهداف علاجية',
+            message:
+                'تأكد من تخصيص برامج علاجية للطالب في شاشة إدخال البيانات، ثم قم بتقييم الطالب في شاشة التقييم العلاجي.',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgramPicker(AppProvider app) {
+    final programs = app.programsForStudent();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildPhase2Header(),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'اختر البرنامج العلاجي',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        if (programs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: EmptyState(
+              icon: Icons.auto_stories_outlined,
+              title: 'لا توجد برامج علاجية مخصصة',
+              message:
+                  'لم يتم تخصيص برامج علاجية لهذا الطالب. يرجى التواصل مع مدخل البيانات.',
+            ),
+          )
+        else
+          ...programs.map((program) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(AppRadii.card),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    onTap: () {
+                      setState(() {
+                        _selectedProgram = program;
+                        _selectedSourceType =
+                            program.usesSpeechSounds ? null : 'standard';
+                        _currentGoal = null;
+                        _currentStep = null;
+                        _allDone = false;
+                        _stepsDone = 0;
+                      });
+                      _findCurrent();
+                    },
+                    child: AppCard(
+                      highlight: true,
+                      child: Row(
+                        children: [
+                          Icon(
+                            program.usesSpeechSounds
+                                ? Icons.record_voice_over_outlined
+                                : Icons.psychology_alt_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  program.name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                                if (program.description.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    program.description,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Icon(
+                            Icons.arrow_back_ios_new_outlined,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )),
+      ],
+    );
+  }
+
+  Widget _buildPhase2Header() {
+    return Row(
+      children: [
+        TextButton.icon(
+          onPressed: () async {
+            await context.read<AppProvider>().selectStudent(null);
+            _reset();
+          },
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('رجوع'),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            'الجلسات العلاجية',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Phase 3: Source type picker ────────────────────────
+
+  Widget _buildSourceTypePicker() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildPhase3Header(),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          'اختر نوع الجلسة',
+          style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 460;
+            if (narrow) {
+              return Column(
+                children: [
+                  _sourceTypeCard(
+                    colorScheme,
+                    Icons.assessment_outlined,
+                    'أقسام التقييم',
+                    'تماثل الوجه - أعضاء النطق - العمليات الوظيفية',
+                    () {
+                      setState(() {
+                        _selectedSourceType = 'standard';
+                        _currentGoal = null;
+                        _currentStep = null;
+                        _allDone = false;
+                        _stepsDone = 0;
+                      });
+                      _findCurrent();
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _sourceTypeCard(
+                    colorScheme,
+                    Icons.record_voice_over_outlined,
+                    'حروف النطق',
+                    'حذف - إبدال - إضافة - تشويه',
+                    () {
+                      setState(() {
+                        _selectedSourceType = 'speechSound';
+                        _currentGoal = null;
+                        _currentStep = null;
+                        _allDone = false;
+                        _stepsDone = 0;
+                      });
+                      _findCurrent();
+                    },
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                    child: _sourceTypeCard(
+                        colorScheme,
+                        Icons.assessment_outlined,
+                        'أقسام التقييم',
+                        'تماثل الوجه - أعضاء النطق - العمليات الوظيفية', () {
+                  setState(() {
+                    _selectedSourceType = 'standard';
+                    _currentGoal = null;
+                    _currentStep = null;
+                    _allDone = false;
+                    _stepsDone = 0;
+                  });
+                  _findCurrent();
+                })),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                    child: _sourceTypeCard(
+                        colorScheme,
+                        Icons.record_voice_over_outlined,
+                        'حروف النطق',
+                        'حذف - إبدال - إضافة - تشويه', () {
+                  setState(() {
+                    _selectedSourceType = 'speechSound';
+                    _currentGoal = null;
+                    _currentStep = null;
+                    _allDone = false;
+                    _stepsDone = 0;
+                  });
+                  _findCurrent();
+                })),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _sourceTypeCard(ColorScheme colorScheme, IconData icon, String title,
+      String subtitle, VoidCallback onTap) {
+    return AppCard(
+      highlight: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            children: [
+              Icon(icon, size: 40, color: colorScheme.primary),
+              const SizedBox(height: 8),
+              Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(subtitle,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhase3Header() {
+    return Row(
+      children: [
+        TextButton.icon(
+          onPressed: () => setState(() {
+            _selectedProgram = null;
+            _selectedSourceType = null;
+            _currentGoal = null;
+            _currentStep = null;
+            _allDone = false;
+            _stepsDone = 0;
+          }),
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('رجوع'),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            _selectedProgram?.name ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Done message ───────────────────────────────────────
+
+  Widget _buildEmpty(String title, String message) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSessionHeader(),
+        const SizedBox(height: AppSpacing.md),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: EmptyState(
+            icon: Icons.track_changes_outlined,
+            title: title,
+            message: message,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPathComplete() {
+    final pathName = _selectedSourceType == 'speechSound'
+        ? 'حروف النطق'
+        : _selectedSourceType == 'evaluationSections'
+            ? 'أقسام التقييم'
+            : 'هذا المسار';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSessionHeader(),
+        const SizedBox(height: AppSpacing.md),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: EmptyState(
+            icon: Icons.check_circle_outline,
+            title: 'تم إنهاء مسار $pathName',
+            message: 'يمكنك اختيار مسار آخر أو العودة لاحقاً.',
+            action: FilledButton.icon(
+              onPressed: () => setState(() {
+                _selectedSourceType = null;
+                _currentGoal = null;
+                _currentStep = null;
+                _allDone = false;
+              }),
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text('اختيار مسار آخر'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Phase 4: Session view ──────────────────────────────
+
+  Widget _buildSessionView(AppProvider app) {
+    final goal = _currentGoal;
+    final student = app.selectedStudent;
+    if (goal == null || student == null) {
+      return _buildEmpty(
+        'لا توجد مهارات متبقية',
+        'تم إتقان جميع المهارات في هذا الهدف.',
+      );
+    }
+
+    final step = _currentStep;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final steps = _filteredSteps(app, goal.id);
+    final progress = app.goalProgress(goal.id);
+    final hasSteps = steps.isNotEmpty;
+    final hasTreatment = goal.treatment.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSessionHeader(),
+        const SizedBox(height: AppSpacing.md),
+        // Student + program pills
+        Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: colorScheme.primaryContainer,
+              child: Text(
+                student.name.isNotEmpty ? student.name[0] : '?',
+                style: TextStyle(
+                  color: colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                student.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            AppPill(
+              label: _selectedProgram?.name ?? '',
+              icon: Icons.auto_stories_outlined,
+              selected: true,
+            ),
+            AppPill(
+              label: _selectedSourceType == 'speechSound'
+                  ? 'حروف النطق'
+                  : 'أقسام التقييم',
+              icon: _selectedSourceType == 'speechSound'
+                  ? Icons.record_voice_over_outlined
+                  : Icons.assessment_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        // Goal card
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.flag_outlined,
+                      size: 18, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text('الهدف الحالي',
+                      style: textTheme.titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                goal.goal,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+              if (hasTreatment) ...[
+                const SizedBox(height: 6),
+                Text(
+                  goal.treatment,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: [
+                  Expanded(
+                    child: LinearProgressIndicator(value: progress / 100),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('$progress%',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  if (hasSteps) ...[
+                    AppPill(label: 'المهارات: ${steps.length}'),
+                    AppPill(
+                      label:
+                          'المتقنة: ${steps.where((s) => s.status == 'متقن').length}',
+                    ),
+                  ],
+                  AppPill(label: app.goalStatus(goal.id)),
+                  if (_stepsDone > 0)
+                    AppPill(
+                      label: 'تم تقييم $_stepsDone في هذه الجلسة',
+                      icon: Icons.check_circle_outline,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // Current step
+        if (hasSteps && step != null) ...[
+          const SizedBox(height: AppSpacing.md),
           Container(
             padding: const EdgeInsets.all(AppSpacing.xl),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(AppRadii.card),
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Theme.of(context)
-                    .colorScheme
-                    .primary
-                    .withValues(alpha: .28),
+                color: colorScheme.primary.withValues(alpha: .3),
               ),
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                AppPill(
-                  label: goal?.goal ?? 'هدف علاجي',
-                  icon: Icons.flag_outlined,
-                  selected: true,
+                Icon(
+                  Icons.psychology,
+                  color: colorScheme.onPrimaryContainer,
+                  size: 32,
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 8),
                 Text(
                   step.title,
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                      ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Wrap(
-                  spacing: AppSpacing.sm,
-                  runSpacing: AppSpacing.sm,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    AppPill(label: 'الحالة الحالية: ${step.status}'),
-                    if (step.notes.isNotEmpty)
-                      const AppPill(label: 'له ملاحظة سابقة'),
-                  ],
+                const SizedBox(height: 6),
+                AppPill(
+                  label: 'الحالة: ${step.status}',
+                  icon: Icons.info_outline,
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          SemanticAlertCard(
-            kind: SemanticAlertKind.info,
-            icon: Icons.home_work_outlined,
-            title: 'واجب مقترح',
-            message: 'تدريب يومي: ${step.title} لمدة 5 دقائق.',
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            value: autoMoveToNext,
-            onChanged: onToggleAutoMove,
-            title: const Text('انتقال تلقائي بعد تحديث الحالة'),
-            subtitle: const Text('اختصارات: 1 مساعدة، 2 جزئي، 3 مستقل، 4 متقن'),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text('حالة المهارة', style: SanadText.subtitle(context)),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: options.map((option) {
-              final selected = selectedValue == option;
-              return SizedBox(
-                height: 68,
-                width: 150,
-                child: selected
-                    ? FilledButton(
-                        onPressed: () => onEvaluate(option),
-                        child: Text(option),
-                      )
-                    : FilledButton.tonal(
-                        onPressed: () => onEvaluate(option),
-                        child: Text(option),
-                      ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _QuickNotes(onQuickNote: onQuickNote),
-          const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: notes,
-            maxLines: 2,
-            decoration: const InputDecoration(labelText: 'ملاحظة الأخصائي'),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              FilledButton.icon(
-                onPressed: onPrevious,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('السابق'),
-              ),
-              FilledButton.icon(
-                onPressed: onNext,
-                icon: const Icon(Icons.arrow_forward),
-                label: const Text('التالي'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: onSendHomework,
-                icon: const Icon(Icons.playlist_add_check),
-                label: const Text('إرسال واجب ذكي'),
-              ),
-              FilledButton.icon(
-                onPressed: completedCount == 0 ? null : onSave,
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('حفظ الجلسة'),
-              ),
-              TextButton.icon(
-                onPressed: onStop,
-                icon: const Icon(Icons.close),
-                label: const Text('إيقاف الجلسة'),
-              ),
-            ],
-          ),
         ],
-      ),
+        const SizedBox(height: AppSpacing.md),
+        Text(
+          hasSteps ? 'تقييم المهارة' : 'تقييم الهدف',
+          style:
+              textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        // Three evaluation buttons
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final narrow = constraints.maxWidth < 400;
+            if (narrow) {
+              return Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                      ),
+                      onPressed: () => _evaluate('متقن'),
+                      child: const Text('متقن',
+                          style: TextStyle(fontSize: 15)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.tertiaryContainer,
+                      ),
+                      onPressed: () => _evaluate('بمساعدة'),
+                      child: Text('بمساعدة',
+                          style: TextStyle(
+                              fontSize: 15,
+                              color: colorScheme.onTertiaryContainer)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: colorScheme.error),
+                      ),
+                      onPressed: () => _evaluate('يحتاج إعادة'),
+                      child: Text('يحتاج إعادة',
+                          style: TextStyle(
+                              fontSize: 15, color: colorScheme.error)),
+                    ),
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                      ),
+                      onPressed: () => _evaluate('متقن'),
+                      child: const Text('متقن'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: FilledButton.tonal(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.tertiaryContainer,
+                      ),
+                      onPressed: () => _evaluate('بمساعدة'),
+                      child: Text('بمساعدة',
+                          style: TextStyle(
+                              color: colorScheme.onTertiaryContainer)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 56,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: colorScheme.error),
+                      ),
+                      onPressed: () => _evaluate('يحتاج إعادة'),
+                      child: Text('يحتاج إعادة',
+                          style: TextStyle(color: colorScheme.error)),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
     );
   }
-}
 
-class _QuickNotes extends StatelessWidget {
-  const _QuickNotes({required this.onQuickNote});
-
-  final ValueChanged<String> onQuickNote;
-
-  @override
-  Widget build(BuildContext context) {
-    const notes = [
-      'تحسن ممتاز',
-      'يحتاج متابعة',
-      'تشتت',
-      'تعاون ممتاز',
-      'يحتاج تدريب منزلي',
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSessionHeader() {
+    return Row(
       children: [
-        Text('ملاحظات سريعة', style: SanadText.subtitle(context)),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.sm,
-          children: notes
-              .map((note) => ActionChip(
-                    label: Text(note),
-                    onPressed: () => onQuickNote(note),
-                  ))
-              .toList(),
+        TextButton.icon(
+          onPressed: () => setState(() {
+            if (_selectedSourceType != null) {
+              _selectedSourceType = null;
+              _currentGoal = null;
+              _currentStep = null;
+              _allDone = false;
+            } else if (_selectedProgram != null) {
+              _selectedProgram = null;
+              _selectedSourceType = null;
+              _currentGoal = null;
+              _currentStep = null;
+              _allDone = false;
+              _stepsDone = 0;
+            }
+          }),
+          icon: const Icon(Icons.arrow_forward),
+          label: const Text('رجوع'),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            'الجلسات العلاجية',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.w900),
+          ),
         ),
       ],
     );
   }
 }
 
-class _ClinicalSessionSummary {
-  const _ClinicalSessionSummary({
-    required this.stepsCount,
-    required this.updatedCount,
-    required this.masteryRate,
-    required this.homeworkSentCount,
-    required this.notes,
+// ─── Student card for session picker ─────────────────────
+
+class _StudentSessionCard extends StatelessWidget {
+  const _StudentSessionCard({
+    required this.student,
+    required this.onTap,
   });
 
-  final int stepsCount;
-  final int updatedCount;
-  final int masteryRate;
-  final int homeworkSentCount;
-  final String notes;
-}
-
-class _ClinicalSessionSummaryCard extends StatelessWidget {
-  const _ClinicalSessionSummaryCard({required this.summary});
-
-  final _ClinicalSessionSummary summary;
+  final Student student;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return TherapyCard(
-      title: 'ملخص آخر جلسة علاجية',
-      icon: Icons.summarize_outlined,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              AppPill(label: 'المهارات: ${summary.stepsCount}'),
-              AppPill(label: 'المحدث: ${summary.updatedCount}'),
-              AppPill(label: 'الإتقان: ${summary.masteryRate}%'),
-              AppPill(label: 'الواجبات: ${summary.homeworkSentCount}'),
-            ],
-          ),
-          if (summary.notes.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text('ملاحظة الأخصائي: ${summary.notes}'),
-          ],
-        ],
-      ),
-    );
-  }
-}
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
-class _PreviousGoalSessions extends StatelessWidget {
-  const _PreviousGoalSessions({required this.app});
-
-  final AppProvider app;
-
-  @override
-  Widget build(BuildContext context) {
-    final sessions = app.sessions
-        .where((session) => session.sessionType.contains('هدف'))
-        .toList();
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('الجلسات المبنية على أهداف', style: SanadText.subtitle(context)),
-          const SizedBox(height: AppSpacing.sm),
-          if (sessions.isEmpty)
-            const EmptyState(
-              icon: Icons.timeline_outlined,
-              title: 'لا توجد جلسات أهداف بعد',
-              message:
-                  'بعد حفظ أول جلسة مبنية على هدف ستظهر هنا كجزء من رحلة التحسن.',
-            )
-          else
-            ...sessions.take(6).map((session) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.track_changes_outlined),
-                  title: Text(session.cardTitle),
-                  subtitle: Text(
-                    '${session.startedAt.split('T').first} - إتقان ${session.successRate}%',
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          onTap: onTap,
+          child: AppCard(
+            child: Row(
+              children: [
+                StudentAvatar(student: student, radius: 28),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        student.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        '${student.age} سنة - ${student.diagnosis}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall,
+                      ),
+                      if (student.parentName.isNotEmpty)
+                        Text(
+                          'ولي الأمر: ${student.parentName}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
                   ),
-                  trailing: Text(session.quickResult),
-                )),
-        ],
+                ),
+                Icon(
+                  Icons.arrow_back_ios_new_outlined,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 18,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 14;
+  static const currentVersion = 25;
 
   mobile.Database? _database;
 
@@ -138,6 +138,7 @@ class DatabaseService {
         id TEXT PRIMARY KEY,
         center_id TEXT NOT NULL,
         student_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL DEFAULT '',
         plan_id TEXT NOT NULL DEFAULT '',
         program_id TEXT NOT NULL DEFAULT '',
         skill_id TEXT NOT NULL DEFAULT '',
@@ -355,6 +356,120 @@ class DatabaseService {
     }
     if (oldVersion < 14) {
       await _ensureTherapyProgramTables(db);
+    }
+    if (oldVersion < 15) {
+      await _addColumns(db, {
+        'assessment_item_templates': {
+          'response_mode': "TEXT NOT NULL DEFAULT 'singleChoice'",
+        },
+      });
+    }
+    if (oldVersion < 16) {
+      await _ensureAssessmentDraftTable(db);
+    }
+    if (oldVersion < 17) {
+      await _addColumns(db, {
+        'speech_sound_trigger_templates': {
+          'skill_steps_json': "TEXT NOT NULL DEFAULT '[]'",
+        },
+      });
+    }
+    if (oldVersion < 18) {
+      await _addColumns(db, {
+        'assessment_drafts': {
+          'letter_results_json': "TEXT NOT NULL DEFAULT '{}'",
+        },
+      });
+    }
+    if (oldVersion < 19) {
+      await _ensureTable(db, 'student_therapy_programs', '''
+        CREATE TABLE student_therapy_programs (
+          id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          program_id TEXT NOT NULL,
+          assigned_at TEXT NOT NULL,
+          assigned_by_user_id TEXT NOT NULL DEFAULT '',
+          is_active INTEGER NOT NULL DEFAULT 1,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+      await _addColumns(db, {
+        'training_plans': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'goal_skill_steps': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'clinical_findings': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'exercises': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'plan_id': "TEXT NOT NULL DEFAULT ''",
+          'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+          'session_date': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 20) {
+      await _addColumns(db, {
+        'student_therapy_programs': {
+          'created_at': "TEXT NOT NULL DEFAULT ''",
+          'updated_at': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 21) {
+      await _addColumns(db, {
+        'training_plans': {
+          'treatment': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 22) {
+      await _addColumns(db, {
+        'exercises': {
+          'note_for_parent': "TEXT NOT NULL DEFAULT ''",
+          'parent_completed_at': "TEXT NOT NULL DEFAULT ''",
+          'specialist_reviewed_at': "TEXT NOT NULL DEFAULT ''",
+          'created_from_session_result': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 23) {
+      await _ensureTable(db, 'student_specialists', '''
+        CREATE TABLE student_specialists (
+          id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          specialist_id TEXT NOT NULL,
+          assigned_by_user_id TEXT NOT NULL DEFAULT '',
+          assigned_at TEXT NOT NULL DEFAULT '',
+          is_active INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 24) {
+      await _addColumns(db, {
+        'student_specialists': {
+          'created_at': "TEXT NOT NULL DEFAULT ''",
+          'updated_at': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 25) {
+      await _addColumns(db, {
+        'sessions': {
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
     }
   }
 
@@ -748,6 +863,7 @@ class DatabaseService {
         section_id TEXT NOT NULL,
         title TEXT NOT NULL,
         response_type TEXT NOT NULL DEFAULT 'custom',
+        response_mode TEXT NOT NULL DEFAULT 'singleChoice',
         prompt TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -795,6 +911,7 @@ class DatabaseService {
         weakness_template TEXT NOT NULL DEFAULT '',
         goal_template TEXT NOT NULL DEFAULT '',
         therapy_template TEXT NOT NULL DEFAULT '',
+        skill_steps_json TEXT NOT NULL DEFAULT '[]',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -834,6 +951,7 @@ class DatabaseService {
         section_id TEXT NOT NULL,
         title TEXT NOT NULL,
         response_type TEXT NOT NULL DEFAULT 'custom',
+        response_mode TEXT NOT NULL DEFAULT 'singleChoice',
         prompt TEXT NOT NULL DEFAULT '',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
@@ -879,6 +997,7 @@ class DatabaseService {
         weakness_template TEXT NOT NULL DEFAULT '',
         goal_template TEXT NOT NULL DEFAULT '',
         therapy_template TEXT NOT NULL DEFAULT '',
+        skill_steps_json TEXT NOT NULL DEFAULT '[]',
         sort_order INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
@@ -893,8 +1012,27 @@ class DatabaseService {
       },
       'speech_sound_trigger_templates': {
         'program_id': "TEXT NOT NULL DEFAULT ''",
+        'skill_steps_json': "TEXT NOT NULL DEFAULT '[]'",
       },
     });
+  }
+
+  Future<void> _ensureAssessmentDraftTable(mobile.Database db) async {
+    await _ensureTable(db, 'assessment_drafts', '''
+      CREATE TABLE assessment_drafts (
+        student_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        phase TEXT NOT NULL DEFAULT 'sections',
+        step_index INTEGER NOT NULL DEFAULT 0,
+        current_letter TEXT NOT NULL DEFAULT '',
+        selections_json TEXT NOT NULL DEFAULT '{}',
+        multi_selections_json TEXT NOT NULL DEFAULT '{}',
+        matrix_selections_json TEXT NOT NULL DEFAULT '[]',
+        letter_results_json TEXT NOT NULL DEFAULT '{}',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (student_id, program_id)
+      )
+    ''');
   }
 
   Future<void> _ensureTherapyProgramTables(mobile.Database db) async {

@@ -44,7 +44,7 @@ class SanadText {
 
   static TextStyle? secondary(BuildContext context) =>
       Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.72),
             fontWeight: FontWeight.w600,
             height: 1.45,
             letterSpacing: 0,
@@ -52,7 +52,7 @@ class SanadText {
 
   static TextStyle? muted(BuildContext context) =>
       Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
             height: 1.45,
             letterSpacing: 0,
           );
@@ -174,6 +174,8 @@ class SemanticAlertCard extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: tone.foreground,
                     fontWeight: FontWeight.w900,
@@ -183,6 +185,8 @@ class SemanticAlertCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   message,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: tone.foreground,
                     fontWeight: FontWeight.w600,
@@ -202,7 +206,7 @@ class AppCard extends StatelessWidget {
   const AppCard({
     super.key,
     required this.child,
-    this.padding = AppSpacing.lg,
+    this.padding = AppSpacing.xl,
     this.highlight = false,
   });
 
@@ -257,20 +261,37 @@ class TherapyCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (title != null) ...[
-            Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(icon, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-                Expanded(
-                  child: Text(
-                    title!,
-                    style: SanadText.subtitle(context),
-                  ),
-                ),
-                if (trailing != null) trailing!,
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final stacked = constraints.maxWidth < 480 && trailing != null;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        if (icon != null) ...[
+                          Icon(icon, color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(width: AppSpacing.sm),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: SanadText.subtitle(context),
+                          ),
+                        ),
+                        if (!stacked && trailing != null) trailing!,
+                      ],
+                    ),
+                    if (stacked)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.sm),
+                        child: trailing!,
+                      ),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
           ],
@@ -322,6 +343,8 @@ class AppPill extends StatelessWidget {
           ],
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: foreground,
               fontWeight: FontWeight.w800,
@@ -371,9 +394,11 @@ class StatTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: SanadText.muted(context)),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: SanadText.muted(context)),
                 Text(
                   value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context)
                       .textTheme
                       .headlineSmall
@@ -530,13 +555,13 @@ class EmptyState extends StatelessWidget {
     final tone = sanadAlertTone(context, SemanticAlertKind.info);
     return AppCard(
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 48,
+              height: 48,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: tone.background,
@@ -545,29 +570,78 @@ class EmptyState extends StatelessWidget {
               ),
               child: Icon(
                 icon,
-                size: 34,
+                size: 26,
                 color: tone.icon,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               title,
               textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: SanadText.subtitle(context),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               message,
               textAlign: TextAlign.center,
+              softWrap: true,
+              overflow: TextOverflow.ellipsis,
               style: SanadText.secondary(context),
             ),
             if (action != null) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               action!,
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class ResponsiveRowHeader extends StatelessWidget {
+  const ResponsiveRowHeader({
+    super.key,
+    required this.title,
+    this.trailing,
+    this.breakpoint = 500,
+    this.spacing = AppSpacing.sm,
+  });
+
+  final Widget title;
+  final Widget? trailing;
+  final double breakpoint;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < breakpoint;
+        if (narrow) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              title,
+              if (trailing != null) ...[
+                SizedBox(height: spacing),
+                trailing!,
+              ],
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: title),
+            if (trailing != null) ...[
+              SizedBox(width: spacing),
+              trailing!,
+            ],
+          ],
+        );
+      },
     );
   }
 }

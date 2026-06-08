@@ -211,7 +211,7 @@ class StaffScreen extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('تغيير كلمة المرور'),
         content: SizedBox(
-          width: 420,
+          width: MediaQuery.of(context).size.width.clamp(300, 420).toDouble(),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -343,13 +343,16 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
                           textDirection: TextDirection.ltr,
                           child: Text(
                             account.email,
+                            maxLines: 1,
                             textAlign: TextAlign.left,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        Text(widget.centerName),
+                        Text(widget.centerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),

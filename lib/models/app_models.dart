@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 enum UserRole {
   sanadOwner,
   centerManager,
@@ -361,6 +363,7 @@ class TherapySession {
     required this.id,
     this.centerId = '',
     required this.studentId,
+    this.specialistId = '',
     this.planId = '',
     this.programId = '',
     this.skillId = '',
@@ -385,6 +388,7 @@ class TherapySession {
   final String id;
   final String centerId;
   final String studentId;
+  final String specialistId;
   final String planId;
   final String programId;
   final String skillId;
@@ -409,6 +413,7 @@ class TherapySession {
         id: row['id'] as String,
         centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         planId: (row['plan_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
         skillId: (row['skill_id'] ?? '') as String,
@@ -434,6 +439,7 @@ class TherapySession {
         'id': id,
         'center_id': centerId,
         'student_id': studentId,
+        'specialist_id': specialistId,
         'plan_id': planId,
         'program_id': programId,
         'skill_id': skillId,
@@ -522,8 +528,11 @@ class TrainingPlan {
     this.centerId = '',
     required this.studentId,
     required this.goal,
+    this.treatment = '',
     required this.targetDate,
     required this.progress,
+    this.programId = '',
+    this.sourceType = 'standard',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -532,8 +541,11 @@ class TrainingPlan {
   final String centerId;
   final String studentId;
   final String goal;
+  final String treatment;
   final String targetDate;
   final int progress;
+  final String programId;
+  final String sourceType;
   final String createdAt;
   final String updatedAt;
 
@@ -542,8 +554,11 @@ class TrainingPlan {
         centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String,
         goal: row['goal'] as String,
+        treatment: (row['treatment'] ?? '') as String,
         targetDate: row['target_date'] as String,
         progress: row['progress'] as int,
+        programId: (row['program_id'] ?? '') as String,
+        sourceType: (row['source_type'] ?? 'standard') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -553,11 +568,35 @@ class TrainingPlan {
         'center_id': centerId,
         'student_id': studentId,
         'goal': goal,
+        'treatment': treatment,
         'target_date': targetDate,
         'progress': progress,
+        'program_id': programId,
+        'source_type': sourceType,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
+
+  TrainingPlan copyWith({
+    String? goal,
+    int? progress,
+    String? programId,
+    String? sourceType,
+    String? targetDate,
+    String? updatedAt,
+  }) =>
+      TrainingPlan(
+        id: id,
+        centerId: centerId,
+        studentId: studentId,
+        goal: goal ?? this.goal,
+        targetDate: targetDate ?? this.targetDate,
+        progress: progress ?? this.progress,
+        programId: programId ?? this.programId,
+        sourceType: sourceType ?? this.sourceType,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }
 
 class GoalSkillStep {
@@ -571,6 +610,8 @@ class GoalSkillStep {
     this.sortOrder = 0,
     this.notes = '',
     this.lastSessionId = '',
+    this.programId = '',
+    this.sourceType = 'standard',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -584,6 +625,8 @@ class GoalSkillStep {
   final int sortOrder;
   final String notes;
   final String lastSessionId;
+  final String programId;
+  final String sourceType;
   final String createdAt;
   final String updatedAt;
 
@@ -597,6 +640,8 @@ class GoalSkillStep {
         sortOrder: (row['sort_order'] ?? 0) as int,
         notes: (row['notes'] ?? '') as String,
         lastSessionId: (row['last_session_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        sourceType: (row['source_type'] ?? 'standard') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -611,6 +656,8 @@ class GoalSkillStep {
         'sort_order': sortOrder,
         'notes': notes,
         'last_session_id': lastSessionId,
+        'program_id': programId,
+        'source_type': sourceType,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -619,6 +666,8 @@ class GoalSkillStep {
     String? status,
     String? notes,
     String? lastSessionId,
+    String? programId,
+    String? sourceType,
     String? updatedAt,
   }) =>
       GoalSkillStep(
@@ -631,6 +680,8 @@ class GoalSkillStep {
         sortOrder: sortOrder,
         notes: notes ?? this.notes,
         lastSessionId: lastSessionId ?? this.lastSessionId,
+        programId: programId ?? this.programId,
+        sourceType: sourceType ?? this.sourceType,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -648,6 +699,15 @@ class Exercise {
     this.audioPath = '',
     this.parentNote = '',
     this.stars = 0,
+    this.programId = '',
+    this.planId = '',
+    this.goalSkillStepId = '',
+    this.sourceType = 'standard',
+    this.sessionDate = '',
+    this.noteForParent = '',
+    this.parentCompletedAt = '',
+    this.specialistReviewedAt = '',
+    this.createdFromSessionResult = '',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -662,6 +722,15 @@ class Exercise {
   final String audioPath;
   final String parentNote;
   final int stars;
+  final String programId;
+  final String planId;
+  final String goalSkillStepId;
+  final String sourceType;
+  final String sessionDate;
+  final String noteForParent;
+  final String parentCompletedAt;
+  final String specialistReviewedAt;
+  final String createdFromSessionResult;
   final String createdAt;
   final String updatedAt;
 
@@ -676,6 +745,16 @@ class Exercise {
         audioPath: row['audio_path'] as String,
         parentNote: (row['parent_note'] ?? '') as String,
         stars: (row['stars'] ?? 0) as int,
+        programId: (row['program_id'] ?? '') as String,
+        planId: (row['plan_id'] ?? '') as String,
+        goalSkillStepId: (row['goal_skill_step_id'] ?? '') as String,
+        sourceType: (row['source_type'] ?? 'standard') as String,
+        sessionDate: (row['session_date'] ?? '') as String,
+        noteForParent: (row['note_for_parent'] ?? '') as String,
+        parentCompletedAt: (row['parent_completed_at'] ?? '') as String,
+        specialistReviewedAt: (row['specialist_reviewed_at'] ?? '') as String,
+        createdFromSessionResult:
+            (row['created_from_session_result'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -691,9 +770,55 @@ class Exercise {
         'audio_path': audioPath,
         'parent_note': parentNote,
         'stars': stars,
+        'program_id': programId,
+        'plan_id': planId,
+        'goal_skill_step_id': goalSkillStepId,
+        'source_type': sourceType,
+        'session_date': sessionDate,
+        'note_for_parent': noteForParent,
+        'parent_completed_at': parentCompletedAt,
+        'specialist_reviewed_at': specialistReviewedAt,
+        'created_from_session_result': createdFromSessionResult,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
+
+  Exercise copyWith({
+    String? status,
+    String? parentNote,
+    String? parentCompletedAt,
+    String? specialistReviewedAt,
+    String? noteForParent,
+    String? programId,
+    String? planId,
+    String? goalSkillStepId,
+    String? sourceType,
+    String? sessionDate,
+  }) =>
+      Exercise(
+        id: id,
+        centerId: centerId,
+        studentId: studentId,
+        title: title,
+        instructions: instructions,
+        dueDate: dueDate,
+        status: status ?? this.status,
+        audioPath: audioPath,
+        parentNote: parentNote ?? this.parentNote,
+        stars: stars,
+        programId: programId ?? this.programId,
+        planId: planId ?? this.planId,
+        goalSkillStepId: goalSkillStepId ?? this.goalSkillStepId,
+        sourceType: sourceType ?? this.sourceType,
+        sessionDate: sessionDate ?? this.sessionDate,
+        noteForParent: noteForParent ?? this.noteForParent,
+        parentCompletedAt: parentCompletedAt ?? this.parentCompletedAt,
+        specialistReviewedAt:
+            specialistReviewedAt ?? this.specialistReviewedAt,
+        createdFromSessionResult: createdFromSessionResult,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
 }
 
 class Reward {
@@ -862,6 +987,8 @@ class ClinicalFinding {
     this.weakness = '',
     this.goal = '',
     this.training = '',
+    this.programId = '',
+    this.sourceType = 'standard',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -877,6 +1004,8 @@ class ClinicalFinding {
   final String weakness;
   final String goal;
   final String training;
+  final String programId;
+  final String sourceType;
   final String createdAt;
   final String updatedAt;
 
@@ -892,6 +1021,8 @@ class ClinicalFinding {
         weakness: (row['weakness'] ?? '') as String,
         goal: (row['goal'] ?? '') as String,
         training: (row['training'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        sourceType: (row['source_type'] ?? 'standard') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -908,6 +1039,8 @@ class ClinicalFinding {
         'weakness': weakness,
         'goal': goal,
         'training': training,
+        'program_id': programId,
+        'source_type': sourceType,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -1010,6 +1143,7 @@ class AssessmentItemTemplate {
     required this.sectionId,
     required this.title,
     this.responseType = 'custom',
+    this.responseMode = 'singleChoice',
     this.prompt = '',
     required this.sortOrder,
     this.createdAt = '',
@@ -1021,6 +1155,7 @@ class AssessmentItemTemplate {
   final String sectionId;
   final String title;
   final String responseType;
+  final String responseMode;
   final String prompt;
   final int sortOrder;
   final String createdAt;
@@ -1033,6 +1168,7 @@ class AssessmentItemTemplate {
         sectionId: row['section_id'] as String,
         title: row['title'] as String,
         responseType: (row['response_type'] ?? 'custom') as String,
+        responseMode: (row['response_mode'] ?? 'singleChoice') as String,
         prompt: (row['prompt'] ?? '') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         createdAt: (row['created_at'] ?? '') as String,
@@ -1045,6 +1181,7 @@ class AssessmentItemTemplate {
         'section_id': sectionId,
         'title': title,
         'response_type': responseType,
+        'response_mode': responseMode,
         'prompt': prompt,
         'sort_order': sortOrder,
         'created_at': createdAt,
@@ -1152,6 +1289,27 @@ class SkillStepTemplate {
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
+
+  SkillStepTemplate copyWith({
+    String? id,
+    String? centerId,
+    String? ownerType,
+    String? ownerId,
+    String? title,
+    int? sortOrder,
+    String? createdAt,
+    String? updatedAt,
+  }) =>
+      SkillStepTemplate(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        ownerType: ownerType ?? this.ownerType,
+        ownerId: ownerId ?? this.ownerId,
+        title: title ?? this.title,
+        sortOrder: sortOrder ?? this.sortOrder,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }
 
 class SpeechSoundTriggerTemplate {
@@ -1166,6 +1324,7 @@ class SpeechSoundTriggerTemplate {
     this.weaknessTemplate = '',
     this.goalTemplate = '',
     this.therapyTemplate = '',
+    this.skillStepTemplates = const [],
     required this.sortOrder,
     this.createdAt = '',
     this.updatedAt = '',
@@ -1181,6 +1340,7 @@ class SpeechSoundTriggerTemplate {
   final String weaknessTemplate;
   final String goalTemplate;
   final String therapyTemplate;
+  final List<String> skillStepTemplates;
   final int sortOrder;
   final String createdAt;
   final String updatedAt;
@@ -1197,6 +1357,7 @@ class SpeechSoundTriggerTemplate {
         weaknessTemplate: (row['weakness_template'] ?? '') as String,
         goalTemplate: (row['goal_template'] ?? '') as String,
         therapyTemplate: (row['therapy_template'] ?? '') as String,
+        skillStepTemplates: _parseSkillSteps(row['skill_steps_json']),
         sortOrder: (row['sort_order'] ?? 0) as int,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -1213,10 +1374,62 @@ class SpeechSoundTriggerTemplate {
         'weakness_template': weaknessTemplate,
         'goal_template': goalTemplate,
         'therapy_template': therapyTemplate,
+        'skill_steps_json': _encodeSkillSteps(skillStepTemplates),
         'sort_order': sortOrder,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
+
+  static List<String> _parseSkillSteps(Object? value) {
+    if (value == null) return const [];
+    if (value is List) return value.cast<String>();
+    if (value is String) {
+      if (value.isEmpty || value == '[]') return const [];
+      try {
+        final decoded = jsonDecode(value);
+        if (decoded is List) return decoded.cast<String>();
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  static String _encodeSkillSteps(List<String> steps) {
+    return steps.isEmpty ? '[]' : jsonEncode(steps);
+  }
+
+  SpeechSoundTriggerTemplate copyWith({
+    String? id,
+    String? centerId,
+    String? programId,
+    String? letter,
+    String? errorType,
+    String? position,
+    bool? generatesTherapy,
+    String? weaknessTemplate,
+    String? goalTemplate,
+    String? therapyTemplate,
+    List<String>? skillStepTemplates,
+    int? sortOrder,
+    String? createdAt,
+    String? updatedAt,
+  }) =>
+      SpeechSoundTriggerTemplate(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        programId: programId ?? this.programId,
+        letter: letter ?? this.letter,
+        errorType: errorType ?? this.errorType,
+        position: position ?? this.position,
+        generatesTherapy: generatesTherapy ?? this.generatesTherapy,
+        weaknessTemplate: weaknessTemplate ?? this.weaknessTemplate,
+        goalTemplate: goalTemplate ?? this.goalTemplate,
+        therapyTemplate: therapyTemplate ?? this.therapyTemplate,
+        skillStepTemplates:
+            skillStepTemplates ?? this.skillStepTemplates,
+        sortOrder: sortOrder ?? this.sortOrder,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }
 
 class SignResource {
@@ -1333,4 +1546,138 @@ class TrainingItem {
   final String position;
   final String level;
   final String category;
+}
+
+class AssessmentDraft {
+  const AssessmentDraft({
+    required this.studentId,
+    required this.programId,
+    this.phase = 'sections',
+    this.stepIndex = 0,
+    this.currentLetter = '',
+    this.selectionsJson = '{}',
+    this.multiSelectionsJson = '{}',
+    this.matrixSelectionsJson = '[]',
+    this.letterResultsJson = '{}',
+    this.updatedAt = '',
+  });
+
+  final String studentId;
+  final String programId;
+  final String phase;
+  final int stepIndex;
+  final String currentLetter;
+  final String selectionsJson;
+  final String multiSelectionsJson;
+  final String matrixSelectionsJson;
+  final String letterResultsJson;
+  final String updatedAt;
+
+  static AssessmentDraft fromMap(Map<String, Object?> row) =>
+      AssessmentDraft(
+        studentId: row['student_id'] as String,
+        programId: row['program_id'] as String,
+        phase: (row['phase'] ?? 'sections') as String,
+        stepIndex: (row['step_index'] ?? 0) as int,
+        currentLetter: (row['current_letter'] ?? '') as String,
+        selectionsJson: (row['selections_json'] ?? '{}') as String,
+        multiSelectionsJson:
+            (row['multi_selections_json'] ?? '{}') as String,
+        matrixSelectionsJson:
+            (row['matrix_selections_json'] ?? '[]') as String,
+        letterResultsJson:
+            (row['letter_results_json'] ?? '{}') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'student_id': studentId,
+        'program_id': programId,
+        'phase': phase,
+        'step_index': stepIndex,
+        'current_letter': currentLetter,
+        'selections_json': selectionsJson,
+        'multi_selections_json': multiSelectionsJson,
+        'matrix_selections_json': matrixSelectionsJson,
+        'letter_results_json': letterResultsJson,
+        'updated_at': updatedAt,
+      };
+}
+
+class StudentTherapyProgram {
+  const StudentTherapyProgram({
+    required this.id,
+    required this.studentId,
+    required this.programId,
+    required this.assignedAt,
+    this.assignedByUserId = '',
+    this.isActive = true,
+    this.sortOrder = 0,
+  });
+
+  final String id;
+  final String studentId;
+  final String programId;
+  final String assignedAt;
+  final String assignedByUserId;
+  final bool isActive;
+  final int sortOrder;
+
+  static StudentTherapyProgram fromMap(Map<String, Object?> row) =>
+      StudentTherapyProgram(
+        id: row['id'] as String,
+        studentId: row['student_id'] as String,
+        programId: row['program_id'] as String,
+        assignedAt: row['assigned_at'] as String,
+        assignedByUserId: (row['assigned_by_user_id'] ?? '') as String,
+        isActive: ((row['is_active'] ?? 1) as int) == 1,
+        sortOrder: (row['sort_order'] ?? 0) as int,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'student_id': studentId,
+        'program_id': programId,
+        'assigned_at': assignedAt,
+        'assigned_by_user_id': assignedByUserId,
+        'is_active': isActive ? 1 : 0,
+        'sort_order': sortOrder,
+      };
+}
+
+class StudentSpecialist {
+  const StudentSpecialist({
+    required this.id,
+    required this.studentId,
+    required this.specialistId,
+    this.assignedByUserId = '',
+    this.assignedAt = '',
+    this.isActive = true,
+  });
+
+  final String id;
+  final String studentId;
+  final String specialistId;
+  final String assignedByUserId;
+  final String assignedAt;
+  final bool isActive;
+
+  static StudentSpecialist fromMap(Map<String, Object?> row) =>
+      StudentSpecialist(
+        id: row['id'] as String,
+        studentId: row['student_id'] as String,
+        specialistId: row['specialist_id'] as String,
+        assignedByUserId: (row['assigned_by_user_id'] ?? '') as String,
+        assignedAt: (row['assigned_at'] ?? '') as String,
+        isActive: ((row['is_active'] ?? 1) as int) == 1,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'student_id': studentId,
+        'specialist_id': specialistId,
+        'assigned_by_user_id': assignedByUserId,
+        'assigned_at': assignedAt,
+        'is_active': isActive ? 1 : 0,
+      };
 }

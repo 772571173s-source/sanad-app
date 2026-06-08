@@ -130,8 +130,8 @@ class _ProgramsPanel extends StatelessWidget {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('إضافة برنامج علاجي'),
-          content: SizedBox(
-            width: 520,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -223,6 +223,8 @@ class _ProgramEditor extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(program.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.headlineSmall),
                   ),
                   _ScopeBadge(centerId: program.centerId),
@@ -230,7 +232,7 @@ class _ProgramEditor extends StatelessWidget {
               ),
               if (program.description.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.xs),
-                Text(program.description, style: SanadText.secondary(context)),
+                Text(program.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
               ],
               const SizedBox(height: AppSpacing.sm),
               Wrap(
@@ -379,8 +381,8 @@ class _SectionAddRowState extends State<_SectionAddRow> {
               decoration: const InputDecoration(labelText: 'اسم القسم'),
             ),
           ),
-          SizedBox(
-            width: 360,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
             child: TextField(
               controller: description,
               decoration: const InputDecoration(labelText: 'وصف مختصر'),
@@ -436,13 +438,16 @@ class _SectionTemplateCard extends StatelessWidget {
         title: Row(
           children: [
             Expanded(
-                child: Text(section.title, style: SanadText.title(context))),
+                child: Text(section.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: SanadText.title(context))),
             _ScopeBadge(centerId: section.centerId),
           ],
         ),
         subtitle: section.description.isEmpty
             ? const Text('قسم تقييم')
-            : Text(section.description),
+            : Text(section.description, maxLines: 2, overflow: TextOverflow.ellipsis),
         trailing: canEdit
             ? IconButton(
                 tooltip: 'حذف القسم',
@@ -487,6 +492,7 @@ class _ItemAddRowState extends State<_ItemAddRow> {
   final title = TextEditingController();
   final prompt = TextEditingController();
   String responseType = 'custom';
+  String responseMode = 'singleChoice';
 
   @override
   void dispose() {
@@ -514,44 +520,37 @@ class _ItemAddRowState extends State<_ItemAddRow> {
               decoration: const InputDecoration(labelText: 'بند تقييم'),
             ),
           ),
-          SizedBox(
-            width: 360,
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
             child: TextField(
               controller: prompt,
               decoration: const InputDecoration(labelText: 'تعليمات الملاحظة'),
             ),
           ),
           SizedBox(
-            width: 280,
+            width: 260,
             child: DropdownButtonFormField<String>(
-              initialValue: responseType,
+              initialValue: responseMode,
               isExpanded: true,
               alignment: AlignmentDirectional.centerStart,
               decoration: const InputDecoration(
-                labelText: 'آلية التقييم',
-                helperText: 'طريقة ظهور الاحتمالات داخل هذا البند',
+                labelText: 'نوع الاستجابة',
+                helperText: 'اختيار واحد أم تقييم كل احتمال',
                 contentPadding:
                     EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
               items: const [
                 DropdownMenuItem(
-                  value: 'custom',
-                  child: Text('احتمالات مخصصة'),
-                ),
-                DropdownMenuItem(value: 'yesNo', child: Text('نعم / لا')),
-                DropdownMenuItem(
-                  value: 'speechMatrix',
-                  enabled: false,
-                  child: Text('تقييم الحروف - من تبويب Matrix'),
+                  value: 'singleChoice',
+                  child: Text('اختيار واحد'),
                 ),
                 DropdownMenuItem(
-                  value: 'scale',
-                  enabled: false,
-                  child: Text('درجات / Scale - لاحقًا'),
+                  value: 'multiResponse',
+                  child: Text('تقييم كل احتمال'),
                 ),
               ],
               onChanged: (value) =>
-                  setState(() => responseType = value ?? responseType),
+                  setState(() => responseMode = value ?? responseMode),
             ),
           ),
           FilledButton.tonalIcon(
@@ -575,6 +574,7 @@ class _ItemAddRowState extends State<_ItemAddRow> {
         sectionId: widget.section.id,
         title: title.text.trim(),
         responseType: responseType,
+        responseMode: responseMode,
         prompt: prompt.text.trim(),
         sortOrder: widget.nextOrder,
         createdAt: now,
@@ -599,7 +599,7 @@ class _ItemAddRowState extends State<_ItemAddRow> {
     }
     title.clear();
     prompt.clear();
-    setState(() => responseType = 'custom');
+    setState(() => responseMode = 'singleChoice');
   }
 }
 
@@ -614,6 +614,16 @@ String _responseTypeLabel(String value) {
     case 'custom':
     default:
       return 'احتمالات مخصصة';
+  }
+}
+
+String _responseModeLabel(String value) {
+  switch (value) {
+    case 'multiResponse':
+      return 'تقييم كل احتمال';
+    case 'singleChoice':
+    default:
+      return 'اختيار واحد';
   }
 }
 
@@ -638,7 +648,7 @@ class _ItemTemplateCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title, style: SanadText.subtitle(context)),
+                    Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.subtitle(context)),
                     Wrap(
                       spacing: AppSpacing.xs,
                       children: [
@@ -646,10 +656,17 @@ class _ItemTemplateCard extends StatelessWidget {
                           label: _responseTypeLabel(item.responseType),
                           icon: Icons.tune_outlined,
                         ),
+                        AppPill(
+                          label: _responseModeLabel(item.responseMode),
+                          icon: item.responseMode == 'multiResponse'
+                              ? Icons.list_alt_outlined
+                              : Icons.radio_button_checked_outlined,
+                          selected: item.responseMode == 'multiResponse',
+                        ),
                       ],
                     ),
                     if (item.prompt.isNotEmpty)
-                      Text(item.prompt, style: SanadText.secondary(context)),
+                      Text(item.prompt, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
                   ],
                 ),
               ),
@@ -787,12 +804,13 @@ class _OptionPanelState extends State<_OptionPanel> {
               children: [
                 Expanded(
                     child:
-                        Text(option.label, style: SanadText.subtitle(context))),
+                        Text(option.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.subtitle(context))),
                 Switch.adaptive(
                   value: generatesTherapy,
                   onChanged: canEdit ? (value) => _save(value) : null,
                 ),
-                Text(generatesTherapy ? 'يولد علاج' : 'لا يولد علاج'),
+                Text(generatesTherapy ? 'يولد علاج' : 'لا يولد علاج',
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (canEdit)
                   IconButton(
                     onPressed: () =>
@@ -845,18 +863,48 @@ class _OptionPanelState extends State<_OptionPanel> {
   }
 }
 
-class _SpeechSoundsEditor extends StatelessWidget {
+class _SpeechSoundsEditor extends StatefulWidget {
   const _SpeechSoundsEditor({required this.app, required this.program});
 
   final AppProvider app;
   final TherapyProgramTemplate program;
 
   @override
-  Widget build(BuildContext context) {
-    final sounds = app.speechSoundTriggers
-        .where((trigger) => trigger.programId == program.id)
+  State<_SpeechSoundsEditor> createState() => _SpeechSoundsEditorState();
+}
+
+class _SpeechSoundsEditorState extends State<_SpeechSoundsEditor> {
+  String? selectedLetter;
+  final letterField = TextEditingController();
+
+  List<String> get _letters {
+    final letters = widget.app.speechSoundTriggers
+        .where((t) => t.programId == widget.program.id)
+        .map((t) => t.letter)
+        .toSet()
         .toList();
-    final canEdit = app.canEditTherapyTemplate(program.centerId);
+    letters.sort();
+    return letters;
+  }
+
+  List<SpeechSoundTriggerTemplate> _triggersFor(String letter) =>
+      widget.app.speechSoundTriggers
+          .where((t) =>
+              t.programId == widget.program.id && t.letter == letter)
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+  @override
+  void dispose() {
+    letterField.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final letters = _letters;
+    final canEdit =
+        widget.app.canEditTherapyTemplate(widget.program.centerId);
     return TherapyCard(
       icon: Icons.grid_on_outlined,
       title: 'تقييم الحروف',
@@ -864,23 +912,123 @@ class _SpeechSoundsEditor extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (canEdit)
-            _SoundAddRow(app: app, program: program, nextOrder: sounds.length),
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: letterField,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        labelText: 'إضافة حرف',
+                        hintText: 'مثال: أ',
+                      ),
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: () {
+                      final l = letterField.text.trim();
+                      if (l.isEmpty) return;
+                      setState(() {
+                        selectedLetter = l;
+                        letterField.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('إضافة حرف'),
+                  ),
+                  if (selectedLetter != null)
+                    AppPill(
+                      label: selectedLetter!,
+                      icon: Icons.check,
+                      selected: true,
+                    ),
+                ],
+              ),
+            ),
+          if (letters.isNotEmpty)
+            SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: letters.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final l = letters[index];
+                  return FilterChip(
+                    selected: l == selectedLetter,
+                    label: Text(l),
+                    onSelected: (_) =>
+                        setState(() => selectedLetter = l),
+                  );
+                },
+              ),
+            ),
           const SizedBox(height: AppSpacing.md),
-          if (sounds.isEmpty)
+          if (selectedLetter == null)
             const EmptyState(
-              icon: Icons.grid_view_outlined,
-              title: 'أضف أول خلية حروف',
+              icon: Icons.touch_app_outlined,
+              title: 'اختر حرفاً',
               message:
-                  'كل خلية = حرف + نوع خطأ + موضع، وترتبط بنقطة ضعف وهدف وعلاج ومهارات.',
+                  'اختر حرفاً من القائمة أعلاه، أو أضف حرفاً جديداً ثم حدد له خلية.',
             )
           else
-            ResponsiveGrid(
-              children: sounds
-                  .map((trigger) => _SoundCard(app: app, trigger: trigger))
-                  .toList(),
+            _LetterDetail(
+              app: widget.app,
+              program: widget.program,
+              letter: selectedLetter!,
+              triggers: _triggersFor(selectedLetter!),
             ),
         ],
       ),
+    );
+  }
+}
+
+class _LetterDetail extends StatelessWidget {
+  const _LetterDetail({
+    required this.app,
+    required this.program,
+    required this.letter,
+    required this.triggers,
+  });
+
+  final AppProvider app;
+  final TherapyProgramTemplate program;
+  final String letter;
+  final List<SpeechSoundTriggerTemplate> triggers;
+
+  @override
+  Widget build(BuildContext context) {
+    final canEdit = app.canEditTherapyTemplate(program.centerId);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (triggers.isEmpty)
+          const EmptyState(
+            icon: Icons.grid_view_outlined,
+            title: 'لا توجد خلايا',
+            message:
+                'لم يتم تعريف أي خلايا لهذا الحرف. أضف الخلية الأولى أدناه.',
+          )
+        else
+          ...triggers.map((t) => Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                child: _SoundCard(app: app, trigger: t),
+              )),
+        if (canEdit)
+          _SoundAddRow(
+            app: app,
+            program: program,
+            letter: letter,
+            nextOrder: triggers.length,
+          ),
+      ],
     );
   }
 }
@@ -889,11 +1037,13 @@ class _SoundAddRow extends StatefulWidget {
   const _SoundAddRow({
     required this.app,
     required this.program,
+    required this.letter,
     required this.nextOrder,
   });
 
   final AppProvider app;
   final TherapyProgramTemplate program;
+  final String letter;
   final int nextOrder;
 
   @override
@@ -901,19 +1051,21 @@ class _SoundAddRow extends StatefulWidget {
 }
 
 class _SoundAddRowState extends State<_SoundAddRow> {
-  final letter = TextEditingController();
   final weakness = TextEditingController();
   final goal = TextEditingController();
   final therapy = TextEditingController();
+  final skillInput = TextEditingController();
+  final _skillStepList = <String>[];
   String errorType = 'إبدال';
   String position = 'أول';
+  int? _editingIndex;
 
   @override
   void dispose() {
-    letter.dispose();
     weakness.dispose();
     goal.dispose();
     therapy.dispose();
+    skillInput.dispose();
     super.dispose();
   }
 
@@ -926,29 +1078,120 @@ class _SoundAddRowState extends State<_SoundAddRow> {
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              SizedBox(
-                width: 110,
-                child: TextField(
-                  controller: letter,
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(labelText: 'الحرف'),
-                ),
-              ),
-              _menu('نوع الخطأ', errorType, ['حذف', 'إبدال', 'إضافة', 'تشويه'],
+              Text(widget.letter,
+                  style: Theme.of(context).textTheme.titleLarge),
+              _menu('نوع الخطأ', errorType,
+                  ['حذف', 'إبدال', 'إضافة', 'تشويه'],
                   (value) => setState(() => errorType = value)),
               _menu('الموضع', position, ['أول', 'وسط', 'آخر'],
                   (value) => setState(() => position = value)),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
-          _TherapyTemplateFields(
-            weakness: weakness,
-            goal: goal,
-            therapy: therapy,
-            onSave: () {},
+          TextField(
+            controller: weakness,
+            decoration: const InputDecoration(labelText: 'نقطة الضعف'),
           ),
           const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: goal,
+            decoration: const InputDecoration(labelText: 'الهدف العلاجي'),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          TextField(
+            controller: therapy,
+            decoration: const InputDecoration(labelText: 'العلاج / التدريب'),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text('الخطوات المهارية:',
+              style: SanadText.subtitle(context)),
+          const SizedBox(height: AppSpacing.xs),
+          if (_skillStepList.isNotEmpty)
+            ..._skillStepList.asMap().entries.map((entry) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        child: Text('${entry.key + 1}',
+                            style: const TextStyle(fontSize: 11)),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _editingIndex == entry.key
+                            ? TextField(
+                                controller: skillInput,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                ),
+                                autofocus: true,
+                                onSubmitted: (_) => _saveEdit(entry.key),
+                              )
+                            : Text(entry.value, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (_editingIndex == entry.key) ...[
+                        IconButton(
+                          icon: const Icon(Icons.check, size: 20),
+                          onPressed: () => _saveEdit(entry.key),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _editingIndex = null;
+                              skillInput.clear();
+                            });
+                          },
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ] else ...[
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _editingIndex = entry.key;
+                              skillInput.text = entry.value;
+                            });
+                          },
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => _deleteStep(entry.key),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ],
+                  ),
+                )),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: skillInput,
+                  decoration: const InputDecoration(
+                    labelText: 'مهارة علاجية',
+                    hintText: 'اكتب مهارة ثم اضغط إضافة',
+                  ),
+                  onSubmitted: (_) => _addStep(),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              FilledButton.tonalIcon(
+                onPressed: _addStep,
+                icon: const Icon(Icons.add_task_outlined),
+                label: const Text('إضافة مهارة'),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FilledButton.icon(
@@ -962,10 +1205,39 @@ class _SoundAddRowState extends State<_SoundAddRow> {
     );
   }
 
+  void _addStep() {
+    final text = skillInput.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _skillStepList.add(text);
+      skillInput.clear();
+    });
+  }
+
+  void _deleteStep(int index) {
+    setState(() {
+      _skillStepList.removeAt(index);
+      if (_editingIndex == index) {
+        _editingIndex = null;
+        skillInput.clear();
+      }
+    });
+  }
+
+  void _saveEdit(int index) {
+    final text = skillInput.text.trim();
+    if (text.isEmpty) return;
+    setState(() {
+      _skillStepList[index] = text;
+      _editingIndex = null;
+      skillInput.clear();
+    });
+  }
+
   Widget _menu(String label, String value, List<String> values,
       ValueChanged<String> onChanged) {
     return SizedBox(
-      width: 160,
+      width: 140,
       child: DropdownButtonFormField<String>(
         initialValue: value,
         decoration: InputDecoration(labelText: label),
@@ -978,85 +1250,215 @@ class _SoundAddRowState extends State<_SoundAddRow> {
   }
 
   Future<void> _save() async {
-    if (letter.text.trim().isEmpty) return;
     final now = DateTime.now().toIso8601String();
     await widget.app.saveSpeechSoundTriggerTemplate(
       SpeechSoundTriggerTemplate(
         id: 'sound_${DateTime.now().microsecondsSinceEpoch}',
         centerId: widget.program.centerId,
         programId: widget.program.id,
-        letter: letter.text.trim(),
+        letter: widget.letter,
         errorType: errorType,
         position: position,
         generatesTherapy: true,
         weaknessTemplate: weakness.text.trim(),
         goalTemplate: goal.text.trim(),
         therapyTemplate: therapy.text.trim(),
+        skillStepTemplates: List.from(_skillStepList),
         sortOrder: widget.nextOrder,
         createdAt: now,
         updatedAt: now,
       ),
     );
-    letter.clear();
     weakness.clear();
     goal.clear();
     therapy.clear();
+    _skillStepList.clear();
+    skillInput.clear();
   }
 }
 
-class _SoundCard extends StatelessWidget {
+class _SoundCard extends StatefulWidget {
   const _SoundCard({required this.app, required this.trigger});
 
   final AppProvider app;
   final SpeechSoundTriggerTemplate trigger;
 
   @override
+  State<_SoundCard> createState() => _SoundCardState();
+}
+
+class _SoundCardState extends State<_SoundCard> {
+  final skillInput = TextEditingController();
+  int? _editingIndex;
+
+  SpeechSoundTriggerTemplate get _trigger => widget.trigger;
+  AppProvider get _app => widget.app;
+
+  @override
+  void dispose() {
+    skillInput.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateSteps(List<String> steps) async {
+    final now = DateTime.now().toIso8601String();
+    await _app.saveSpeechSoundTriggerTemplate(
+      _trigger.copyWith(
+        skillStepTemplates: steps,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  Future<void> _addStep() async {
+    final text = skillInput.text.trim();
+    if (text.isEmpty) return;
+    final updated = List<String>.from(_trigger.skillStepTemplates)
+      ..add(text);
+    await _updateSteps(updated);
+    skillInput.clear();
+  }
+
+  Future<void> _deleteStep(int index) async {
+    final updated = List<String>.from(_trigger.skillStepTemplates)
+      ..removeAt(index);
+    await _updateSteps(updated);
+  }
+
+  Future<void> _saveEdit(int index) async {
+    final text = skillInput.text.trim();
+    if (text.isEmpty) return;
+    final updated = List<String>.from(_trigger.skillStepTemplates);
+    updated[index] = text;
+    await _updateSteps(updated);
+    setState(() {
+      _editingIndex = null;
+      skillInput.clear();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final canEdit = app.canEditTherapyTemplate(trigger.centerId);
-    final steps = app.skillStepTemplates
-        .where(
-            (step) => step.ownerType == 'sound' && step.ownerId == trigger.id)
-        .toList();
+    final canEdit = _app.canEditTherapyTemplate(_trigger.centerId);
+    final steps = _trigger.skillStepTemplates;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              Text(trigger.letter,
-                  style: Theme.of(context).textTheme.displaySmall),
+              Text(_trigger.letter,
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Wrap(
-                  spacing: AppSpacing.xs,
-                  children: [
-                    AppPill(label: trigger.errorType, selected: true),
-                    AppPill(label: trigger.position),
-                    _ScopeBadge(centerId: trigger.centerId),
-                  ],
-                ),
-              ),
+              AppPill(label: _trigger.errorType, selected: true),
+              const SizedBox(width: AppSpacing.xs),
+              AppPill(label: _trigger.position),
+              const Spacer(),
+              _ScopeBadge(centerId: _trigger.centerId),
               if (canEdit)
                 IconButton(
                   onPressed: () =>
-                      app.deleteSpeechSoundTriggerTemplate(trigger.id),
+                      _app.deleteSpeechSoundTriggerTemplate(_trigger.id),
                   icon: const Icon(Icons.delete_outline),
                 ),
             ],
           ),
           _TemplatePreview(
-              label: 'نقطة الضعف', value: trigger.weaknessTemplate),
-          _TemplatePreview(label: 'الهدف العلاجي', value: trigger.goalTemplate),
+              label: 'نقطة الضعف', value: _trigger.weaknessTemplate),
           _TemplatePreview(
-              label: 'العلاج / التدريب', value: trigger.therapyTemplate),
-          if (canEdit)
-            _SkillStepAddRow(
-              app: app,
-              ownerType: 'sound',
-              ownerId: trigger.id,
-              nextOrder: steps.length,
+              label: 'الهدف العلاجي', value: _trigger.goalTemplate),
+          _TemplatePreview(
+              label: 'العلاج / التدريب', value: _trigger.therapyTemplate),
+          const SizedBox(height: AppSpacing.sm),
+          Text('الخطوات المهارية:',
+              style: SanadText.subtitle(context)),
+          const SizedBox(height: AppSpacing.xs),
+          if (steps.isNotEmpty)
+            ...steps.asMap().entries.map((entry) =>
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        child: Text('${entry.key + 1}',
+                            style: const TextStyle(fontSize: 11)),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _editingIndex == entry.key
+                            ? TextField(
+                                controller: skillInput,
+                                decoration: const InputDecoration(
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 8),
+                                ),
+                                autofocus: true,
+                                onSubmitted: (_) => _saveEdit(entry.key),
+                              )
+                            : Text(entry.value, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (canEdit)
+                        if (_editingIndex == entry.key) ...[
+                          IconButton(
+                            icon: const Icon(Icons.check, size: 20),
+                            onPressed: () => _saveEdit(entry.key),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _editingIndex = null;
+                                skillInput.clear();
+                              });
+                            },
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ] else ...[
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            onPressed: () {
+                              setState(() {
+                                _editingIndex = entry.key;
+                                skillInput.text = entry.value;
+                              });
+                            },
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () => _deleteStep(entry.key),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        ],
+                    ],
+                  ),
+                )),
+          if (canEdit) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: skillInput,
+                    decoration: const InputDecoration(
+                      labelText: 'مهارة علاجية',
+                      hintText: 'اكتب مهارة ثم اضغط إضافة',
+                    ),
+                    onSubmitted: (_) => _addStep(),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                FilledButton.tonalIcon(
+                  onPressed: _addStep,
+                  icon: const Icon(Icons.add_task_outlined),
+                  label: const Text('إضافة مهارة'),
+                ),
+              ],
             ),
-          ...steps.map((step) => _SkillStepTile(app: app, step: step)),
+          ],
         ],
       ),
     );
@@ -1145,8 +1547,8 @@ class _SkillStepAddRowState extends State<_SkillStepAddRow> {
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
       children: [
-        SizedBox(
-          width: 420,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
           child: TextField(
             controller: title,
             decoration: const InputDecoration(labelText: 'مهارة علاجية'),
@@ -1193,14 +1595,54 @@ class _SkillStepTile extends StatelessWidget {
       dense: true,
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(child: Text('${step.sortOrder + 1}')),
-      title: Text(step.title),
+      title: Text(step.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: canEdit
-          ? IconButton(
-              onPressed: () => app.deleteSkillStepTemplate(step.id),
-              icon: const Icon(Icons.close),
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  onPressed: () => _edit(context),
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  onPressed: () => app.deleteSkillStepTemplate(step.id),
+                  icon: const Icon(Icons.close, size: 20),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             )
           : const Icon(Icons.lock_outline),
     );
+  }
+
+  Future<void> _edit(BuildContext context) async {
+    final controller = TextEditingController(text: step.title);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('تعديل المهارة'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'المهارة العلاجية'),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      await app.saveSkillStepTemplate(step.copyWith(title: result));
+    }
+    controller.dispose();
   }
 }
 
@@ -1215,7 +1657,7 @@ class _TemplatePreview extends StatelessWidget {
     if (value.trim().isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Text('$label: $value', style: SanadText.secondary(context)),
+      child: Text('$label: $value', maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
     );
   }
 }

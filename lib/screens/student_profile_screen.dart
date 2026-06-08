@@ -7,7 +7,9 @@ import '../widgets/app_widgets.dart';
 import '../widgets/feedback.dart';
 
 class StudentProfileScreen extends StatelessWidget {
-  const StudentProfileScreen({super.key});
+  const StudentProfileScreen({super.key, this.onOpenSession});
+
+  final VoidCallback? onOpenSession;
 
   @override
   Widget build(BuildContext context) {
@@ -19,26 +21,109 @@ class StudentProfileScreen extends StatelessWidget {
     if (app.isParent) {
       return _ParentStudentProfile(app: app, student: student);
     }
+
+    final assessments = app.clinicalAssessments;
+    final assessmentSummary = assessments.isEmpty
+        ? 'لا توجد تقييمات'
+        : 'آخر تقييم: ${assessments.first.createdAt.split('T').first}';
+
+    final plans = app.plans;
+    final goalSummary = plans.isEmpty
+        ? 'لا توجد أهداف'
+        : '${plans.length} أهداف قيد المتابعة';
+
+    final exercises = app.exercises;
+    final pendingCount =
+        exercises.where((e) => e.status == 'pending').length;
+    final reviewCount =
+        exercises.where((e) => e.status == 'completed_by_parent').length;
+    final reviewedCount =
+        exercises.where((e) => e.status == 'specialist_reviewed').length;
+    final homeworkSummary = exercises.isEmpty
+        ? 'لا توجد واجبات'
+        : '$pendingCount بانتظار  |  $reviewCount للمراجعة  |  $reviewedCount تمت مراجعتها';
+
+    final notesExercises =
+        exercises.where((e) => e.parentNote.isNotEmpty).toList();
+    final parentNotesSummary = notesExercises.isEmpty
+        ? 'لا توجد ملاحظات'
+        : '${notesExercises.length} ملاحظات';
+
+    final timelineCount = app.sessions.length +
+        app.evaluations.length +
+        app.clinicalAssessments.length +
+        app.exercises.length +
+        app.reports.length +
+        (app.reward != null ? 1 : 0);
+    final timelineSummary = timelineCount == 0
+        ? 'لا توجد أحداث'
+        : '$timelineCount أحداث';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (!app.isParent)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => app.selectStudent(null),
+                  icon: const Icon(Icons.arrow_forward),
+                  label: const Text('رجوع لاختيار طالب آخر'),
+                ),
+              ],
+            ),
+          ),
         _StudentOverview(app: app, student: student),
         const SizedBox(height: 16),
         _ProfileSummary(app: app),
         const SizedBox(height: 16),
-        _ClinicalAssessmentProfileSection(app: app),
-        const SizedBox(height: 16),
-        _GoalProgressSection(app: app),
+        _CollapsibleCard(
+          icon: Icons.fact_check_outlined,
+          title: 'التقييم العلاجي',
+          summary: assessmentSummary,
+          count: assessments.length,
+          child: _ClinicalAssessmentProfileSection(app: app),
+        ),
+        const SizedBox(height: 12),
+        _CollapsibleCard(
+          icon: Icons.track_changes_outlined,
+          title: 'متابعة الأهداف العلاجية',
+          summary: goalSummary,
+          count: plans.length,
+          child: _GoalProgressSection(app: app, onOpenSession: onOpenSession),
+        ),
+        const SizedBox(height: 12),
+        _CollapsibleCard(
+          icon: Icons.assignment_turned_in_outlined,
+          title: 'الواجبات المنزلية',
+          summary: homeworkSummary,
+          count: exercises.length,
+          child: _HomeworkSummary(app: app),
+        ),
+        const SizedBox(height: 12),
+        _CollapsibleCard(
+          icon: Icons.chat_outlined,
+          title: 'ملاحظات ولي الأمر',
+          summary: parentNotesSummary,
+          count: notesExercises.length,
+          child: _ParentNotesCard(exercises: notesExercises),
+        ),
+        const SizedBox(height: 12),
+        _CollapsibleCard(
+          icon: Icons.auto_graph_outlined,
+          title: 'الخط الزمني',
+          summary: timelineSummary,
+          count: timelineCount,
+          child: _Timeline(app: app),
+        ),
         const SizedBox(height: 16),
         _QuickActions(app: app, student: student),
         const SizedBox(height: 16),
         _PreviousSessions(app: app),
         const SizedBox(height: 16),
         _ReportsFromProfile(app: app),
-        const SizedBox(height: 16),
-        _HomeworkSummary(app: app),
-        const SizedBox(height: 16),
-        _Timeline(app: app),
       ],
     );
   }
@@ -70,8 +155,8 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
           title: 'اختر طالبًا لعرض ملفه',
           message:
               'لا يتم فتح أي ملف تلقائيًا. اختر الطالب من القائمة أو ابحث عنه.',
-          action: SizedBox(
-            width: 360,
+          action: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
             child: TextField(
               decoration: const InputDecoration(
                 prefixIcon: Icon(Icons.search),
@@ -105,7 +190,7 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(student.diagnosis),
+                                    Text(student.diagnosis, maxLines: 2, overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 4),
                                     AppPill(label: student.status),
                                   ],
@@ -160,13 +245,17 @@ class _ParentStudentProfile extends StatelessWidget {
                       children: [
                         Text(
                           student.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: Theme.of(context)
                               .textTheme
                               .headlineSmall
                               ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 4),
-                        const Text('متابعة منزلية مبسطة لولي الأمر'),
+                        const Text('متابعة منزلية مبسطة لولي الأمر',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
@@ -260,56 +349,183 @@ class _StudentOverview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final programs = app.programsForStudent();
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              StudentAvatar(student: student, radius: 42),
-              const SizedBox(width: 12),
+              CircleAvatar(
+                radius: 34,
+                backgroundColor: colorScheme.primaryContainer,
+                child: Icon(Icons.child_care, size: 32, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(student.name,
+          Text(student.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 2),
+                    Text(app.currentCenter?.name ?? 'المركز غير محدد',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context)
                             .textTheme
-                            .headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    Text(app.currentCenter?.name ?? 'المركز غير محدد'),
+                            .bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant)),
                   ],
                 ),
               ),
-              Chip(label: Text(student.status)),
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text(student.status, style: const TextStyle(fontSize: 12)),
+              ),
             ],
           ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          if (programs.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: programs.map((p) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(AppRadii.control),
+                ),
+                child: Text(
+                  p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Row(
             children: [
-              _InfoTile('العمر', '${student.age}'),
-              _InfoTile('التشخيص', student.diagnosis),
-              _InfoTile('ولي الأمر', student.parentName),
-              _InfoTile('رقم ولي الأمر', student.parentPhone),
-              _InfoTile('نوع البرنامج', student.programType),
-              _InfoTile('اسم المستخدم', student.portalEmail, ltr: true),
+              Expanded(
+                child: _CompactInfoTile(
+                  icon: Icons.cake_outlined,
+                  label: 'العمر',
+                  value: '${student.age}',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _CompactInfoTile(
+                  icon: Icons.medical_information_outlined,
+                  label: 'التشخيص',
+                  value: student.diagnosis,
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _CompactInfoTile(
+                  icon: Icons.person_outlined,
+                  label: 'ولي الأمر',
+                  value: student.parentName,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _CompactInfoTile(
+                  icon: Icons.phone_outlined,
+                  label: 'رقم ولي الأمر',
+                  value: student.parentPhone,
+                  ltr: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _CompactInfoTile(
+            icon: Icons.person_outline,
+            label: 'اسم المستخدم',
+            value: student.portalEmail,
+            ltr: true,
           ),
           if (student.notes.isNotEmpty) ...[
-            const Divider(height: 28),
+            const Divider(height: 24),
             Text('ملاحظات الملف',
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
                     ?.copyWith(fontWeight: FontWeight.w900)),
-            const SizedBox(height: 6),
-            Text(student.notes),
+            const SizedBox(height: 4),
+            Text(student.notes, maxLines: 3, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ],
       ),
+    );
+  }
+}
+
+class _CompactInfoTile extends StatelessWidget {
+  const _CompactInfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.ltr = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool ltr;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorScheme.onSurface,
+                  )),
+              Directionality(
+                textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
+                child: Text(
+                  value.isEmpty ? '-' : value,
+                  maxLines: 1,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                  textAlign: ltr ? TextAlign.left : TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -332,20 +548,17 @@ class _QuickActions extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              _action(context, Icons.play_circle_outline, 'بدء جلسة',
-                  'افتح شاشة الجلسات واختر أنشطة الطالب.'),
-              _action(context, Icons.history, 'الجلسات السابقة',
-                  'الجلسات السابقة ظاهرة أسفل الملف.'),
-              _reportButton(context, 'تقرير جلسة'),
-              _reportButton(context, 'تقرير أسبوعي'),
-              _reportButton(context, 'تقرير شهري'),
-              _reportButton(context, 'تقرير ثلاثة أشهر'),
-              _reportButton(context, 'تقرير سنة'),
+              _reportButton(context, 'تقرير مختصر'),
+              FilledButton.tonalIcon(
+                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('سيتم تفعيل اختبار جلسة محددة لاحقًا'),
+                  ),
+                ),
+                icon: const Icon(Icons.science_outlined),
+                label: const Text('اختبار جلسة محددة'),
+              ),
               _reportButton(context, 'تقرير شامل'),
-              _action(context, Icons.edit_outlined, 'تعديل البيانات',
-                  'التعديل يتم من شاشة الطلاب أو الإدخال.'),
-              _action(context, Icons.phone_in_talk_outlined, 'التواصل',
-                  student.parentPhone),
             ],
           ),
         ],
@@ -356,7 +569,7 @@ class _QuickActions extends StatelessWidget {
   Widget _reportButton(BuildContext context, String type) {
     return FilledButton.tonalIcon(
       onPressed: app.canViewReports
-          ? () => type == 'تقرير جلسة'
+          ? () => type == 'تقرير مختصر'
               ? _chooseSessionReport(context)
               : runWithFeedback(
                   context,
@@ -371,7 +584,7 @@ class _QuickActions extends StatelessWidget {
                 )
           : null,
       icon: const Icon(Icons.picture_as_pdf_outlined),
-      label: Text(type),
+      label: Text(type, maxLines: 1, overflow: TextOverflow.ellipsis),
     );
   }
 
@@ -387,14 +600,14 @@ class _QuickActions extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: const Text('اختر جلسة للتقرير'),
         content: SizedBox(
-          width: 560,
+          width: MediaQuery.of(context).size.width.clamp(300, 560).toDouble(),
           child: ListView(
             shrinkWrap: true,
             children: app.sessions.map((session) {
               return ListTile(
-                title: Text(session.cardTitle),
+                title: Text(session.cardTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
                 subtitle: Text(
-                    '${session.startedAt.split('T').first} - نجاح ${session.successRate}%'),
+                    '${session.startedAt.split('T').first} - نجاح ${session.successRate}%', maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: const Icon(Icons.picture_as_pdf_outlined),
                 onTap: () async {
                   await runWithFeedback(
@@ -422,26 +635,13 @@ class _QuickActions extends StatelessWidget {
     if (type == 'تقرير شامل') return app.sessions;
     final now = DateTime.now();
     final from = switch (type) {
-      'تقرير أسبوعي' => now.subtract(const Duration(days: 7)),
-      'تقرير شهري' => DateTime(now.year, now.month, 1),
-      'تقرير سنة' => DateTime(now.year, 1, 1),
-      'تقرير ثلاثة أشهر' => DateTime(now.year, now.month - 2, 1),
+      'تقرير مختصر' => now.subtract(const Duration(days: 7)),
       _ => DateTime(1900),
     };
     return app.sessions.where((session) {
       final date = DateTime.tryParse(session.startedAt);
       return date != null && !date.isBefore(from);
     }).toList();
-  }
-
-  Widget _action(
-      BuildContext context, IconData icon, String label, String message) {
-    return FilledButton.tonalIcon(
-      onPressed: () => ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(message))),
-      icon: Icon(icon),
-      label: Text(label),
-    );
   }
 }
 
@@ -485,15 +685,17 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'تقييم نطقي - ${assessment.createdAt.split('T').first}',
-                            style: SanadText.subtitle(context),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'تقييم نطقي - ${assessment.createdAt.split('T').first}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: SanadText.subtitle(context),
+                            ),
                           ),
-                        ),
-                        AppPill(
+                          AppPill(
                           label: weaknesses.isEmpty
                               ? 'كلها طبيعية'
                               : '${weaknesses.length} أهداف',
@@ -508,12 +710,16 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
                     if (assessment.strengthsSummary.isNotEmpty)
                       Text(
                         'القوة:\n${assessment.strengthsSummary}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: SanadText.secondary(context),
                       ),
                     if (assessment.weaknessesSummary.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'الضعف:\n${assessment.weaknessesSummary}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: SanadText.secondary(context),
                       ),
                     ],
@@ -521,6 +727,8 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'الأهداف:\n${assessment.goalsSummary}',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
                         style: SanadText.secondary(context),
                       ),
                     ],
@@ -535,9 +743,11 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
 }
 
 class _GoalProgressSection extends StatelessWidget {
-  const _GoalProgressSection({required this.app});
+  const _GoalProgressSection(
+      {required this.app, this.onOpenSession});
 
   final AppProvider app;
+  final VoidCallback? onOpenSession;
 
   @override
   Widget build(BuildContext context) {
@@ -577,56 +787,131 @@ class _GoalProgressSection extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadii.card),
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 380;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: Text(plan.goal,
-                              style: SanadText.subtitle(context)),
-                        ),
-                        AppPill(
-                          label: status,
-                          icon: status == 'مكتمل'
-                              ? Icons.verified_outlined
-                              : Icons.trending_up_outlined,
-                          selected: status == 'مكتمل',
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    LinearProgressIndicator(value: progress / 100),
-                    const SizedBox(height: AppSpacing.sm),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        AppPill(label: 'التقدم: $progress%'),
-                        AppPill(label: 'متقن: $completed'),
-                        AppPill(label: 'متبقي: $remaining'),
-                        AppPill(label: 'آخر جلسة: $lastSession'),
-                      ],
-                    ),
-                    if (steps.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Wrap(
-                        spacing: AppSpacing.sm,
-                        runSpacing: AppSpacing.sm,
-                        children: steps.map((step) {
-                          return Chip(
-                            avatar: Icon(
-                              step.status == 'متقن'
-                                  ? Icons.check_circle_outline
-                                  : Icons.radio_button_unchecked,
-                              size: 18,
+                        if (narrow)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(plan.goal,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SanadText.subtitle(context)),
+                              const SizedBox(height: 6),
+                              AppPill(
+                                label: status,
+                                icon: status == 'مكتمل'
+                                    ? Icons.verified_outlined
+                                    : Icons.trending_up_outlined,
+                                selected: status == 'مكتمل',
+                              ),
+                            ],
+                          )
+                        else
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(plan.goal,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: SanadText.subtitle(context)),
+                              ),
+                              AppPill(
+                                label: status,
+                                icon: status == 'مكتمل'
+                                    ? Icons.verified_outlined
+                                    : Icons.trending_up_outlined,
+                                selected: status == 'مكتمل',
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: AppSpacing.sm),
+                        LinearProgressIndicator(value: progress / 100),
+                        const SizedBox(height: AppSpacing.sm),
+                        if (narrow)
+                          Column(
+                            children: [
+                              _progressRow(
+                                  Icons.trending_up_outlined, 'التقدم: $progress%', context),
+                              const SizedBox(height: 6),
+                              _progressRow(
+                                  Icons.check_circle_outline, 'متقن: $completed', context),
+                              const SizedBox(height: 6),
+                              _progressRow(
+                                  Icons.pending_outlined, 'متبقي: $remaining', context),
+                              const SizedBox(height: 6),
+                              _progressRow(
+                                  Icons.history_outlined, 'آخر جلسة: $lastSession', context),
+                            ],
+                          )
+                        else
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: [
+                              AppPill(label: 'التقدم: $progress%'),
+                              AppPill(label: 'متقن: $completed'),
+                              AppPill(label: 'متبقي: $remaining'),
+                              AppPill(label: 'آخر جلسة: $lastSession'),
+                            ],
+                          ),
+                        if (steps.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: AppSpacing.sm,
+                            runSpacing: AppSpacing.sm,
+                            children: steps.map((step) {
+                              final needsRetrain = step.status == 'بمساعدة' ||
+                                  step.status == 'يحتاج إعادة';
+                              final chip = Chip(
+                                avatar: Icon(
+                                  step.status == 'متقن'
+                                      ? Icons.check_circle_outline
+                                      : Icons.radio_button_unchecked,
+                                  size: 18,
+                                ),
+                                label: Text('${step.title} - ${step.status}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                                deleteIcon: needsRetrain
+                                    ? const Icon(Icons.refresh_outlined, size: 18)
+                                    : null,
+                                onDeleted: needsRetrain
+                                    ? () => _openRetrain(context, plan, step)
+                                    : null,
+                              );
+                              if (narrow) {
+                                return ConstrainedBox(
+                                  constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                                  child: chip,
+                                );
+                              }
+                              return chip;
+                            }).toList(),
+                          ),
+                        ],
+                        if (steps.isEmpty && plan.treatment.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(plan.treatment,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: SanadText.secondary(context)),
+                          if (plan.progress < 100)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: FilledButton.tonalIcon(
+                                onPressed: () =>
+                                    _openRetrainPlan(context, plan),
+                                icon: const Icon(Icons.refresh_outlined),
+                                label: const Text('إعادة التدريب'),
+                              ),
                             ),
-                            label: Text('${step.title} - ${step.status}'),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ],
+                        ],
+                      ],
+                    );
+                  },
                 ),
               );
             }),
@@ -646,6 +931,57 @@ class _GoalProgressSection extends StatelessWidget {
       ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
     if (matches.isEmpty) return 'لا توجد';
     return matches.first.startedAt.split('T').first;
+  }
+
+  Widget _progressRow(IconData icon, String label, BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openRetrain(BuildContext context, TrainingPlan plan,
+      GoalSkillStep step) {
+    final app = context.read<AppProvider>();
+    app.preselectSession({
+      'programId': plan.programId,
+      'sourceType': plan.sourceType,
+      'planId': plan.id,
+      'stepId': step.id,
+    });
+    onOpenSession?.call();
+  }
+
+  void _openRetrainPlan(BuildContext context, TrainingPlan plan) {
+    final app = context.read<AppProvider>();
+    app.preselectSession({
+      'programId': plan.programId,
+      'sourceType': plan.sourceType,
+      'planId': plan.id,
+    });
+    onOpenSession?.call();
   }
 }
 
@@ -739,6 +1075,8 @@ class _SessionTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(session.cardTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -754,7 +1092,7 @@ class _SessionTile extends StatelessWidget {
             children: [
               Chip(label: Text(session.startedAt.split('T').first)),
               Chip(label: Text(session.sessionType)),
-              Chip(label: Text(session.quickResult)),
+              Chip(label: Text(session.quickResult, maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
           ),
           if (activities.isNotEmpty) ...[
@@ -772,11 +1110,11 @@ class _SessionTile extends StatelessWidget {
           ],
           if (session.summary.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(session.summary),
+            Text(session.summary, maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
           if (session.notes.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text('ملاحظة الأخصائي: ${session.notes}'),
+            Text('ملاحظة الأخصائي: ${session.notes}', maxLines: 2, overflow: TextOverflow.ellipsis),
           ],
         ],
       ),
@@ -803,7 +1141,7 @@ class _ReportsFromProfile extends StatelessWidget {
             ...app.reports.map((report) => ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.picture_as_pdf_outlined),
-                  title: Text(report.type),
+                  title: Text(report.type, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: Text('نسبة التقدم ${report.improvementRate}%'),
                   trailing: Text(report.createdAt.split('T').first),
                 )),
@@ -820,27 +1158,342 @@ class _HomeworkSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pending = app.exercises
+        .where((e) => e.status == 'pending')
+        .toList();
+    final review = app.exercises
+        .where((e) => e.status == 'completed_by_parent')
+        .toList();
+    final reviewed = app.exercises
+        .where((e) => e.status == 'specialist_reviewed')
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _HomeworkSection(
+          icon: Icons.hourglass_empty_outlined,
+          title: 'بانتظار ولي الأمر',
+          count: pending.length,
+          color: Colors.orange,
+          exercises: pending,
+          app: app,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _HomeworkSection(
+          icon: Icons.rate_review_outlined,
+          title: 'تحتاج مراجعة',
+          count: review.length,
+          color: Colors.blue,
+          exercises: review,
+          app: app,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _HomeworkSection(
+          icon: Icons.check_circle_outline,
+          title: 'تمت مراجعتها',
+          count: reviewed.length,
+          color: Colors.green,
+          exercises: reviewed,
+          app: app,
+        ),
+      ],
+    );
+  }
+}
+
+class _HomeworkSection extends StatelessWidget {
+  const _HomeworkSection({
+    required this.icon,
+    required this.title,
+    required this.count,
+    required this.color,
+    required this.exercises,
+    required this.app,
+  });
+
+  final IconData icon;
+  final String title;
+  final int count;
+  final Color color;
+  final List<Exercise> exercises;
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader(context, 'الواجبات وملاحظات ولي الأمر',
-              Icons.assignment_turned_in_outlined),
-          const SizedBox(height: 10),
-          if (app.exercises.isEmpty)
-            const Text('لا توجد واجبات بعد.')
+          Row(
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w900, color: color)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('$count',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: color, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          if (exercises.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+              child: Text(
+                'لا توجد واجبات',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            )
           else
-            ...app.exercises.take(8).map((exercise) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.assignment_outlined),
-                  title: Text(exercise.title),
-                  subtitle: Text(
-                      '${exercise.status}${exercise.parentNote.isEmpty ? '' : '\nملاحظة: ${exercise.parentNote}'}'),
-                  trailing: Text('★ ${exercise.stars}'),
+            ...exercises.map((ex) => _HomeworkTile(
+                  exercise: ex,
+                  app: app,
                 )),
         ],
       ),
     );
+  }
+}
+
+class _HomeworkTile extends StatelessWidget {
+  const _HomeworkTile({required this.exercise, required this.app});
+
+  final Exercise exercise;
+  final AppProvider app;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPlan = exercise.planId.isNotEmpty;
+    final plan =
+        app.plans.where((p) => p.id == exercise.planId).toList();
+    final planName = plan.isNotEmpty ? plan.first.goal : '';
+    final step = exercise.goalSkillStepId.isNotEmpty
+        ? app.goalSkillSteps
+            .where((s) => s.id == exercise.goalSkillStepId)
+            .toList()
+        : <GoalSkillStep>[];
+    final stepName = step.isNotEmpty ? step.first.title : '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(exercise.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900)),
+              ),
+              if (exercise.status == 'pending')
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('بانتظار',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.orange, fontSize: 11)),
+                )
+              else if (exercise.status == 'completed_by_parent')
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('للمراجعة',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.blue, fontSize: 11)),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('تمت المراجعة',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: Colors.green, fontSize: 11)),
+                ),
+            ],
+          ),
+          if (exercise.instructions.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(exercise.instructions,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+          if (hasPlan) ...[
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.track_changes_outlined,
+                    size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    planName.isNotEmpty ? planName : 'هدف علاجي',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.primary),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (stepName.isNotEmpty && hasPlan) ...[
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                const Icon(Icons.checklist_outlined,
+                    size: 14, color: Colors.grey),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    stepName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (exercise.parentNote.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: SanadUiColors.accentAmber,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.chat_outlined, size: 14),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(exercise.parentNote,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                exercise.parentCompletedAt.isNotEmpty
+                    ? 'تم: ${exercise.parentCompletedAt.split('T').first}'
+                    : 'أرسل: ${exercise.createdAt.isNotEmpty ? exercise.createdAt.split('T').first : ''}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const Spacer(),
+              if (exercise.status == 'completed_by_parent' && !app.isParent)
+                FilledButton.tonal(
+                  onPressed: () => _reviewHomework(context, exercise),
+                  child: const Text('مراجعة',
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              if (exercise.stars > 0)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text('★ ${exercise.stars}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _reviewHomework(
+      BuildContext context, Exercise exercise) async {
+    final app = context.read<AppProvider>();
+    final student = app.selectedStudent;
+    if (student == null) return;
+    if (exercise.planId.isEmpty) return;
+    final plan =
+        app.plans.where((p) => p.id == exercise.planId).toList();
+    if (plan.isEmpty) return;
+    final planItem = plan.first;
+    if (exercise.goalSkillStepId.isNotEmpty) {
+      final step = app.goalSkillSteps
+          .where((s) => s.id == exercise.goalSkillStepId)
+          .toList();
+      if (step.isNotEmpty) {
+        await app.updateGoalSkillStepStatus(
+          step: step.first,
+          status: 'متقن',
+          notes: 'تم اعتماد الإتقان بعد واجب منزلي.',
+        );
+      }
+    } else {
+      await app.updatePlanProgress(
+        planId: planItem.id,
+        progress: 100,
+      );
+    }
+    final now = DateTime.now().toIso8601String();
+    await app.saveExercise(
+      exercise.copyWith(
+        status: 'specialist_reviewed',
+        specialistReviewedAt: now,
+      ),
+    );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('تم اعتماد إتقان المهارة.')),
+      );
+    }
   }
 }
 
@@ -958,6 +1611,8 @@ class _TimelineRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.w900),
                       ),
                     ),
@@ -965,7 +1620,7 @@ class _TimelineRow extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(item.subtitle),
+                Text(item.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -998,13 +1653,19 @@ class _ParentHomeworkTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(exercise.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w900)),
                 const SizedBox(height: 4),
-                Text('الحالة: ${exercise.status}'),
+                Text('الحالة: ${exercise.status}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
-          Text('★ ${exercise.stars}'),
+          Text('★ ${exercise.stars}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -1033,6 +1694,8 @@ class _ParentSessionCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(session.cardTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w900)),
               ),
               Chip(label: Text('نجاح ${session.successRate}%')),
@@ -1041,7 +1704,7 @@ class _ParentSessionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text('التاريخ: ${session.startedAt.split('T').first}'),
           Text('البرنامج: ${session.sessionType}'),
-          if (parentNote.isNotEmpty) Text('ملاحظتك: $parentNote'),
+          if (parentNote.isNotEmpty) Text('ملاحظتك: $parentNote', maxLines: 2, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
@@ -1049,30 +1712,23 @@ class _ParentSessionCard extends StatelessWidget {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile(this.label, this.value, {this.ltr = false});
+  const _InfoTile(this.label, this.value);
 
   final String label;
   final String value;
-  final bool ltr;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 220,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
-          Directionality(
-            textDirection: ltr ? TextDirection.ltr : TextDirection.rtl,
-            child: Text(
-              value.isEmpty ? '-' : value,
-              textAlign: ltr ? TextAlign.left : TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Text(
+          value.isEmpty ? '-' : value,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 }
@@ -1086,6 +1742,148 @@ class _TimelineItem {
   final String date;
 }
 
+class _CollapsibleCard extends StatefulWidget {
+  const _CollapsibleCard({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.child,
+    this.count,
+  });
+
+  final IconData icon;
+  final String title;
+  final String summary;
+  final Widget child;
+  final int? count;
+
+  @override
+  State<_CollapsibleCard> createState() => _CollapsibleCardState();
+}
+
+class _CollapsibleCardState extends State<_CollapsibleCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return AppCard(
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(widget.icon, size: 18, color: colorScheme.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      if (widget.count != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${widget.count}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _expanded
+                ? Padding(
+                    padding: const EdgeInsets.only(
+                        bottom: 16, left: 16, right: 16),
+                    child: widget.child,
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParentNotesCard extends StatelessWidget {
+  const _ParentNotesCard({required this.exercises});
+  final List<Exercise> exercises;
+
+  @override
+  Widget build(BuildContext context) {
+    if (exercises.isEmpty) {
+      return const Text('لا توجد ملاحظات من ولي الأمر.');
+    }
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      children: exercises.map((e) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(AppRadii.control),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(e.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 14)),
+            const SizedBox(height: 4),
+            Text(e.parentNote,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          ],
+        ),
+      )).toList(),
+    );
+  }
+}
+
 Widget _sectionHeader(BuildContext context, String title, IconData icon) {
   return Row(
     children: [
@@ -1094,6 +1892,8 @@ Widget _sectionHeader(BuildContext context, String title, IconData icon) {
       Expanded(
         child: Text(
           title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: Theme.of(context)
               .textTheme
               .titleLarge

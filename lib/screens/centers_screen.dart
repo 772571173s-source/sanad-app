@@ -84,7 +84,8 @@ class CentersScreen extends StatelessWidget {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text('حذف المركز'),
-            content: Text('هل تريد حذف مركز ${center.name}؟'),
+            content: Text('هل تريد حذف مركز ${center.name}؟',
+                maxLines: 2, overflow: TextOverflow.ellipsis),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
@@ -117,7 +118,7 @@ class CentersScreen extends StatelessWidget {
       builder: (dialogContext) => AlertDialog(
         title: Text(center == null ? 'إضافة مركز' : 'تعديل مركز'),
         content: SizedBox(
-          width: 520,
+          width: MediaQuery.of(context).size.width.clamp(320, 520).toDouble(),
           child: SingleChildScrollView(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               TextField(
@@ -235,6 +236,7 @@ class _CenterDashboardCardState extends State<_CenterDashboardCard> {
                               ? 'لم يتم تحديد مدير'
                               : 'المدير: ${center.managerName}',
                           style: const TextStyle(fontWeight: FontWeight.w800),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -325,7 +327,7 @@ class _MiniStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 118,
+      constraints: const BoxConstraints(maxWidth: 118),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,

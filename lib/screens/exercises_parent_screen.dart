@@ -64,7 +64,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
           AppCard(
             child: ListTile(
               leading: const Icon(Icons.child_care_outlined),
-              title: Text(student.name),
+              title: Text(student.name, maxLines: 1, overflow: TextOverflow.ellipsis),
               subtitle: Text('الواجبات الحالية: ${visibleExercises.length}'),
             ),
           ),
@@ -109,16 +109,20 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
         else
           ResponsiveGrid(
             children: visibleExercises
-                .map((exercise) => _HomeworkCard(
-                      app: app,
-                      exercise: exercise,
-                      studentName: student?.name,
-                      onOpen: () => _openHomeworkFlow(app, exercise),
-                      onNote: () => _addParentNote(context, app, exercise),
-                      onUpload: () => _uploadAudio(app, exercise),
-                      onApprove:
-                          app.isParent ? null : () => _approve(app, exercise),
-                    ))
+                  .map((exercise) => _HomeworkCard(
+                        app: app,
+                        exercise: exercise,
+                        studentName: student?.name,
+                        onOpen: () => _openHomeworkFlow(app, exercise),
+                        onNote: () => _addParentNote(context, app, exercise),
+                        onUpload: () => _uploadAudio(app, exercise),
+                        onApprove:
+                            app.isParent ? null : () => _approve(app, exercise),
+                        onComplete: exercise.status == 'pending'
+                            ? () =>
+                                _completeHomework(context, app, exercise)
+                            : null,
+                      ))
                 .toList(),
           ),
       ],
@@ -147,6 +151,22 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
       title.clear();
       instructions.clear();
     }, success: 'تم إرسال الواجب.');
+  }
+
+  Future<void> _completeHomework(
+      BuildContext context, AppProvider app, Exercise exercise) async {
+    await runWithFeedback(
+      context,
+      () => app.saveExercise(
+        _copyExercise(
+          exercise,
+          status: 'completed_by_parent',
+          stars: exercise.stars + 1,
+          parentCompletedAt: DateTime.now().toIso8601String(),
+        ),
+      ),
+      success: 'تم تسليم الواجب. شكرًا لمتابعتك.',
+    );
   }
 
   Future<void> _uploadAudio(AppProvider app, Exercise exercise) async {
@@ -215,8 +235,8 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
             return AlertDialog(
               title: Text(_cleanTitle(exercise.title)),
               contentPadding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
-              content: SizedBox(
-                width: 640,
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -226,13 +246,15 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                         children: [
                           Text(
                             'نشاط ${index + 1} من ${activities.length}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w900),
                           ),
                           const Spacer(),
-                          Chip(label: Text(current.typeLabel)),
+                          Chip(label: Text(current.typeLabel, maxLines: 1, overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -242,6 +264,8 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
                         remaining == 0
                             ? 'هذا آخر نشاط في الواجب.'
                             : 'المتبقي: $remaining نشاط',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 14),
@@ -313,6 +337,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
     String? audioPath,
     String? parentNote,
     int? stars,
+    String? parentCompletedAt,
   }) {
     return Exercise(
       id: exercise.id,
@@ -325,6 +350,16 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
       audioPath: audioPath ?? exercise.audioPath,
       parentNote: parentNote ?? exercise.parentNote,
       stars: stars ?? exercise.stars,
+      programId: exercise.programId,
+      planId: exercise.planId,
+      goalSkillStepId: exercise.goalSkillStepId,
+      sourceType: exercise.sourceType,
+      sessionDate: exercise.sessionDate,
+      noteForParent: exercise.noteForParent,
+      parentCompletedAt:
+          parentCompletedAt ?? exercise.parentCompletedAt,
+      specialistReviewedAt: exercise.specialistReviewedAt,
+      createdFromSessionResult: exercise.createdFromSessionResult,
       createdAt: exercise.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     );
@@ -340,6 +375,7 @@ class _HomeworkCard extends StatelessWidget {
     required this.onUpload,
     required this.studentName,
     this.onApprove,
+    this.onComplete,
   });
 
   final AppProvider app;
@@ -349,6 +385,7 @@ class _HomeworkCard extends StatelessWidget {
   final VoidCallback onNote;
   final VoidCallback onUpload;
   final VoidCallback? onApprove;
+  final VoidCallback? onComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -375,6 +412,8 @@ class _HomeworkCard extends StatelessWidget {
                     if (studentName != null)
                       Text(
                         studentName!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context)
                             .textTheme
                             .labelLarge
@@ -382,6 +421,8 @@ class _HomeworkCard extends StatelessWidget {
                       ),
                     Text(
                       programName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -389,17 +430,19 @@ class _HomeworkCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(activityName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodyLarge),
                   ],
                 ),
               ),
-              Chip(label: Text(exercise.status)),
+              Chip(label: Text(exercise.status, maxLines: 1, overflow: TextOverflow.ellipsis)),
             ],
           ),
           const SizedBox(height: 12),
           _HomeworkPreview(summary: summary, activities: activities),
           const SizedBox(height: 8),
-          Text('تاريخ التسليم: ${exercise.dueDate}'),
+          Text('تاريخ التسليم: ${exercise.dueDate}', maxLines: 1, overflow: TextOverflow.ellipsis),
           if (exercise.audioPath.isNotEmpty)
             Directionality(
               textDirection: TextDirection.ltr,
@@ -411,7 +454,7 @@ class _HomeworkCard extends StatelessWidget {
               ),
             ),
           if (exercise.parentNote.isNotEmpty)
-            Text('ملاحظة ولي الأمر: ${exercise.parentNote}'),
+            Text('ملاحظة ولي الأمر: ${exercise.parentNote}', maxLines: 2, overflow: TextOverflow.ellipsis),
           Text('النجوم: ${exercise.stars}'),
           const SizedBox(height: 10),
           const Wrap(
@@ -429,7 +472,17 @@ class _HomeworkCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          if (app.isParent)
+          if (app.isParent && exercise.status == 'pending')
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: FilledButton.icon(
+                onPressed: onComplete,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('تم تنفيذ الواجب'),
+              ),
+            ),
+          if (app.isParent && exercise.status != 'pending')
             SizedBox(
               width: double.infinity,
               height: 54,
@@ -495,7 +548,7 @@ class _HomeworkPreview extends StatelessWidget {
                 ?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
-          Text(summary),
+          Text(summary, maxLines: 2, overflow: TextOverflow.ellipsis),
           if (visible.isNotEmpty) ...[
             const SizedBox(height: 10),
             Wrap(
@@ -505,7 +558,9 @@ class _HomeworkPreview extends StatelessWidget {
                 for (final item in visible)
                   Chip(
                       label: Text(
-                          '${item.typeLabel}: ${_cleanTitle(item.title)}')),
+                          '${item.typeLabel}: ${_cleanTitle(item.title)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis)),
                 if (activities.length > visible.length)
                   Chip(label: Text('+${activities.length - visible.length}')),
               ],
@@ -582,6 +637,8 @@ class _HomeworkActivityView extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               _safeText(step.homework, fallback: step.instructions),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium,
             ),
@@ -609,6 +666,8 @@ class _HomeworkActivityView extends StatelessWidget {
                     ),
                     child: Text(
                       word,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.w900),
@@ -629,6 +688,8 @@ class _HomeworkActivityView extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Text(
                       sentence,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w900,
@@ -656,7 +717,10 @@ class _HomeworkActivityView extends StatelessWidget {
                         const Icon(Icons.check_circle_outline, size: 20),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(line, style: theme.textTheme.titleMedium),
+                          child: Text(line,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium),
                         ),
                       ],
                     ),

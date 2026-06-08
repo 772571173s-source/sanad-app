@@ -39,7 +39,10 @@ class AppProvider extends ChangeNotifier {
   List<Evaluation> centerEvaluations = [];
   List<Exercise> centerExercises = [];
   List<SanadNotification> notifications = [];
+  List<StudentSpecialist> studentSpecialists = [];
   Reward? reward;
+  List<String> studentProgramIds = [];
+  Map<String, String>? sessionPreselect;
   bool loading = false;
   bool darkMode = false;
   bool initialized = false;
@@ -51,6 +54,9 @@ class AppProvider extends ChangeNotifier {
   Map<String, int> centerSpecialistCounts = {};
   Map<String, int> centerSessionCounts = {};
   Map<String, String> centerLastActivities = {};
+  List<TrainingPlan> centerPlans = [];
+  List<GoalSkillStep> centerGoalSteps = [];
+  bool _centerPlansLoaded = false;
 
   bool get isSanadOwnerAccount => user?.role == UserRole.sanadOwner;
   bool get isSupportMode => isSanadOwnerAccount && supportModeCenter != null;
@@ -287,6 +293,7 @@ class AppProvider extends ChangeNotifier {
     evaluations = [];
     plans = [];
     exercises = [];
+    studentSpecialists = [];
     reports = [];
     clinicalAssessments = [];
     clinicalFindingsByAssessment = {};
@@ -343,7 +350,7 @@ class AppProvider extends ChangeNotifier {
     } else {
       currentCenter = null;
     }
-    staff = canManageStaff
+    staff = canManageStaff || isCoordinator
         ? await _repository.users(centerId: isOwner ? null : activeCenterId)
         : [];
     await _loadCenterCardsMetrics();
@@ -359,6 +366,18 @@ class AppProvider extends ChangeNotifier {
         : activeCenterId.isEmpty
             ? []
             : await _repository.students(activeCenterId);
+
+    if (isSpecialist || isCoordinator || isCenterManager || isClinicalSupervisor) {
+      studentSpecialists = await _repository.studentSpecialists();
+    }
+    if (isSpecialist) {
+      final myStudentIds = studentSpecialists
+          .where((s) => s.specialistId == current.id && s.isActive)
+          .map((s) => s.studentId)
+          .toSet();
+      students = students.where((s) => myStudentIds.contains(s.id)).toList();
+    }
+
     await _loadCenterMetrics();
     final currentSelection = selectedStudent;
     selectedStudent = currentSelection != null &&
@@ -445,6 +464,7 @@ class AppProvider extends ChangeNotifier {
               centerId: isOwner ? null : activeCenterId)
           : [];
       reward = null;
+      studentProgramIds = [];
     } else {
       sessions = await _repository.sessions(student.id);
       evaluations = await _repository.evaluations(student.id);
@@ -463,6 +483,7 @@ class AppProvider extends ChangeNotifier {
               centerId: isOwner ? null : activeCenterId, studentId: student.id)
           : [];
       reward = await _repository.reward(student.id);
+      studentProgramIds = await _repository.studentProgramIds(student.id);
     }
     notifyListeners();
   }
@@ -494,6 +515,18 @@ class AppProvider extends ChangeNotifier {
       centerLastActivities[center.id] =
           await _repository.centerLastActivity(center.id);
     }
+  }
+
+  Future<void> loadCenterPlansAndSteps() async {
+    if (_centerPlansLoaded) return;
+    centerPlans = [];
+    centerGoalSteps = [];
+    for (final student in students) {
+      centerPlans.addAll(await _repository.plans(student.id));
+      centerGoalSteps.addAll(await _repository.goalSkillSteps(student.id));
+    }
+    _centerPlansLoaded = true;
+    notifyListeners();
   }
 
   Future<void> saveCenter(SanadCenter center) async {
@@ -645,6 +678,68 @@ class AppProvider extends ChangeNotifier {
     await loadHome();
   }
 
+  Future<void> assignStudentProgram(
+      String studentId, String programId) async {
+    final existing = studentProgramIds.contains(programId);
+    if (existing) return;
+    await _repository.saveStudentTherapyProgram(StudentTherapyProgram(
+      id: 'stp_${studentId}_$programId',
+      studentId: studentId,
+      programId: programId,
+      assignedAt: DateTime.now().toIso8601String(),
+      assignedByUserId: user?.id ?? '',
+      sortOrder: studentProgramIds.length,
+    ));
+    studentProgramIds.add(programId);
+    notifyListeners();
+  }
+
+  Future<void> unassignStudentProgram(
+      String studentId, String programId) async {
+    await _repository.removeStudentTherapyProgram(studentId, programId);
+    studentProgramIds.remove(programId);
+    notifyListeners();
+  }
+
+  Future<void> assignStudentToSpecialist(
+      String studentId, String specialistId) async {
+    await _repository.saveStudentSpecialist(StudentSpecialist(
+      id: 'ss_${studentId}_$specialistId',
+      studentId: studentId,
+      specialistId: specialistId,
+      assignedByUserId: user?.id ?? '',
+      assignedAt: DateTime.now().toIso8601String(),
+      isActive: true,
+    ));
+    studentSpecialists = await _repository.studentSpecialists();
+    notifyListeners();
+  }
+
+  Future<void> unassignStudentFromSpecialist(
+      String studentId, String specialistId) async {
+    await _repository.deactivateStudentSpecialist(studentId, specialistId);
+    studentSpecialists = await _repository.studentSpecialists();
+    notifyListeners();
+  }
+
+  List<TherapyProgramTemplate> programsForStudent() {
+    if (studentProgramIds.isEmpty) return [];
+    return therapyPrograms
+        .where((p) => studentProgramIds.contains(p.id))
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
+
+  void preselectSession(Map<String, String> target) {
+    sessionPreselect = target;
+    notifyListeners();
+  }
+
+  void clearSessionPreselect() {
+    sessionPreselect = null;
+    notifyListeners();
+  }
+
   Future<void> saveSession(TherapySession session,
       {bool autosave = false}) async {
     _ensure(canRunSessions, 'الجلسات ينفذها الأخصائي فقط.');
@@ -728,7 +823,7 @@ class AppProvider extends ChangeNotifier {
     _ensure(canUpdateGoalProgress, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step);
-    await _syncGoalProgress(step.goalId);
+    await syncGoalProgress(step.goalId);
     await selectStudent(selectedStudent);
   }
 
@@ -740,32 +835,70 @@ class AppProvider extends ChangeNotifier {
   }) async {
     _ensure(canUpdateGoalProgress, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
     _ensureClinicalAccess(step.studentId, step.centerId);
-    await _repository.saveGoalSkillStep(step.copyWith(
+    final updated = step.copyWith(
       status: status,
       notes: notes,
       lastSessionId: lastSessionId.isEmpty ? step.lastSessionId : lastSessionId,
       updatedAt: DateTime.now().toIso8601String(),
-    ));
-    await _syncGoalProgress(step.goalId);
+    );
+    await _repository.saveGoalSkillStep(updated);
+    final stepIdx = goalSkillSteps.indexWhere((s) => s.id == step.id);
+    if (stepIdx != -1) goalSkillSteps[stepIdx] = updated;
+    await syncGoalProgress(step.goalId);
+    notifyListeners();
   }
 
-  Future<void> _syncGoalProgress(String goalId) async {
-    final goalSteps = await _repository.goalStepsForGoal(goalId);
-    final matches = plans.where((plan) => plan.id == goalId).toList();
-    if (matches.isEmpty || goalSteps.isEmpty) return;
+  Future<void> updatePlanProgress({
+    required String planId,
+    required int progress,
+  }) async {
+    final matches = plans.where((p) => p.id == planId).toList();
+    if (matches.isEmpty) return;
     final plan = matches.first;
-    final completed = goalSteps.where((step) => step.status == 'متقن').length;
-    final progress = ((completed / goalSteps.length) * 100).round();
-    await _repository.savePlan(TrainingPlan(
+    final updated = TrainingPlan(
       id: plan.id,
       centerId: plan.centerId,
       studentId: plan.studentId,
       goal: plan.goal,
+      treatment: plan.treatment,
       targetDate: plan.targetDate,
       progress: progress,
+      programId: plan.programId,
+      sourceType: plan.sourceType,
       createdAt: plan.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
-    ));
+    );
+    await _repository.savePlan(updated);
+    final planIdx = plans.indexWhere((p) => p.id == planId);
+    if (planIdx != -1) plans[planIdx] = updated;
+    notifyListeners();
+  }
+
+  Future<void> syncGoalProgress(String goalId) async {
+    final goalSteps = await _repository.goalStepsForGoal(goalId);
+    final matches = plans.where((plan) => plan.id == goalId).toList();
+    if (matches.isEmpty) return;
+    final plan = matches.first;
+    final completed = goalSteps.where((step) => step.status == 'متقن').length;
+    final progress = goalSteps.isEmpty
+        ? plan.progress
+        : ((completed / goalSteps.length) * 100).round();
+    final updated = TrainingPlan(
+      id: plan.id,
+      centerId: plan.centerId,
+      studentId: plan.studentId,
+      goal: plan.goal,
+      treatment: plan.treatment,
+      targetDate: plan.targetDate,
+      progress: progress,
+      programId: plan.programId,
+      sourceType: plan.sourceType,
+      createdAt: plan.createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    await _repository.savePlan(updated);
+    final planIdx = plans.indexWhere((p) => p.id == goalId);
+    if (planIdx != -1) plans[planIdx] = updated;
   }
 
   Future<void> saveClinicalAssessment({
@@ -780,40 +913,38 @@ class AppProvider extends ChangeNotifier {
       if (!finding.isNormal && finding.goal.trim().isNotEmpty) {
         final planId = 'plan_${finding.id}';
         final now = DateTime.now().toIso8601String();
-        await _repository.savePlan(
-          TrainingPlan(
-            id: planId,
-            centerId: finding.centerId,
-            studentId: finding.studentId,
-            goal: finding.goal,
+      final training =
+          finding.training.trim().isEmpty ? finding.goal : finding.training;
+      await _repository.savePlan(
+        TrainingPlan(
+          id: planId,
+          centerId: finding.centerId,
+          studentId: finding.studentId,
+          goal: finding.goal,
+          treatment: training,
             targetDate: DateTime.now()
                 .add(const Duration(days: 45))
                 .toIso8601String()
                 .split('T')
                 .first,
             progress: 0,
+            programId: finding.programId,
+            sourceType: finding.sourceType,
             createdAt: now,
             updatedAt: now,
           ),
         );
-        final training =
-            finding.training.trim().isEmpty ? finding.goal : finding.training;
         final templateSteps = _skillStepTemplatesForFinding(finding);
-        final stepTitles = templateSteps.isEmpty
-            ? [
-                'يشاهد الأخصائي ينفذ التدريب: $training',
-                'ينفذ التدريب بمساعدة: $training',
-                'ينفذ التدريب باستقلالية: $training',
-              ]
-            : templateSteps.map((step) => step.title).toList();
-        for (var index = 0; index < stepTitles.length; index++) {
+        for (var index = 0; index < templateSteps.length; index++) {
           await _repository.saveGoalSkillStep(GoalSkillStep(
             id: 'step_${finding.id}_${index + 1}',
             centerId: finding.centerId,
             studentId: finding.studentId,
             goalId: planId,
-            title: stepTitles[index],
+            title: templateSteps[index].title,
             sortOrder: index,
+            programId: finding.programId,
+            sourceType: finding.sourceType,
             createdAt: now,
             updatedAt: now,
           ));
@@ -899,6 +1030,7 @@ class AppProvider extends ChangeNotifier {
       sectionId: item.sectionId,
       title: item.title,
       responseType: item.responseType,
+      responseMode: item.responseMode,
       prompt: item.prompt,
       sortOrder: item.sortOrder,
       createdAt: item.createdAt,
@@ -977,6 +1109,7 @@ class AppProvider extends ChangeNotifier {
       weaknessTemplate: trigger.weaknessTemplate,
       goalTemplate: trigger.goalTemplate,
       therapyTemplate: trigger.therapyTemplate,
+      skillStepTemplates: trigger.skillStepTemplates,
       sortOrder: trigger.sortOrder,
       createdAt: trigger.createdAt,
       updatedAt: trigger.updatedAt,
@@ -1101,19 +1234,39 @@ class AppProvider extends ChangeNotifier {
             option.weaknessTemplate == finding.weakness)
         .map((option) => option.id)
         .toSet();
-    final soundIds = speechSoundTriggers
+    final matchedSoundTriggers = speechSoundTriggers
         .where((trigger) =>
             trigger.goalTemplate == finding.goal &&
             trigger.therapyTemplate == finding.training &&
             trigger.weaknessTemplate == finding.weakness)
-        .map((trigger) => trigger.id)
-        .toSet();
+        .toList();
+    final soundIds = matchedSoundTriggers.map((t) => t.id).toSet();
+
     final steps = skillStepTemplates
         .where((step) =>
             (step.ownerType == 'option' && optionIds.contains(step.ownerId)) ||
             (step.ownerType == 'sound' && soundIds.contains(step.ownerId)))
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    // Fall back to inline skillStepTemplates on the trigger if no separate
+    // skill_step_templates entries exist.
+    if (steps.isEmpty && matchedSoundTriggers.isNotEmpty) {
+      final trigger = matchedSoundTriggers.first;
+      for (var i = 0; i < trigger.skillStepTemplates.length; i++) {
+        steps.add(SkillStepTemplate(
+          id: '${trigger.id}_step_$i',
+          centerId: '',
+          ownerType: 'sound',
+          ownerId: trigger.id,
+          title: trigger.skillStepTemplates[i],
+          sortOrder: i,
+          createdAt: '',
+          updatedAt: '',
+        ));
+      }
+    }
+
     return steps;
   }
 
@@ -1201,6 +1354,20 @@ class AppProvider extends ChangeNotifier {
         dailyStreak: current.dailyStreak,
       ),
     );
+  }
+
+  Future<AssessmentDraft?> assessmentDraft(
+      String studentId, String programId) async {
+    return _repository.assessmentDraft(studentId, programId);
+  }
+
+  Future<void> saveAssessmentDraft(AssessmentDraft draft) async {
+    await _repository.saveAssessmentDraft(draft);
+  }
+
+  Future<void> deleteAssessmentDraft(
+      String studentId, String programId) async {
+    await _repository.deleteAssessmentDraft(studentId, programId);
   }
 
   Future<void> printCredentials(Student student) =>

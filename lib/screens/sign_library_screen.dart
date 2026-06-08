@@ -114,7 +114,8 @@ class _SignLibraryScreenState extends State<SignLibraryScreen> {
                     ? Icons.image_outlined
                     : Icons.video_library_outlined),
                 title:
-                    Text(mediaPath.isEmpty ? 'لم يتم اختيار ملف' : mediaPath),
+                    Text(mediaPath.isEmpty ? 'لم يتم اختيار ملف' : mediaPath,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: TextButton(
                     onPressed: _pickMedia, child: const Text('اختيار')),
               ),
@@ -180,14 +181,17 @@ class _SignLibraryScreenState extends State<SignLibraryScreen> {
                             child: Text(resource.title,
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 18))),
+                                    fontSize: 18),
+                                maxLines: 2, overflow: TextOverflow.ellipsis)),
                         if (resource.isFavorite)
                           const Icon(Icons.star, size: 20),
                       ],
                     ),
                     Text(
-                        '${resource.category} - ${resource.level} - ${resource.mediaType}'),
-                    if (resource.notes.isNotEmpty) Text(resource.notes),
+                        '${resource.category} - ${resource.level} - ${resource.mediaType}',
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    if (resource.notes.isNotEmpty) Text(resource.notes,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
                     Align(
                         alignment: Alignment.centerLeft,
                         child: IconButton(

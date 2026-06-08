@@ -105,6 +105,7 @@ class _SupportCenterCardState extends State<_SupportCenterCard> {
                     ? 'لم يتم تحديد مدير'
                     : 'المدير: ${center.managerName}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(
@@ -165,7 +166,7 @@ class _SupportStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 118,
+      constraints: const BoxConstraints(minWidth: 100, maxWidth: 140),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
@@ -179,8 +180,11 @@ class _SupportStat extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            maxLines: 1, overflow: TextOverflow.ellipsis,
           ),
-          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          Text(label,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );
