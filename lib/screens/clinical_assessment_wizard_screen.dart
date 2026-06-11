@@ -323,6 +323,16 @@ class _ClinicalAssessmentWizardScreenState
         letterResults.isNotEmpty;
   }
 
+  bool _isStepAnswered(int index) {
+    if (index < 0 || index >= _steps.length) return false;
+    final step = _steps[index];
+    if (step.isSingleChoice) {
+      return selections.containsKey(step.item.id);
+    } else {
+      return step.option != null && multiSelections.containsKey(step.option!.id);
+    }
+  }
+
   Future<void> _confirmBackToStudentSelect() async {
     if (_hasAnyAnswer()) {
       final confirmed = await showDialog<bool>(
@@ -436,22 +446,46 @@ class _ClinicalAssessmentWizardScreenState
     final resume = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('تقييم غير مكتمل'),
-        content: const Text(
-          'يوجد تقييم غير مكتمل لنفس الطالب والبرنامج، هل تريد المتابعة؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('بدء تقييم جديد'),
+      builder: (ctx) {
+        final dialogColors = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.info_outline, color: dialogColors.primary),
+              const SizedBox(width: 8),
+              const Text('تقييم غير مكتمل'),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('متابعة التقييم'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('الطالب: ${student.name}'),
+              const SizedBox(height: 4),
+              Text('البرنامج: ${selectedProgram?.name ?? ''}'),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'لديك تقييم غير مكتمل لهذا الطالب والبرنامج.',
+                style: SanadText.secondary(ctx),
+              ),
+              Text(
+                'يمكنك المتابعة من حيث توقفت.',
+                style: SanadText.secondary(ctx),
+              ),
+            ],
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('بدء تقييم جديد'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('متابعة التقييم'),
+            ),
+          ],
+        );
+      },
     );
 
     if (resume == true && mounted) {
@@ -533,9 +567,21 @@ class _ClinicalAssessmentWizardScreenState
       restoredStepIndex = 0;
     }
 
+    // Advance past any answered items to the first unanswered one
+    while (restoredStepIndex < _steps.length &&
+        _isStepAnswered(restoredStepIndex)) {
+      restoredStepIndex++;
+    }
+    if (restoredStepIndex >= _steps.length && _steps.isNotEmpty) {
+      resolvedPhase = selectedProgram?.usesSpeechSounds == true
+          ? _WizardPhase.soundMatrix
+          : _WizardPhase.summary;
+    }
+
     debugPrint('[Wizard] _restoreFromDraft —'
         ' resolvedPhase=${resolvedPhase.name}'
         ' draftStepIndex=${draft.stepIndex}'
+        ' restoredStepIndex=$restoredStepIndex'
         ' _steps.length=${_steps.length}'
         ' restoredSoundIndex=$restoredSoundIndex');
 
@@ -552,6 +598,7 @@ class _ClinicalAssessmentWizardScreenState
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final app = context.watch<AppProvider>();
     _app = app; // cache for dispose where context.read may not work
     final student = app.selectedStudent;
@@ -588,29 +635,57 @@ class _ClinicalAssessmentWizardScreenState
     final int displayStep =
         inSoundPhase ? soundLetterIndex + 1 : stepIndex + 1;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _WizardProgressHeader(
-          phase: phase,
-          programName: selectedProgram?.name ?? '',
-          studentName: student?.name ?? '',
-          sectionTitle:
-              phase == _WizardPhase.sections ? _currentSectionTitle : '',
-          totalSteps: displayTotal,
-          currentStep: displayStep,
-          onBackToStudentSelect: phase == _WizardPhase.programSelect
-              ? _confirmBackToStudentSelect
-              : null,
-          onBackToProgramSelect: (phase == _WizardPhase.sections ||
-                  phase == _WizardPhase.soundMatrix ||
-                  phase == _WizardPhase.summary)
-              ? _confirmBackToProgramSelect
-              : null,
+    final showNavBar = phase == _WizardPhase.sections ||
+        phase == _WizardPhase.soundMatrix ||
+        phase == _WizardPhase.summary;
+
+    const double maxWidth = 640;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth > 720;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            colorScheme.surface,
+            colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+            colorScheme.surface,
+          ],
         ),
-        SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
-        _buildPhaseContent(app, student, sections, lettersList),
-      ],
+      ),
+      child: Center(
+        child: Container(
+          constraints: BoxConstraints(
+            maxWidth: isDesktop ? maxWidth : double.infinity,
+          ),
+              child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _CompactHeader(
+                phase: phase,
+                programName: selectedProgram?.name ?? '',
+                studentName: student?.name ?? '',
+                sectionTitle:
+                    phase == _WizardPhase.sections ? _currentSectionTitle : '',
+                totalSteps: displayTotal,
+                currentStep: displayStep,
+                onBackToStudentSelect: phase == _WizardPhase.programSelect
+                    ? _confirmBackToStudentSelect
+                    : null,
+                onBackToProgramSelect: (phase == _WizardPhase.sections ||
+                        phase == _WizardPhase.soundMatrix ||
+                        phase == _WizardPhase.summary)
+                    ? _confirmBackToProgramSelect
+                    : null,
+              ),
+              _buildPhaseContent(app, student, sections, lettersList),
+              if (showNavBar) _buildNavBar(context),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -706,13 +781,15 @@ class _ClinicalAssessmentWizardScreenState
         if (step == null) return const SizedBox.shrink();
         return _StepView(
           step: step,
+          stepIndex: stepIndex + 1,
+          totalSteps: _totalSteps,
+          sectionTitle: _currentSectionTitle,
           selections: selections,
           multiSelections: multiSelections,
           optionsForItem: (item) => _optionsForItem(app, item),
           onSelect: (item, option) => _handleSelect(item, option),
           onMultiSelect: (optionId, isNormal) =>
               _handleMultiSelect(optionId, isNormal),
-          onPrevious: stepIndex > 0 ? _goPrevious : null,
         );
       case _WizardPhase.soundMatrix:
         return _LetterEvalPhase(
@@ -775,18 +852,6 @@ class _ClinicalAssessmentWizardScreenState
           sections: sections,
           program: selectedProgram,
           saved: saved || isSaving,
-          onBack: () => setState(() {
-            if (_steps.isNotEmpty) {
-              stepIndex = _steps.length - 1;
-              phase = _WizardPhase.sections;
-            } else if (selectedProgram?.usesSpeechSounds == true) {
-              phase = _WizardPhase.soundMatrix;
-              soundLetterIndex = lettersList.isNotEmpty
-                  ? lettersList.length - 1
-                  : 0;
-            }
-          }),
-          onSave: () => _saveAssessment(app, student),
         );
     }
   }
@@ -854,6 +919,7 @@ class _ClinicalAssessmentWizardScreenState
           training: option.therapyTemplate,
           programId: selectedProgram?.id ?? '',
           sourceType: 'standard',
+          templateId: option.id,
           createdAt: now,
         ));
       }
@@ -919,6 +985,7 @@ class _ClinicalAssessmentWizardScreenState
           training: isNormal ? '' : option.therapyTemplate,
           programId: selectedProgram?.id ?? '',
           sourceType: 'standard',
+          templateId: option.id,
           createdAt: now,
         ));
       }
@@ -968,6 +1035,7 @@ class _ClinicalAssessmentWizardScreenState
             training: trigger?.therapyTemplate ?? '',
             programId: selectedProgram?.id ?? '',
             sourceType: 'speechSound',
+            templateId: trigger?.id ?? '',
             createdAt: now,
           ));
         }
@@ -1006,7 +1074,8 @@ class _ClinicalAssessmentWizardScreenState
             findings: findings,
           );
           await _clearDraft();
-          setState(() => saved = true);
+          if (!mounted) return;
+          _goToStudentSelect();
         },
         loading: 'جار حفظ التقييم العلاجي وتوليد الأهداف...',
         success: 'تم حفظ التقييم وتوليد الأهداف والخطوات المهارية.',
@@ -1015,13 +1084,108 @@ class _ClinicalAssessmentWizardScreenState
       debugPrint('ClinicalAssessmentWizard: save failed: $e');
     } finally {
       isSaving = false;
-      setState(() {});
+      if (mounted) setState(() {});
+    }
+  }
+
+  Widget _buildNavBar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
+    switch (phase) {
+      case _WizardPhase.sections:
+        final isFirst = stepIndex <= 0;
+        final isLast = stepIndex >= _steps.length - 1;
+        return _BottomActionBar(
+          colorScheme: colorScheme,
+          bottomInset: bottomInset,
+          leftButton: isFirst
+              ? null
+              : _ActionBarButtonData(
+                  label: 'السابق',
+                  icon: isRtl ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
+                  onTap: _goPrevious,
+                ),
+          rightButton: isLast
+              ? null
+              : _ActionBarButtonData(
+                  label: 'التالي',
+                  icon: isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
+                  onTap: _goNext,
+                  emphasized: true,
+                ),
+        );
+      case _WizardPhase.soundMatrix:
+        return _BottomActionBar(
+          colorScheme: colorScheme,
+          bottomInset: bottomInset,
+          leftButton: _ActionBarButtonData(
+            label: 'السابق',
+            icon: isRtl ? Icons.arrow_forward_ios : Icons.arrow_back_ios,
+            onTap: () {
+              setState(() {
+                if (soundLetterIndex > 0) {
+                  soundLetterIndex--;
+                  _showPositionPicker = false;
+                  _selectedErrorType = null;
+                }
+                _autoSaveDraft();
+              });
+            },
+          ),
+          rightButton: _ActionBarButtonData(
+            label: 'التالي',
+            icon: isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
+            onTap: () {
+              setState(() {
+                if (soundLetterIndex < lettersList.length - 1) {
+                  soundLetterIndex++;
+                  _showPositionPicker = false;
+                  _selectedErrorType = null;
+                } else {
+                  phase = _WizardPhase.summary;
+                }
+                _autoSaveDraft();
+              });
+            },
+            emphasized: true,
+          ),
+        );
+      case _WizardPhase.summary:
+        return _BottomActionBar(
+          colorScheme: colorScheme,
+          bottomInset: bottomInset,
+          leftButton: _ActionBarButtonData(
+            label: 'مراجعة',
+            icon: Icons.edit_outlined,
+            onTap: () {
+              if (_steps.isNotEmpty) {
+                stepIndex = _steps.length - 1;
+                phase = _WizardPhase.sections;
+              } else if (selectedProgram?.usesSpeechSounds == true) {
+                phase = _WizardPhase.soundMatrix;
+                soundLetterIndex =
+                    lettersList.isNotEmpty ? lettersList.length - 1 : 0;
+              }
+            },
+          ),
+          rightButton: _ActionBarButtonData(
+            label: saved ? 'تم الحفظ ✓' : 'حفظ التقييم',
+            icon: saved ? Icons.check_circle : Icons.save_outlined,
+            onTap: saved ? null : () => _saveAssessment(context.read<AppProvider>(), context.read<AppProvider>().selectedStudent!),
+            emphasized: true,
+            disabled: saved,
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
     }
   }
 }
 
-class _WizardProgressHeader extends StatelessWidget {
-  const _WizardProgressHeader({
+class _CompactHeader extends StatelessWidget {
+  const _CompactHeader({
     required this.phase,
     required this.programName,
     required this.studentName,
@@ -1041,257 +1205,255 @@ class _WizardProgressHeader extends StatelessWidget {
   final VoidCallback? onBackToStudentSelect;
   final VoidCallback? onBackToProgramSelect;
 
-  static const _phases = [
-    (_WizardPhase.studentSelect, 'اختيار الطالب'),
-    (_WizardPhase.programSelect, 'اختيار البرنامج'),
-    (_WizardPhase.sections, 'أسئلة التقييم'),
-    (_WizardPhase.soundMatrix, 'تقييم الحروف'),
-    (_WizardPhase.summary, 'الملخص'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final phaseIndex = _phases.indexWhere((p) => p.$1 == phase);
+    final showProgress = phase == _WizardPhase.sections || phase == _WizardPhase.soundMatrix;
+    final showSection = phase == _WizardPhase.sections;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (phase == _WizardPhase.programSelect &&
-            onBackToStudentSelect != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: TextButton.icon(
-              onPressed: onBackToStudentSelect,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('رجوع لاختيار طالب آخر'),
-            ),
-          )
-        else if (phase != _WizardPhase.studentSelect &&
-            phase != _WizardPhase.programSelect &&
-            onBackToProgramSelect != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: TextButton.icon(
-              onPressed: onBackToProgramSelect,
-              icon: const Icon(Icons.arrow_forward),
-              label: const Text('رجوع لاختيار برنامج آخر'),
-            ),
-          ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final stacked = constraints.maxWidth < 500;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.psychology_alt_outlined,
-                        color: colorScheme.onPrimaryContainer,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        'التقييم العلاجي',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w900),
-                      ),
-                    ),
-                    if (!stacked && studentName.isNotEmpty)
-                      AppPill(
-                        label: studentName,
-                        icon: Icons.person_outlined,
-                        selected: true,
-                      ),
-                    if (!stacked && programName.isNotEmpty)
-                      AppPill(
-                        label: programName,
-                        icon: Icons.auto_stories_outlined,
-                        selected: true,
-                      ),
-                  ],
-                ),
-                if (stacked && (studentName.isNotEmpty || programName.isNotEmpty))
-                  Padding(
-                    padding: const EdgeInsets.only(top: AppSpacing.sm),
-                    child: Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      children: [
-                        if (studentName.isNotEmpty)
-                          AppPill(
-                            label: studentName,
-                            icon: Icons.person_outlined,
-                            selected: true,
-                          ),
-                        if (programName.isNotEmpty)
-                          AppPill(
-                            label: programName,
-                            icon: Icons.auto_stories_outlined,
-                            selected: true,
-                          ),
-                      ],
+    final progress = totalSteps == 0 ? 0.0 : (currentStep / totalSteps).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3), width: 0.5),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        top: 8,
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        bottom: showProgress ? 10 : 8,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              if (onBackToStudentSelect != null)
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: IconButton(
+                    onPressed: onBackToStudentSelect,
+                    icon: Icon(Icons.arrow_forward, size: 16, color: colorScheme.onSurfaceVariant),
+                    padding: EdgeInsets.zero,
+                    splashRadius: 14,
+                  ),
+                )
+              else if (onBackToProgramSelect != null)
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: IconButton(
+                    onPressed: onBackToProgramSelect,
+                    icon: Icon(Icons.arrow_forward, size: 16, color: colorScheme.onSurfaceVariant),
+                    padding: EdgeInsets.zero,
+                    splashRadius: 14,
+                  ),
+                )
+              else
+                const SizedBox(width: 28),
+              const SizedBox(width: 6),
+              if (programName.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    programName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onPrimaryContainer,
                     ),
                   ),
+                ),
+                const SizedBox(width: 6),
               ],
-            );
-          },
-        ),
-        SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
-        _WizardPhaseStepper(currentPhaseIndex: phaseIndex),
-        SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
-        if (phase == _WizardPhase.sections) ...[
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  sectionTitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
+              if (showSection && sectionTitle.isNotEmpty) ...[
+                Flexible(
+                  child: Text(
+                    sectionTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
-              ),
-              Flexible(
-                child: Text(
-                  'السؤال $currentStep من $totalSteps',
-                  style: SanadText.muted(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: totalSteps == 0 ? 0.0 : (currentStep / totalSteps).clamp(0, 1),
-              minHeight: 8,
-            ),
-          ),
-        ] else if (phase == _WizardPhase.soundMatrix) ...[
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  'تقييم الحروف',
-                  style: SanadText.subtitle(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+                const SizedBox(width: 6),
+              ],
               const Spacer(),
-              Flexible(
-                child: Text(
-                  'الحرف $currentStep من $totalSteps',
-                  style: SanadText.muted(context),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              if (showProgress)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.checklist, size: 12, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(
+                        '$currentStep / $totalSteps',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: totalSteps == 0 ? 0.0 : (currentStep / totalSteps).clamp(0, 1),
-              minHeight: 8,
+          if (showProgress) ...[
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 4,
+                backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  colorScheme.primary.withValues(alpha: 0.8),
+                ),
+              ),
             ),
-          ),
-        ] else if (phase == _WizardPhase.summary) ...[
-          Text('الملخص', style: SanadText.subtitle(context)),
-        ] else if (phase == _WizardPhase.studentSelect) ...[
-          Text('اختيار الطالب', style: SanadText.subtitle(context)),
-        ] else if (phase == _WizardPhase.programSelect) ...[
-          Text('اختيار البرنامج العلاجي', style: SanadText.subtitle(context)),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
 
-class _WizardPhaseStepper extends StatelessWidget {
-  const _WizardPhaseStepper({required this.currentPhaseIndex});
+class _ActionBarButtonData {
+  const _ActionBarButtonData({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.emphasized = false,
+    this.disabled = false,
+  });
 
-  final int currentPhaseIndex;
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool emphasized;
+  final bool disabled;
+}
+
+class _BottomActionBar extends StatelessWidget {
+  const _BottomActionBar({
+    required this.colorScheme,
+    required this.bottomInset,
+    this.leftButton,
+    this.rightButton,
+  });
+
+  final ColorScheme colorScheme;
+  final double bottomInset;
+  final _ActionBarButtonData? leftButton;
+  final _ActionBarButtonData? rightButton;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final narrow = MediaQuery.of(context).size.width < 400;
-    final steps = narrow
-        ? ['ط', 'ب', 'ق', 'ح', 'م']
-        : ['طالب', 'برنامج', 'تقييم', 'حروف', 'ملخص'];
+    return Container(
+      padding: EdgeInsets.only(
+        top: 12,
+        left: AppSpacing.sm,
+        right: AppSpacing.sm,
+        bottom: 12 + bottomInset,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(
+          top: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3), width: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, -3),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            if (leftButton != null)
+              Expanded(
+                child: _ActionBarButton(data: leftButton!),
+              ),
+            if (leftButton != null && rightButton != null)
+              const SizedBox(width: 10),
+            if (rightButton != null)
+              Expanded(
+                flex: rightButton!.emphasized ? 2 : 1,
+                child: _ActionBarButton(data: rightButton!),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    return Row(
-      children: List.generate(steps.length, (i) {
-        final isCompleted = i < currentPhaseIndex;
-        final isCurrent = i == currentPhaseIndex;
+class _ActionBarButton extends StatelessWidget {
+  const _ActionBarButton({required this.data});
 
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(
-              left: i < steps.length - 1 ? 4.0 : 0,
+  final _ActionBarButtonData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = data.disabled
+        ? FilledButton.icon(
+            onPressed: null,
+            icon: Icon(data.icon, size: 18),
+            label: Text(data.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: isCompleted
-                              ? colorScheme.primary
-                              : isCurrent
-                                  ? colorScheme.primary.withValues(alpha: .45)
-                                  : colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  steps[i],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                    color: isCurrent
-                        ? colorScheme.primary
-                        : isCompleted
-                            ? colorScheme.onSurfaceVariant
-                            : colorScheme.onSurfaceVariant.withValues(alpha: .55),
+          )
+        : data.emphasized
+            ? FilledButton.icon(
+                onPressed: data.onTap,
+                icon: Icon(data.icon, size: 18),
+                label: Text(data.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-              ],
-            ),
-          ),
-        );
-      }),
-    );
+              )
+            : FilledButton.tonalIcon(
+                onPressed: data.onTap,
+                icon: Icon(data.icon, size: 18),
+                label: Text(data.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 52),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              );
+
+    return button;
   }
 }
 
@@ -1613,20 +1775,7 @@ class _StudentSelectPhaseState extends State<_StudentSelectPhase> {
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: _rv(context, small: 20, large: 24),
-                              backgroundColor: colorScheme.primaryContainer,
-                              child: Text(
-                                student.name.isNotEmpty
-                                    ? student.name[0]
-                                    : '?',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w900,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
+                            StudentAvatar(student: student, radius: _rv(context, small: 20, large: 24)),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
                               child: Column(
@@ -1729,15 +1878,20 @@ class _StudentSelectPhaseState extends State<_StudentSelectPhase> {
 class _StepView extends StatelessWidget {
   const _StepView({
     required this.step,
+    required this.stepIndex,
+    required this.totalSteps,
+    required this.sectionTitle,
     required this.selections,
     required this.multiSelections,
     required this.optionsForItem,
     required this.onSelect,
     required this.onMultiSelect,
-    this.onPrevious,
   });
 
   final _AssessmentStep step;
+  final int stepIndex;
+  final int totalSteps;
+  final String sectionTitle;
   final Map<String, AssessmentOptionTemplate> selections;
   final Map<String, bool> multiSelections;
   final List<AssessmentOptionTemplate> Function(AssessmentItemTemplate)
@@ -1745,101 +1899,199 @@ class _StepView extends StatelessWidget {
   final void Function(AssessmentItemTemplate, AssessmentOptionTemplate)
       onSelect;
   final void Function(String optionId, bool isNormal) onMultiSelect;
-  final VoidCallback? onPrevious;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final item = step.item;
     final isMulti = item.responseMode == 'multiResponse';
+    final bool isAnswered = isMulti
+        ? (step.option != null && multiSelections.containsKey(step.option!.id))
+        : selections.containsKey(item.id);
+    final narrow = MediaQuery.of(context).size.width < 400;
+    final progress = totalSteps == 0 ? 0.0 : ((stepIndex + 1) / totalSteps).clamp(0.0, 1.0);
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppCard(
-            padding: _rv(context, small: AppSpacing.md, large: AppSpacing.xl),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: _rv(context, small: 48, large: 56),
-                    height: _rv(context, small: 48, large: 56),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      isMulti
-                          ? Icons.list_alt_outlined
-                          : Icons.radio_button_checked_outlined,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 28,
-                    ),
-                  ),
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.sm,
+      ),
+      child: SingleChildScrollView(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: Column(
+          key: ValueKey('step_$stepIndex'),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Hero Question Card
+            Container(
+              padding: EdgeInsets.all(narrow ? AppSpacing.md : AppSpacing.lg),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.4),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  item.title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w900),
-                ),
-                if (item.prompt.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    item.prompt,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: SanadText.secondary(context),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.lg),
-                Divider(color: colorScheme.outlineVariant),
-                const SizedBox(height: AppSpacing.md),
-                Text(
-                  'اختر الإجابة الأقرب لحالة الطالب:',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurfaceVariant,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top row: progress + section chip
+                  Row(
+                    children: [
+                      if (sectionTitle.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            sectionTitle,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.onTertiaryContainer,
+                            ),
+                          ),
+                        ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.check_circle_outline, size: 12, color: colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${stepIndex + 1} / $totalSteps',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (isMulti)
-                  _MultiResponseOption(
-                    option: step.option!,
-                    multiSelections: multiSelections,
-                    onMultiSelect: onMultiSelect,
-                  )
-                else
-                  _SingleChoiceOptions(
-                    item: item,
-                    options: optionsForItem(item),
-                    selected: selections[item.id],
-                    onSelect: (option) => onSelect(item, option),
+                  SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                  // Icon with glow
+                  Center(
+                    child: Container(
+                      width: narrow ? 56 : 64,
+                      height: narrow ? 56 : 64,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: isAnswered
+                              ? [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)]
+                              : [
+                                  colorScheme.primaryContainer,
+                                  colorScheme.primaryContainer.withValues(alpha: 0.7),
+                                ],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isAnswered
+                                ? const Color(0xFF22C55E).withValues(alpha: 0.15)
+                                : colorScheme.primary.withValues(alpha: 0.1),
+                            blurRadius: 12,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isMulti
+                            ? Icons.list_alt_rounded
+                            : Icons.checklist_rounded,
+                        color: isAnswered
+                            ? const Color(0xFF166534)
+                            : colorScheme.onPrimaryContainer,
+                        size: narrow ? 28 : 32,
+                      ),
+                    ),
                   ),
-              ],
+                  SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                  // Question title
+                  Text(
+                    item.title,
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: (narrow ? textTheme.titleMedium : textTheme.titleLarge)?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.3,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  if (item.prompt.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      item.prompt,
+                      textAlign: TextAlign.center,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                  SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                  // Progress bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.primary.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: narrow ? AppSpacing.md : AppSpacing.lg),
+                  // Options
+                  if (isMulti)
+                    _MultiResponseOption(
+                      option: step.option!,
+                      multiSelections: multiSelections,
+                      onMultiSelect: onMultiSelect,
+                    )
+                  else
+                    _SingleChoiceOptions(
+                      item: item,
+                      options: optionsForItem(item),
+                      selected: selections[item.id],
+                      onSelect: (option) => onSelect(item, option),
+                    ),
+                ],
+              ),
             ),
+          ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              if (onPrevious != null)
-                FilledButton.tonalIcon(
-                  onPressed: onPrevious,
-                  icon: const Icon(Icons.arrow_back),
-                  label: const Text('السابق'),
-                ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1865,78 +2117,131 @@ class _SingleChoiceOptions extends StatelessWidget {
     return Column(
       children: options.map((option) {
         final active = selected?.id == option.id;
-              final needsTherapy = option.generatesTherapy;
+        final needsTherapy = option.generatesTherapy;
+
         final bgColor = active
             ? (needsTherapy
                 ? const Color(0xFFFEF3C7)
                 : const Color(0xFFDCFCE7))
-            : colorScheme.surfaceContainerHighest;
+            : colorScheme.surface;
         final borderColor = active
             ? (needsTherapy
                 ? const Color(0xFFF59E0B)
                 : const Color(0xFF22C55E))
-            : colorScheme.outlineVariant;
+            : colorScheme.outlineVariant.withValues(alpha: 0.5);
         final textColor = active
             ? (needsTherapy
                 ? const Color(0xFF92400E)
                 : const Color(0xFF166534))
             : colorScheme.onSurface;
-        final iconColor = active
-            ? (needsTherapy
-                ? const Color(0xFFF59E0B)
-                : const Color(0xFF22C55E))
-            : colorScheme.onSurfaceVariant;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-          child: SizedBox(
-            width: double.infinity,
-            height: 60,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadii.control),
-              onTap: () => onSelect(option),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 14),
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius:
-                      BorderRadius.circular(AppRadii.control),
-                  border: Border.all(
-                    color: borderColor,
-                    width: active ? 2 : 1,
-                  ),
+          child: GestureDetector(
+            onTap: () => onSelect(option),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: borderColor,
+                  width: active ? 2 : 1,
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      active
-                        ? Icons.check_circle
-                        : Icons.circle_outlined,
-                      size: 24,
-                      color: iconColor,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        option.label,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: textColor,
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: borderColor.withValues(alpha: 0.12),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
+                      ]
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 6,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 250),
+                    width: active ? 28 : 24,
+                    height: active ? 28 : 24,
+                    decoration: BoxDecoration(
+                      color: active ? borderColor : Colors.transparent,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: active ? borderColor : colorScheme.outlineVariant,
+                        width: active ? 0 : 2,
                       ),
                     ),
-                    if (needsTherapy)
-                      const AppPill(
-                        label: 'علاج',
-                        icon: Icons.psychology_alt_outlined,
+                    child: active
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          option.label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: textColor,
+                            height: 1.3,
+                          ),
+                        ),
+                        if (needsTherapy) ...[
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7).withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              option.therapyTemplate.isNotEmpty
+                                  ? 'سيولد هدفًا علاجيًا'
+                                  : 'يحتاج علاجًا',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (needsTherapy)
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF3C7).withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                  ],
-                ),
+                      child: Icon(
+                        Icons.psychology_alt_outlined,
+                        size: 18,
+                        color: const Color(0xFF92400E),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -1962,176 +2267,130 @@ class _MultiResponseOption extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final result = multiSelections[option.id];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                option.label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 16),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  if (constraints.maxWidth < 320) {
-                    return Column(
-                      children: [
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: _AnswerButton(
-                            label: 'نعم',
-                            icon: Icons.check_circle_outline,
-                            selected: result == true,
-                            positive: true,
-                            onTap: result == true
-                                ? null
-                                : () => onMultiSelect(option.id, true),
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: _AnswerButton(
-                            label: 'لا',
-                            icon: Icons.report_problem_outlined,
-                            selected: result == false,
-                            positive: false,
-                            onTap: result == false
-                                ? null
-                                : () => onMultiSelect(option.id, false),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 56,
-                          child: _AnswerButton(
-                            label: 'نعم',
-                            icon: Icons.check_circle_outline,
-                            selected: result == true,
-                            positive: true,
-                            onTap: result == true
-                                ? null
-                                : () => onMultiSelect(option.id, true),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: SizedBox(
-                          height: 56,
-                          child: _AnswerButton(
-                            label: 'لا',
-                            icon: Icons.report_problem_outlined,
-                            selected: result == false,
-                            positive: false,
-                            onTap: result == false
-                                ? null
-                                : () => onMultiSelect(option.id, false),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
         ),
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            option.label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          if (option.therapyTemplate.isNotEmpty && result == null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7).withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'سيولد تدريبًا',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF92400E),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stacked = constraints.maxWidth < 320;
+              final buttons = [
+                _buildToggle(context, 'نعم، طبيعي', Icons.check_circle_outline,
+                    result == true, true, () {
+                  if (result != true) onMultiSelect(option.id, true);
+                }),
+                const SizedBox(width: AppSpacing.sm),
+                _buildToggle(context, 'لا، يحتاج تدخل', Icons.report_problem_outlined,
+                    result == false, false, () {
+                  if (result != false) onMultiSelect(option.id, false);
+                }),
+              ];
+
+              if (stacked) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    buttons[0],
+                    const SizedBox(height: AppSpacing.sm),
+                    buttons[2],
+                  ],
+                );
+              }
+              return Row(children: buttons);
+            },
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _AnswerButton extends StatelessWidget {
-  const _AnswerButton({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.positive,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final bool positive;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildToggle(BuildContext context, String label, IconData icon,
+      bool selected, bool positive, VoidCallback onTap) {
     final colorScheme = Theme.of(context).colorScheme;
+    final bgColor = selected
+        ? (positive
+            ? const Color(0xFFDCFCE7)
+            : const Color(0xFFFEF3C7))
+        : colorScheme.surface;
+    final borderColor = selected
+        ? (positive
+            ? const Color(0xFF22C55E)
+            : const Color(0xFFF59E0B))
+        : colorScheme.outlineVariant.withValues(alpha: 0.4);
+    final fgColor = selected
+        ? (positive
+            ? const Color(0xFF166534)
+            : const Color(0xFF92400E))
+        : colorScheme.onSurfaceVariant;
 
-    final Color bgColor;
-    final Color borderColor;
-    final Color fgColor;
-    final Color iconColor;
-
-    if (selected) {
-      if (positive) {
-        bgColor = const Color(0xFFDCFCE7);
-        borderColor = const Color(0xFF22C55E);
-        fgColor = const Color(0xFF166534);
-        iconColor = const Color(0xFF22C55E);
-      } else {
-        bgColor = const Color(0xFFFEF3C7);
-        borderColor = const Color(0xFFF59E0B);
-        fgColor = const Color(0xFF92400E);
-        iconColor = const Color(0xFFF59E0B);
-      }
-    } else {
-      bgColor = colorScheme.surfaceContainerHighest;
-      borderColor = colorScheme.outlineVariant;
-      fgColor = colorScheme.onSurfaceVariant;
-      iconColor = colorScheme.onSurfaceVariant;
-    }
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppRadii.control),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-            horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(AppRadii.control),
-          border: Border.all(
-            color: borderColor,
-            width: selected ? 2 : 1,
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor, width: selected ? 2 : 1),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: borderColor.withValues(alpha: 0.1),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 24, color: iconColor),
-              const SizedBox(width: 8),
+              Icon(icon, size: 24, color: fgColor),
+              const SizedBox(height: 6),
               Text(
                 label,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
                   color: fgColor,
                 ),
               ),
@@ -2197,33 +2456,63 @@ class _LetterEvalPhase extends StatelessWidget {
     final alreadyHasPosition = existingResult?['position'] as String?;
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AppCard(
-            padding: _rv(context, small: AppSpacing.md, large: AppSpacing.xl),
+          Container(
+            padding: EdgeInsets.all(_rv(context, small: AppSpacing.md, large: AppSpacing.xl)),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
             child: Column(
               children: [
                 Center(
                   child: Container(
-                    width: _rv(context, small: 100, large: 140),
-                    height: _rv(context, small: 100, large: 140),
+                    width: _rv(context, small: 110, large: 150),
+                    height: _rv(context, small: 110, large: 150),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: isAlreadyError
-                          ? const Color(0xFFFEF3C7)
-                          : isAlreadyNormal
-                              ? const Color(0xFFDCFCE7)
-                              : colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isAlreadyError
+                            ? [const Color(0xFFFEF3C7), const Color(0xFFFDE68A)]
+                            : isAlreadyNormal
+                                ? [const Color(0xFFDCFCE7), const Color(0xFFBBF7D0)]
+                                : [colorScheme.surfaceContainerHighest, colorScheme.surfaceContainerHighest],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: isAlreadyError
-                            ? const Color(0xFFF59E0B)
+                            ? const Color(0xFFF59E0B).withValues(alpha: 0.6)
                             : isAlreadyNormal
-                                ? const Color(0xFF22C55E)
-                                : colorScheme.outlineVariant,
-                        width: 4,
+                                ? const Color(0xFF22C55E).withValues(alpha: 0.6)
+                                : colorScheme.outlineVariant.withValues(alpha: 0.3),
+                        width: 3,
                       ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: isAlreadyError
+                              ? const Color(0xFFF59E0B).withValues(alpha: 0.1)
+                              : isAlreadyNormal
+                                  ? const Color(0xFF22C55E).withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Text(
                       letter,
@@ -2398,7 +2687,7 @@ class _LetterEvalPhase extends StatelessWidget {
                 ),
                 label: Text(
                   isAlreadyNormal ? 'تم التقييم: طبيعي ✓' : 'طبيعي',
-                  style: const TextStyle(fontSize: 18),
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 style: FilledButton.styleFrom(
                   backgroundColor: isAlreadyNormal
@@ -2407,16 +2696,19 @@ class _LetterEvalPhase extends StatelessWidget {
                   foregroundColor: isAlreadyNormal
                       ? const Color(0xFF166534)
                       : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            Divider(color: colorScheme.outlineVariant),
-            const SizedBox(height: AppSpacing.sm),
+            Divider(color: colorScheme.outlineVariant.withValues(alpha: 0.3), height: 1),
+            const SizedBox(height: AppSpacing.md),
             Text(
               'أو حدد نوع الخطأ:',
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -2454,7 +2746,10 @@ class _LetterEvalPhase extends StatelessWidget {
                           : null,
                       side: isActive
                           ? const BorderSide(color: Color(0xFFF59E0B), width: 2)
-                          : null,
+                          : BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ),
@@ -2463,31 +2758,6 @@ class _LetterEvalPhase extends StatelessWidget {
           ],
 
           const SizedBox(height: AppSpacing.lg),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.sm,
-            alignment: WrapAlignment.spaceBetween,
-            runAlignment: WrapAlignment.center,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: onPrevious,
-                icon: const Icon(Icons.arrow_back),
-                label: const Text('السابق'),
-              ),
-              if (!showPositionPicker && letterResults.containsKey(letter))
-                FilledButton.icon(
-                  onPressed: onAdvance,
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('التالي'),
-                ),
-              if (showPositionPicker)
-                TextButton.icon(
-                  onPressed: onAdvance,
-                  icon: const Icon(Icons.skip_next),
-                  label: const Text('تخطي هذا الحرف'),
-                ),
-            ],
-          ),
         ],
       ),
     );
@@ -2504,8 +2774,6 @@ class _SummaryPhase extends StatelessWidget {
     required this.sections,
     required this.program,
     required this.saved,
-    required this.onBack,
-    required this.onSave,
   });
 
   final AppProvider app;
@@ -2516,8 +2784,6 @@ class _SummaryPhase extends StatelessWidget {
   final List<AssessmentSectionTemplate> sections;
   final TherapyProgramTemplate? program;
   final bool saved;
-  final VoidCallback onBack;
-  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -2647,17 +2913,109 @@ class _SummaryPhase extends StatelessWidget {
     }();
 
     return SingleChildScrollView(
+      padding: const EdgeInsets.all(AppSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SemanticAlertCard(
-            kind: SemanticAlertKind.info,
-            icon: Icons.summarize_outlined,
-            title: 'ملخص التقييم العلاجي',
-            message:
-                'راجع نقاط القوة والضعف والأهداف المقترحة قبل الحفظ.',
+          // Student and program info header
+          Container(
+            padding: EdgeInsets.all(_rv(context, small: AppSpacing.md, large: AppSpacing.lg)),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                StudentAvatar(student: student, radius: 24),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(student.name,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.onSurface,
+                          )),
+                      const SizedBox(height: 2),
+                      Text(
+                        program?.name ?? '',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.checklist, size: 14,
+                          color: colorScheme.onSecondaryContainer),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${selections.length + multiSelections.length + letterResults.length}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
           SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
+          // Summary info banner
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.summarize_outlined, size: 20, color: colorScheme.onPrimaryContainer),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'ملخص التقييم — راجع النتائج قبل الحفظ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
+          // Strengths
           _SummarySectionCard(
             title: 'نقاط القوة',
             icon: Icons.verified_outlined,
@@ -2666,25 +3024,42 @@ class _SummaryPhase extends StatelessWidget {
             itemCount: strengths.length,
             child: strengths.isEmpty
                 ? Text('لا توجد نقاط قوة مسجلة',
-                    style: SanadText.secondary(context))
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ))
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: strengths.map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('• ', style: TextStyle(
-                            color: Color(0xFF22C55E),
-                            fontWeight: FontWeight.w900,
-                          )),
-                          Expanded(child: Text(s, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context))),
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(Icons.check, size: 14, color: Color(0xFF166534)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(s, maxLines: 2, overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurface,
+                                height: 1.4,
+                              )),
+                          ),
                         ],
                       ),
                     )).toList(),
                   ),
           ),
           SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
+          // Weaknesses
           _SummarySectionCard(
             title: 'نقاط الضعف',
             icon: Icons.flag_outlined,
@@ -2693,32 +3068,68 @@ class _SummaryPhase extends StatelessWidget {
             itemCount: weaknesses.length,
             child: weaknesses.isEmpty
                 ? Text('لا توجد نقاط ضعف',
-                    style: SanadText.secondary(context))
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ))
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: weaknesses.map((w) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(w.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: colorScheme.onSurface,
-                              )),
-                          if (w.weakness.isNotEmpty)
-                            Text(w.weakness,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: SanadText.secondary(context)),
-                        ],
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7).withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFFEF3C7).withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF59E0B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(w.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: colorScheme.onSurface,
+                                      )),
+                                ),
+                              ],
+                            ),
+                            if (w.weakness.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(w.weakness,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colorScheme.onSurfaceVariant,
+                                    height: 1.4,
+                                  )),
+                            ],
+                          ],
+                        ),
                       ),
                     )).toList(),
                   ),
           ),
           SizedBox(height: _rv(context, small: AppSpacing.sm, large: AppSpacing.md)),
+          // Goals
           _SummarySectionCard(
             title: 'الأهداف العلاجية',
             icon: Icons.track_changes_outlined,
@@ -2727,27 +3138,72 @@ class _SummaryPhase extends StatelessWidget {
             itemCount: goals.length,
             child: goals.isEmpty
                 ? Text('لا توجد أهداف',
-                    style: SanadText.secondary(context))
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurfaceVariant,
+                    ))
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: goals.map((g) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('🎯 ${g.goal}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                color: colorScheme.onSurface,
-                              )),
-                          if (g.training.isNotEmpty)
-                            Text('التدريب: ${g.training}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: SanadText.secondary(context)),
-                        ],
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.flag_circle_outlined, size: 20, color: colorScheme.primary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(g.goal,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 14,
+                                        color: colorScheme.onSurface,
+                                        height: 1.4,
+                                      )),
+                                ),
+                              ],
+                            ),
+                            if (g.training.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.fitness_center, size: 14, color: colorScheme.onSurfaceVariant),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text('تدريب: ${g.training}',
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: colorScheme.onSurfaceVariant,
+                                          )),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     )).toList(),
                   ),
@@ -2760,50 +3216,52 @@ class _SummaryPhase extends StatelessWidget {
               headerColor: colorScheme.secondaryContainer,
               headerIconColor: colorScheme.onSecondaryContainer,
               itemCount: skillSteps.length,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: skillSteps.map((step) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: skillSteps.asMap().entries.map((e) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
+                    ),
+                  ),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('• ', style: TextStyle(
-                        color: colorScheme.primary,
-                        fontWeight: FontWeight.w900,
-                      )),
-                      Expanded(child: Text(step, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context))),
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${e.key + 1}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                              color: colorScheme.onSecondaryContainer,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(e.value, maxLines: 2, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: colorScheme.onSurface,
+                        )),
                     ],
                   ),
                 )).toList(),
               ),
             ),
           ],
-          SizedBox(height: _rv(context, small: AppSpacing.md, large: AppSpacing.lg)),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.sm,
-            alignment: WrapAlignment.spaceBetween,
-            runAlignment: WrapAlignment.center,
-            children: [
-              FilledButton.tonalIcon(
-                onPressed: onBack,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('مراجعة التقييم'),
-              ),
-              SizedBox(
-                height: 52,
-                child: FilledButton.icon(
-                  onPressed: saved ? null : onSave,
-                  icon: Icon(
-                      saved ? Icons.check_circle : Icons.save_outlined),
-                  label: Text(
-                    saved ? 'تم الحفظ ✓' : 'حفظ التقييم',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: AppSpacing.lg),
         ],
       ),
     );
@@ -2855,49 +3313,72 @@ class _SummarySectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      padding: _rv(context, small: AppSpacing.md, large: AppSpacing.lg),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: _rv(context, small: 32, large: 36),
-                height: _rv(context, small: 32, large: 36),
-                decoration: BoxDecoration(
-                  color: headerColor,
-                  borderRadius: BorderRadius.circular(10),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.md, AppSpacing.md, 0),
+            child: Row(
+              children: [
+                Container(
+                  width: _rv(context, small: 32, large: 36),
+                  height: _rv(context, small: 32, large: 36),
+                  decoration: BoxDecoration(
+                    color: headerColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: headerIconColor),
                 ),
-                child: Icon(icon, size: 20, color: headerIconColor),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: SanadText.subtitle(context)),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: headerColor,
-                  borderRadius: BorderRadius.circular(10),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      )),
                 ),
-                child: Text(
-                  '$itemCount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                    color: headerIconColor,
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: headerColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$itemCount',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: headerIconColor,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          child,
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: child,
+          ),
         ],
       ),
     );

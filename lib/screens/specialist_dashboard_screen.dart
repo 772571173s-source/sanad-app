@@ -18,7 +18,9 @@ class _SpecialistDashboardScreenState extends State<SpecialistDashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AppProvider>().loadCenterPlansAndSteps();
+      final app = context.read<AppProvider>();
+      app.loadCenterPlansAndSteps();
+      app.loadCenterAssessments();
     });
   }
 
@@ -107,17 +109,11 @@ class _SpecialistDashboardScreenState extends State<SpecialistDashboardScreen> {
   double _safeDiv(int a, int b) => b == 0 ? 0 : a / b;
 
   int _improvement(AppProvider app) {
-    final sessions = app.centerSessions;
-    if (sessions.isNotEmpty) {
-      final total = sessions
-          .fold<int>(0, (sum, session) => sum + session.successRate);
-      return (total / sessions.length).round();
-    }
-    return 0;
+    return app.centerGoalImprovementRate;
   }
 
   List<TherapySession> _todaySessions(AppProvider app) {
-    return app.centerSessions
+    return app.specialistSessions
         .where((session) => _isToday(session.startedAt))
         .toList();
   }
@@ -133,19 +129,30 @@ class _SpecialistDashboardScreenState extends State<SpecialistDashboardScreen> {
 
   int _activeGoals(AppProvider app) {
     if (app.centerPlans.isEmpty) return 0;
-    return app.centerPlans.where((p) => p.progress < 100).length;
+    return app.centerPlans.where((p) => app.goalProgress(p.id) < 100).length;
   }
 
   int _masteredGoals(AppProvider app) {
     if (app.centerPlans.isEmpty) return 0;
-    return app.centerPlans.where((p) => p.progress >= 100).length;
+    return app.centerPlans.where((p) => app.goalProgress(p.id) >= 100).length;
   }
 
   List<_AlertItem> _alerts(
       AppProvider app, List<TherapySession> todaySessions) {
     final items = <_AlertItem>[];
 
-    final studentIdsWithSession = app.centerSessions
+    final needsAssessment = app.studentsNeedingAssessment;
+    if (needsAssessment.isNotEmpty) {
+      items.add(_AlertItem(
+        icon: Icons.fact_check_outlined,
+        title: 'طلاب يحتاجون تقييم',
+        message:
+            '${needsAssessment.length} طالب لم يعمل لهم تقييم علاجي بعد. ${needsAssessment.take(3).map((s) => s.name).join('، ')}${needsAssessment.length > 3 ? '...' : ''}',
+        kind: SemanticAlertKind.warning,
+      ));
+    }
+
+    final studentIdsWithSession = app.specialistSessions
         .map((s) => s.studentId)
         .toSet();
 
@@ -166,7 +173,7 @@ class _SpecialistDashboardScreenState extends State<SpecialistDashboardScreen> {
         .toIso8601String();
     final stale = <String>[];
     for (final student in app.students) {
-      final studentSessions = app.centerSessions
+      final studentSessions = app.specialistSessions
           .where((s) => s.studentId == student.id)
           .toList();
       if (studentSessions.isNotEmpty) {
@@ -274,7 +281,7 @@ class _DashboardHero extends StatelessWidget {
                 icon: Icons.timer_outlined,
               ),
               _HeroMetric(
-                label: 'نسبة التحسن',
+                label: 'متوسط تقدم أهداف طلابي',
                 value: '$improvement%',
                 icon: Icons.trending_up,
               ),
@@ -491,8 +498,8 @@ class _RecentActivity extends StatelessWidget {
   List<_ActivityItem> _activityItems(AppProvider app) {
     final items = <_ActivityItem>[];
 
-    final lastSession = app.centerSessions.isNotEmpty
-        ? app.centerSessions
+    final lastSession = app.specialistSessions.isNotEmpty
+        ? app.specialistSessions
             .reduce((a, b) =>
                 a.startedAt.compareTo(b.startedAt) > 0 ? a : b)
         : null;

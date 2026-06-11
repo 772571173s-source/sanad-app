@@ -106,8 +106,8 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
             Chip(
               avatar: CircleAvatar(
                 radius: 12,
-                child: Text(_selectedStudent!.name[0],
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                child: Icon(Icons.person, size: 14, color: Theme.of(context).colorScheme.primary),
               ),
               label: Text(_selectedStudent!.name,
                   maxLines: 1, overflow: TextOverflow.ellipsis),

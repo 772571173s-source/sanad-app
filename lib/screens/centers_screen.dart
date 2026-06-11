@@ -84,8 +84,8 @@ class CentersScreen extends StatelessWidget {
           context: context,
           builder: (dialogContext) => AlertDialog(
             title: const Text('حذف المركز'),
-            content: Text('هل تريد حذف مركز ${center.name}؟',
-                maxLines: 2, overflow: TextOverflow.ellipsis),
+            content: const Text(
+                'هل أنت متأكد من حذف المركز؟\nسيتم حذف جميع البيانات المرتبطة به'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),

@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 25;
+  static const currentVersion = 31;
 
   mobile.Database? _database;
 
@@ -28,7 +28,10 @@ class DatabaseService {
           await _createSchema(db);
         },
         onUpgrade: _upgrade,
-        onOpen: _repairStoredArabicText,
+        onOpen: (db) async {
+          await _repairStoredArabicText(db);
+          await _ensureLatestSchema(db);
+        },
       ),
     );
     return _database!;
@@ -186,8 +189,11 @@ class DatabaseService {
         center_id TEXT NOT NULL,
         student_id TEXT NOT NULL,
         goal TEXT NOT NULL,
+        treatment TEXT NOT NULL DEFAULT '',
         target_date TEXT NOT NULL,
         progress INTEGER NOT NULL,
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(center_id) REFERENCES centers(id),
@@ -205,7 +211,16 @@ class DatabaseService {
         due_date TEXT NOT NULL,
         status TEXT NOT NULL,
         audio_path TEXT NOT NULL,
+        program_id TEXT NOT NULL DEFAULT '',
+        plan_id TEXT NOT NULL DEFAULT '',
+        goal_skill_step_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
+        session_date TEXT NOT NULL DEFAULT '',
         parent_note TEXT NOT NULL DEFAULT '',
+        note_for_parent TEXT NOT NULL DEFAULT '',
+        parent_completed_at TEXT NOT NULL DEFAULT '',
+        specialist_reviewed_at TEXT NOT NULL DEFAULT '',
+        created_from_session_result TEXT NOT NULL DEFAULT '',
         stars INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
@@ -243,6 +258,19 @@ class DatabaseService {
         FOREIGN KEY(center_id) REFERENCES centers(id),
         FOREIGN KEY(student_id) REFERENCES students(id)
       )
+    '''    );
+    await db.execute('''
+      CREATE TABLE session_skill_results (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        goal_skill_step_id TEXT NOT NULL,
+        goal_id TEXT NOT NULL,
+        step_title TEXT NOT NULL,
+        result TEXT NOT NULL DEFAULT 'لم يبدأ',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES sessions(id)
+      )
     ''');
     await _createClinicalAssessmentTables(db);
     await _createTherapyStructureTables(db);
@@ -275,11 +303,71 @@ class DatabaseService {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL DEFAULT ''
       )
+      ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_therapy_programs (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        assigned_at TEXT NOT NULL,
+        assigned_by_user_id TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS assessment_drafts (
+        student_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        phase TEXT NOT NULL DEFAULT 'sections',
+        step_index INTEGER NOT NULL DEFAULT 0,
+        current_letter TEXT NOT NULL DEFAULT '',
+        selections_json TEXT NOT NULL DEFAULT '{}',
+        multi_selections_json TEXT NOT NULL DEFAULT '{}',
+        matrix_selections_json TEXT NOT NULL DEFAULT '[]',
+        letter_results_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (student_id, program_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_specialists (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL,
+        assigned_by_user_id TEXT NOT NULL DEFAULT '',
+        assigned_at TEXT NOT NULL DEFAULT '',
+        is_active INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_followups (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT '',
+        plan_id TEXT NOT NULL DEFAULT '',
+        goal_skill_step_id TEXT NOT NULL DEFAULT '',
+        reason TEXT NOT NULL DEFAULT 'retry',
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TEXT NOT NULL DEFAULT '',
+        resolved_at TEXT NOT NULL DEFAULT '',
+        last_opened_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
     ''');
   }
 
   Future<void> _upgrade(
       mobile.Database db, int oldVersion, int newVersion) async {
+    // ignore: avoid_print
+    print('[Database] _upgrade: old=$oldVersion new=$newVersion');
     if (oldVersion < 2) {
       await _ensureTable(db, 'sign_resources', '''
         CREATE TABLE sign_resources (
@@ -471,6 +559,113 @@ class DatabaseService {
         },
       });
     }
+    if (oldVersion < 26) {
+      await _ensureTable(db, 'student_followups', '''
+        CREATE TABLE student_followups (
+          id TEXT PRIMARY KEY,
+          student_id TEXT NOT NULL,
+          specialist_id TEXT NOT NULL DEFAULT '',
+          program_id TEXT NOT NULL DEFAULT '',
+          source_type TEXT NOT NULL DEFAULT '',
+          plan_id TEXT NOT NULL DEFAULT '',
+          goal_skill_step_id TEXT NOT NULL DEFAULT '',
+          reason TEXT NOT NULL DEFAULT 'retry',
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT '',
+          last_opened_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 27) {
+      await _addColumns(db, {
+        'student_followups': {
+          'updated_at': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 28) {
+      await _addColumns(db, {
+        'assessment_drafts': {
+          'created_at': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 29) {
+      // ignore: avoid_print
+      print('[Database] Running migration v29: adding missing columns');
+      final allTables = [
+        'clinical_findings', 'goal_skill_steps', 'training_plans', 'exercises',
+      ];
+      final columnDefs = <String, Map<String, String>>{
+        'clinical_findings': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'goal_skill_steps': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'training_plans': {
+          'treatment': "TEXT NOT NULL DEFAULT ''",
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        },
+        'exercises': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'plan_id': "TEXT NOT NULL DEFAULT ''",
+          'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
+          'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+          'session_date': "TEXT NOT NULL DEFAULT ''",
+          'note_for_parent': "TEXT NOT NULL DEFAULT ''",
+          'parent_completed_at': "TEXT NOT NULL DEFAULT ''",
+          'specialist_reviewed_at': "TEXT NOT NULL DEFAULT ''",
+          'created_from_session_result': "TEXT NOT NULL DEFAULT ''",
+        },
+      };
+      for (final table in allTables) {
+        final existing = <String>{};
+        try {
+          final info = await db.rawQuery('PRAGMA table_info($table)');
+          for (final row in info) {
+            final name = row['name'] as String?;
+            if (name != null) existing.add(name);
+          }
+        } catch (_) {}
+        final defs = columnDefs[table] ?? {};
+        for (final col in defs.entries) {
+          if (!existing.contains(col.key)) {
+            try {
+              await db.execute('ALTER TABLE $table ADD COLUMN ${col.key} ${col.value}');
+            } catch (e) {
+              // Column may already exist or table doesn't exist; skip.
+            }
+          }
+        }
+      }
+    }
+    if (oldVersion < 30) {
+      await _addColumns(db, {
+        'clinical_findings': {
+          'template_id': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+  }
+
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.execute('PRAGMA foreign_keys = OFF');
+    final tables = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+    );
+    for (final tableRow in tables) {
+      final table = tableRow['name'] as String?;
+      if (table == null || table.isEmpty) continue;
+      await db.delete(table);
+    }
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _resetAccountsForRoleRebuild(mobile.Database db) async {
@@ -480,6 +675,18 @@ class DatabaseService {
       'portal_password': '',
       'updated_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  Future<void> clearAccounts() async {
+    final db = await database;
+    await db.execute('PRAGMA foreign_keys = OFF');
+    await db.delete('users');
+    await db.delete('audit_logs');
+    await db.update('students', {
+      'portal_password': '',
+      'updated_at': DateTime.now().toIso8601String(),
+    });
+    await db.execute('PRAGMA foreign_keys = ON');
   }
 
   Future<void> _repairStoredArabicText(mobile.Database db) async {
@@ -755,7 +962,16 @@ class DatabaseService {
         due_date TEXT NOT NULL,
         status TEXT NOT NULL,
         audio_path TEXT NOT NULL,
+        program_id TEXT NOT NULL DEFAULT '',
+        plan_id TEXT NOT NULL DEFAULT '',
+        goal_skill_step_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
+        session_date TEXT NOT NULL DEFAULT '',
         parent_note TEXT NOT NULL DEFAULT '',
+        note_for_parent TEXT NOT NULL DEFAULT '',
+        parent_completed_at TEXT NOT NULL DEFAULT '',
+        specialist_reviewed_at TEXT NOT NULL DEFAULT '',
+        created_from_session_result TEXT NOT NULL DEFAULT '',
         stars INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT ''
@@ -822,6 +1038,9 @@ class DatabaseService {
         weakness TEXT NOT NULL DEFAULT '',
         goal TEXT NOT NULL DEFAULT '',
         training TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
+        template_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(assessment_id) REFERENCES clinical_assessments(id),
@@ -1029,6 +1248,7 @@ class DatabaseService {
         multi_selections_json TEXT NOT NULL DEFAULT '{}',
         matrix_selections_json TEXT NOT NULL DEFAULT '[]',
         letter_results_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL,
         PRIMARY KEY (student_id, program_id)
       )
@@ -1069,6 +1289,8 @@ class DatabaseService {
         weakness TEXT NOT NULL DEFAULT '',
         goal TEXT NOT NULL DEFAULT '',
         training TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -1087,6 +1309,8 @@ class DatabaseService {
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(center_id) REFERENCES centers(id),
@@ -1108,6 +1332,8 @@ class DatabaseService {
         sort_order INTEGER NOT NULL DEFAULT 0,
         notes TEXT NOT NULL DEFAULT '',
         last_session_id TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        source_type TEXT NOT NULL DEFAULT 'standard',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -1133,6 +1359,388 @@ class DatabaseService {
               'ALTER TABLE ${entry.key} ADD COLUMN ${column.key} ${column.value}');
         }
       }
+    }
+  }
+
+  Future<void> _ensureLatestSchema(mobile.Database db) async {
+    final tables = {
+      'centers': {
+        'id': 'TEXT PRIMARY KEY',
+        'name': 'TEXT NOT NULL',
+        'logo_path': "TEXT NOT NULL DEFAULT ''",
+        'address': "TEXT NOT NULL DEFAULT ''",
+        'phone': "TEXT NOT NULL DEFAULT ''",
+        'manager_name': "TEXT NOT NULL DEFAULT ''",
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'users': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'email': 'TEXT NOT NULL UNIQUE',
+        'password_hash': 'TEXT NOT NULL',
+        'name': 'TEXT NOT NULL',
+        'role': 'TEXT NOT NULL',
+        'student_id': 'TEXT',
+        'force_password_change': 'INTEGER NOT NULL DEFAULT 0',
+        'is_demo': 'INTEGER NOT NULL DEFAULT 0',
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'students': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': 'TEXT NOT NULL',
+        'name': 'TEXT NOT NULL',
+        'age': 'INTEGER NOT NULL',
+        'status': 'TEXT NOT NULL',
+        'diagnosis': 'TEXT NOT NULL',
+        'program_type': "TEXT NOT NULL DEFAULT '\u0646\u0637\u0642 \u0648\u062A\u062E\u0627\u0637\u0628'",
+        'parent_name': 'TEXT NOT NULL',
+        'parent_phone': 'TEXT NOT NULL',
+        'portal_email': 'TEXT NOT NULL',
+        'portal_password': 'TEXT NOT NULL',
+        'photo_path': 'TEXT NOT NULL',
+        'notes': 'TEXT NOT NULL',
+        'deleted_at': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'parents': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'name': 'TEXT NOT NULL',
+        'phone': 'TEXT NOT NULL',
+        'email': 'TEXT NOT NULL',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'sessions': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'skill_id': "TEXT NOT NULL DEFAULT ''",
+        'activity_results': "TEXT NOT NULL DEFAULT ''",
+        'session_type': "TEXT NOT NULL DEFAULT '\u0646\u0637\u0642 \u0648\u062A\u062E\u0627\u0637\u0628'",
+        'target_letter': "TEXT NOT NULL DEFAULT ''",
+        'letter_position': "TEXT NOT NULL DEFAULT ''",
+        'error_type': "TEXT NOT NULL DEFAULT ''",
+        'practice_items': "TEXT NOT NULL DEFAULT ''",
+        'attempts': 'INTEGER NOT NULL DEFAULT 0',
+        'success_rate': 'INTEGER NOT NULL DEFAULT 0',
+        'started_at': 'TEXT NOT NULL',
+        'duration_seconds': 'INTEGER NOT NULL',
+        'card_title': 'TEXT NOT NULL',
+        'quick_result': 'TEXT NOT NULL',
+        'notes': 'TEXT NOT NULL',
+        'summary': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'evaluations': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'letter': 'TEXT NOT NULL',
+        'position': 'TEXT NOT NULL',
+        'error_type': 'TEXT NOT NULL',
+        'score': 'TEXT NOT NULL',
+        'severity': 'INTEGER NOT NULL DEFAULT 1',
+        'recommendation': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+        'notes': 'TEXT NOT NULL',
+      },
+      'training_plans': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'goal': 'TEXT NOT NULL',
+        'treatment': "TEXT NOT NULL DEFAULT ''",
+        'target_date': 'TEXT NOT NULL',
+        'progress': 'INTEGER NOT NULL',
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'goal_skill_steps': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': 'TEXT NOT NULL',
+        'student_id': 'TEXT NOT NULL',
+        'goal_id': 'TEXT NOT NULL',
+        'title': 'TEXT NOT NULL',
+        'status': "TEXT NOT NULL DEFAULT '\u0644\u0645 \u064A\u0628\u062F\u0623'",
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'notes': "TEXT NOT NULL DEFAULT ''",
+        'last_session_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'exercises': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'title': 'TEXT NOT NULL',
+        'instructions': 'TEXT NOT NULL',
+        'due_date': 'TEXT NOT NULL',
+        'status': 'TEXT NOT NULL',
+        'audio_path': 'TEXT NOT NULL',
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
+        'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'session_date': "TEXT NOT NULL DEFAULT ''",
+        'parent_note': "TEXT NOT NULL DEFAULT ''",
+        'note_for_parent': "TEXT NOT NULL DEFAULT ''",
+        'parent_completed_at': "TEXT NOT NULL DEFAULT ''",
+        'specialist_reviewed_at': "TEXT NOT NULL DEFAULT ''",
+        'created_from_session_result': "TEXT NOT NULL DEFAULT ''",
+        'stars': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'rewards': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'xp': 'INTEGER NOT NULL',
+        'level': 'INTEGER NOT NULL',
+        'badges': 'TEXT NOT NULL',
+        'daily_streak': 'INTEGER NOT NULL',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'reports': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'student_id': 'TEXT NOT NULL',
+        'type': 'TEXT NOT NULL',
+        'created_at': 'TEXT NOT NULL',
+        'improvement_rate': 'INTEGER NOT NULL',
+        'specialist_signature': 'TEXT NOT NULL',
+        'manager_signature': "TEXT NOT NULL DEFAULT ''",
+        'file_path': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'clinical_assessments': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': 'TEXT NOT NULL',
+        'student_id': 'TEXT NOT NULL',
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        'specialist_name': "TEXT NOT NULL DEFAULT ''",
+        'type': "TEXT NOT NULL DEFAULT 'speech'",
+        'strengths_summary': "TEXT NOT NULL DEFAULT ''",
+        'weaknesses_summary': "TEXT NOT NULL DEFAULT ''",
+        'goals_summary': "TEXT NOT NULL DEFAULT ''",
+        'training_summary': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'clinical_findings': {
+        'id': 'TEXT PRIMARY KEY',
+        'assessment_id': 'TEXT NOT NULL',
+        'center_id': 'TEXT NOT NULL',
+        'student_id': 'TEXT NOT NULL',
+        'domain': 'TEXT NOT NULL',
+        'item_title': 'TEXT NOT NULL',
+        'result': 'TEXT NOT NULL',
+        'is_normal': 'INTEGER NOT NULL DEFAULT 0',
+        'weakness': "TEXT NOT NULL DEFAULT ''",
+        'goal': "TEXT NOT NULL DEFAULT ''",
+        'training': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'template_id': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'therapy_program_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'name': 'TEXT NOT NULL',
+        'description': "TEXT NOT NULL DEFAULT ''",
+        'uses_speech_sounds': 'INTEGER NOT NULL DEFAULT 0',
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'assessment_section_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'title': 'TEXT NOT NULL',
+        'description': "TEXT NOT NULL DEFAULT ''",
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'assessment_item_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'section_id': 'TEXT NOT NULL',
+        'title': 'TEXT NOT NULL',
+        'response_type': "TEXT NOT NULL DEFAULT 'custom'",
+        'response_mode': "TEXT NOT NULL DEFAULT 'singleChoice'",
+        'prompt': "TEXT NOT NULL DEFAULT ''",
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'assessment_option_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'item_id': 'TEXT NOT NULL',
+        'label': 'TEXT NOT NULL',
+        'generates_therapy': 'INTEGER NOT NULL DEFAULT 0',
+        'weakness_template': "TEXT NOT NULL DEFAULT ''",
+        'goal_template': "TEXT NOT NULL DEFAULT ''",
+        'therapy_template': "TEXT NOT NULL DEFAULT ''",
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'skill_step_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'owner_type': 'TEXT NOT NULL',
+        'owner_id': 'TEXT NOT NULL',
+        'title': 'TEXT NOT NULL',
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'speech_sound_trigger_templates': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'letter': 'TEXT NOT NULL',
+        'error_type': 'TEXT NOT NULL',
+        'position': 'TEXT NOT NULL',
+        'generates_therapy': 'INTEGER NOT NULL DEFAULT 1',
+        'weakness_template': "TEXT NOT NULL DEFAULT ''",
+        'goal_template': "TEXT NOT NULL DEFAULT ''",
+        'therapy_template': "TEXT NOT NULL DEFAULT ''",
+        'skill_steps_json': "TEXT NOT NULL DEFAULT '[]'",
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'sign_resources': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'title': 'TEXT NOT NULL',
+        'category': 'TEXT NOT NULL',
+        'media_type': 'TEXT NOT NULL',
+        'media_path': 'TEXT NOT NULL',
+        'notes': 'TEXT NOT NULL',
+        'level': "TEXT NOT NULL DEFAULT '\u0645\u0628\u062A\u062F\u0626'",
+        'is_favorite': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'audit_logs': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'user_id': 'TEXT NOT NULL',
+        'user_name': 'TEXT NOT NULL',
+        'action': 'TEXT NOT NULL',
+        'entity_type': 'TEXT NOT NULL',
+        'entity_id': 'TEXT NOT NULL',
+        'details': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'student_therapy_programs': {
+        'id': 'TEXT PRIMARY KEY',
+        'student_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'assigned_at': 'TEXT NOT NULL',
+        'assigned_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        'sort_order': 'INTEGER NOT NULL DEFAULT 0',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'assessment_drafts': {
+        'student_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'phase': "TEXT NOT NULL DEFAULT 'sections'",
+        'step_index': 'INTEGER NOT NULL DEFAULT 0',
+        'current_letter': "TEXT NOT NULL DEFAULT ''",
+        'selections_json': "TEXT NOT NULL DEFAULT '{}'",
+        'multi_selections_json': "TEXT NOT NULL DEFAULT '{}'",
+        'matrix_selections_json': "TEXT NOT NULL DEFAULT '[]'",
+        'letter_results_json': "TEXT NOT NULL DEFAULT '{}'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'student_specialists': {
+        'id': 'TEXT PRIMARY KEY',
+        'student_id': 'TEXT NOT NULL',
+        'specialist_id': 'TEXT NOT NULL',
+        'assigned_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'assigned_at': "TEXT NOT NULL DEFAULT ''",
+        'is_active': 'INTEGER NOT NULL DEFAULT 1',
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'student_followups': {
+        'id': 'TEXT PRIMARY KEY',
+        'student_id': 'TEXT NOT NULL',
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'source_type': "TEXT NOT NULL DEFAULT ''",
+        'plan_id': "TEXT NOT NULL DEFAULT ''",
+        'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
+        'reason': "TEXT NOT NULL DEFAULT 'retry'",
+        'status': "TEXT NOT NULL DEFAULT 'pending'",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'resolved_at': "TEXT NOT NULL DEFAULT ''",
+        'last_opened_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+      'session_skill_results': {
+        'id': 'TEXT PRIMARY KEY',
+        'session_id': 'TEXT NOT NULL',
+        'goal_skill_step_id': 'TEXT NOT NULL',
+        'goal_id': 'TEXT NOT NULL',
+        'step_title': 'TEXT NOT NULL',
+        'result': "TEXT NOT NULL DEFAULT 'لم يبدأ'",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+    };
+    for (final entry in tables.entries) {
+      final table = entry.key;
+      final columns = entry.value;
+      try {
+        final info = await db.rawQuery('PRAGMA table_info("$table")');
+        final existing =
+            info.map((r) => r['name'] as String?).whereType<String>().toSet();
+        if (existing.isEmpty) {
+          final colDefs = columns.entries
+              .map((c) => '${c.key} ${c.value}')
+              .join(',\n');
+          await db.execute('CREATE TABLE IF NOT EXISTS "$table" ($colDefs)');
+        } else {
+          for (final col in columns.entries) {
+            if (!existing.contains(col.key)) {
+              try {
+                await db.execute(
+                    'ALTER TABLE "$table" ADD COLUMN ${col.key} ${col.value}');
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
     }
   }
 
@@ -1207,4 +1815,53 @@ class DatabaseService {
     final db = await database;
     await db.delete(table, where: where, whereArgs: whereArgs);
   }
-}
+
+  Future<void> deleteCenter(String centerId) async {
+    final db = await database;
+    await db.execute('PRAGMA foreign_keys = OFF');
+    try {
+      // Tables with center_id column – delete all child records first
+      await db.delete('users', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('parents', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('sessions', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('evaluations', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('training_plans', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('goal_skill_steps', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('exercises', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('rewards', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('reports', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('clinical_assessments', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('clinical_findings', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('sign_resources', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('therapy_program_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('assessment_section_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('assessment_item_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('assessment_option_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('skill_step_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('speech_sound_trigger_templates', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('audit_logs', where: 'center_id = ?', whereArgs: [centerId]);
+
+      // Tables without center_id – reference students in this center
+      await db.delete('student_followups',
+          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
+          whereArgs: [centerId]);
+      await db.delete('student_therapy_programs',
+          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
+          whereArgs: [centerId]);
+      await db.delete('student_specialists',
+          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
+          whereArgs: [centerId]);
+      await db.delete('assessment_drafts',
+          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
+          whereArgs: [centerId]);
+
+      // Students (depends on center)
+      await db.delete('students', where: 'center_id = ?', whereArgs: [centerId]);
+
+      // Finally the center itself
+      await db.delete('centers', where: 'id = ?', whereArgs: [centerId]);
+    } finally {
+      await db.execute('PRAGMA foreign_keys = ON');
+      }
+    }
+  }

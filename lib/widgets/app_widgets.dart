@@ -341,14 +341,16 @@ class AppPill extends StatelessWidget {
             Icon(icon, size: 18, color: foreground),
             const SizedBox(width: 6),
           ],
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: foreground,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: foreground,
+                fontWeight: FontWeight.w800,
+                height: 1.2,
+              ),
             ),
           ),
         ],
@@ -524,14 +526,16 @@ class StudentAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final hasPhoto =
         student.photoPath.isNotEmpty && File(student.photoPath).existsSync();
     return CircleAvatar(
       radius: radius,
       backgroundImage: hasPhoto ? FileImage(File(student.photoPath)) : null,
+      backgroundColor: hasPhoto ? null : colorScheme.primaryContainer,
       child: hasPhoto
           ? null
-          : Text(student.name.isEmpty ? 'س' : student.name.substring(0, 1)),
+          : Icon(Icons.person, size: radius * 0.9, color: colorScheme.primary),
     );
   }
 }

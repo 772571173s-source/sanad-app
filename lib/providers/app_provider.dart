@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
+import '../models/assessment_improvement_summary.dart';
 import '../repositories/sanad_repository.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
@@ -25,6 +26,8 @@ class AppProvider extends ChangeNotifier {
   List<GoalSkillStep> goalSkillSteps = [];
   List<Exercise> exercises = [];
   List<ReportRecord> reports = [];
+  List<StudentFollowup> studentFollowups = [];
+  List<StudentFollowup> centerStudentFollowups = [];
   List<ClinicalAssessment> clinicalAssessments = [];
   Map<String, List<ClinicalFinding>> clinicalFindingsByAssessment = {};
   List<TherapyProgramTemplate> therapyPrograms = [];
@@ -57,6 +60,8 @@ class AppProvider extends ChangeNotifier {
   List<TrainingPlan> centerPlans = [];
   List<GoalSkillStep> centerGoalSteps = [];
   bool _centerPlansLoaded = false;
+  List<ClinicalAssessment> centerClinicalAssessments = [];
+  bool _centerAssessmentsLoaded = false;
 
   bool get isSanadOwnerAccount => user?.role == UserRole.sanadOwner;
   bool get isSupportMode => isSanadOwnerAccount && supportModeCenter != null;
@@ -95,6 +100,75 @@ class AppProvider extends ChangeNotifier {
 
   int get completedHomeworkCount =>
       centerExercises.where((item) => item.status == 'مكتمل').length;
+
+  List<TherapySession> get specialistSessions {
+    if (user == null) return [];
+    return centerSessions.where((s) => s.specialistId == user!.id).toList();
+  }
+
+  int get centerGoalImprovementRate {
+    final withProgress = centerPlans.where((p) => goalProgress(p.id) > 0).toList();
+    if (withProgress.isEmpty) return 0;
+    return (withProgress.fold<int>(0, (sum, p) => sum + goalProgress(p.id)) /
+            withProgress.length)
+        .round();
+  }
+
+  List<Student> get studentsNeedingAssessment {
+    if (!isSpecialist) return [];
+    return students
+        .where((s) => !centerClinicalAssessments.any((a) => a.studentId == s.id))
+        .toList();
+  }
+
+  int studentGoalAverageProgress(String studentId) {
+    final studentPlans =
+        plans.where((p) => p.studentId == studentId && goalProgress(p.id) > 0).toList();
+    if (studentPlans.isEmpty) return 0;
+    return (studentPlans.fold<int>(0, (sum, p) => sum + goalProgress(p.id)) /
+            studentPlans.length)
+        .round();
+  }
+
+  bool studentHasAssessment(String studentId) =>
+      clinicalAssessments.any((a) => a.studentId == studentId);
+
+  String get studentAssessmentStatus {
+    final student = selectedStudent;
+    if (student == null) return '';
+    final has = clinicalAssessments.any((a) => a.studentId == student.id);
+    return has ? 'مقيّم' : 'يحتاج تقييم';
+  }
+
+  AssessmentImprovementSummary get studentAssessmentImprovement {
+    final student = selectedStudent;
+    if (student == null) {
+      return const AssessmentImprovementSummary(hasEnoughData: false);
+    }
+    return AssessmentImprovementSummary.compute(
+      student.id,
+      clinicalAssessments,
+      clinicalFindingsByAssessment,
+    );
+  }
+
+  String get pendingHomeworkReviewCount =>
+      '${exercises.where((e) => e.status == 'completed_by_parent').length}';
+
+  String get lastSessionDate {
+    if (sessions.isEmpty) return 'لا توجد';
+    return sessions.first.startedAt.split('T').first;
+  }
+
+  String get activeGoalCount {
+    final studentPlans = plans.where((p) => goalProgress(p.id) < 100).toList();
+    return '${studentPlans.length}';
+  }
+
+  String get masteredGoalCount {
+    final studentPlans = plans.where((p) => goalProgress(p.id) >= 100).toList();
+    return '${studentPlans.length}';
+  }
 
   String get hardestLetter {
     final counts = <String, int>{};
@@ -295,6 +369,8 @@ class AppProvider extends ChangeNotifier {
     exercises = [];
     studentSpecialists = [];
     reports = [];
+    studentFollowups = [];
+    centerStudentFollowups = [];
     clinicalAssessments = [];
     clinicalFindingsByAssessment = {};
     therapyPrograms = [];
@@ -308,6 +384,8 @@ class AppProvider extends ChangeNotifier {
     centerSessions = [];
     centerEvaluations = [];
     centerExercises = [];
+    centerClinicalAssessments = [];
+    _centerAssessmentsLoaded = false;
     notifications = [];
     reward = null;
     notifyListeners();
@@ -319,72 +397,77 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> loadHome() async {
-    final current = _requireUser();
-    final allCenters = await _repository.centers();
-    totalStudentsCount = isOwner ? await _repository.totalStudents() : 0;
-    totalSessionsCount = isOwner ? await _repository.totalSessions() : 0;
-    centers = isOwner
-        ? allCenters
-        : isSupportMode && supportModeCenter != null
-            ? allCenters
-                .where((center) => center.id == supportModeCenter!.id)
-                .toList()
-            : allCenters
-                .where((center) => center.id == current.centerId)
-                .toList();
-    if (isSupportMode && supportModeCenter != null) {
-      final matches =
-          allCenters.where((center) => center.id == supportModeCenter!.id);
-      currentCenter = matches.isEmpty ? supportModeCenter : matches.first;
-      supportModeCenter = currentCenter;
-    } else if (isOwner) {
-      final selectedCenter = currentCenter;
-      currentCenter = selectedCenter == null ||
-              centers.any((center) => center.id == selectedCenter.id)
-          ? selectedCenter
+    try {
+      final current = _requireUser();
+      final allCenters = await _repository.centers();
+      totalStudentsCount = isOwner ? await _repository.totalStudents() : 0;
+      totalSessionsCount = isOwner ? await _repository.totalSessions() : 0;
+      centers = isOwner
+          ? allCenters
+          : isSupportMode && supportModeCenter != null
+              ? allCenters
+                  .where((center) => center.id == supportModeCenter!.id)
+                  .toList()
+              : allCenters
+                  .where((center) => center.id == current.centerId)
+                  .toList();
+      if (isSupportMode && supportModeCenter != null) {
+        final matches =
+            allCenters.where((center) => center.id == supportModeCenter!.id);
+        currentCenter = matches.isEmpty ? supportModeCenter : matches.first;
+        supportModeCenter = currentCenter;
+      } else if (isOwner) {
+        final selectedCenter = currentCenter;
+        currentCenter = selectedCenter == null ||
+                centers.any((center) => center.id == selectedCenter.id)
+            ? selectedCenter
+            : null;
+      } else if (current.centerId.isNotEmpty) {
+        final matches =
+            centers.where((center) => center.id == current.centerId).toList();
+        currentCenter = matches.isEmpty ? null : matches.first;
+      } else {
+        currentCenter = null;
+      }
+      staff = canManageStaff || isCoordinator
+          ? await _repository.users(centerId: isOwner ? null : activeCenterId)
+          : [];
+      await _loadCenterCardsMetrics();
+      signResources = activeCenterId.isEmpty
+          ? []
+          : await _repository.signResources(activeCenterId);
+      await _loadTherapyStructure();
+      auditLogs = isOwner || isCenterManager
+          ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId)
+          : [];
+      students = current.role == UserRole.parent
+          ? await _repository.studentsForParent(current)
+          : activeCenterId.isEmpty
+              ? []
+              : await _repository.students(activeCenterId);
+
+      if (isSpecialist || isCoordinator || isCenterManager || isClinicalSupervisor) {
+        studentSpecialists = await _repository.studentSpecialists();
+      }
+      if (isSpecialist) {
+        final myStudentIds = studentSpecialists
+            .where((s) => s.specialistId == current.id && s.isActive)
+            .map((s) => s.studentId)
+            .toSet();
+        students = students.where((s) => myStudentIds.contains(s.id)).toList();
+      }
+
+      await _loadCenterMetrics();
+      final currentSelection = selectedStudent;
+      selectedStudent = currentSelection != null &&
+              students.any((student) => student.id == currentSelection.id)
+          ? currentSelection
           : null;
-    } else if (current.centerId.isNotEmpty) {
-      final matches =
-          centers.where((center) => center.id == current.centerId).toList();
-      currentCenter = matches.isEmpty ? null : matches.first;
-    } else {
-      currentCenter = null;
+      await selectStudent(selectedStudent);
+    } catch (error) {
+      _debugLog('loadHome: $error');
+      notifyListeners();
     }
-    staff = canManageStaff || isCoordinator
-        ? await _repository.users(centerId: isOwner ? null : activeCenterId)
-        : [];
-    await _loadCenterCardsMetrics();
-    signResources = activeCenterId.isEmpty
-        ? []
-        : await _repository.signResources(activeCenterId);
-    await _loadTherapyStructure();
-    auditLogs = isOwner || isCenterManager
-        ? await _repository.auditLogs(centerId: isOwner ? null : activeCenterId)
-        : [];
-    students = current.role == UserRole.parent
-        ? await _repository.studentsForParent(current)
-        : activeCenterId.isEmpty
-            ? []
-            : await _repository.students(activeCenterId);
-
-    if (isSpecialist || isCoordinator || isCenterManager || isClinicalSupervisor) {
-      studentSpecialists = await _repository.studentSpecialists();
-    }
-    if (isSpecialist) {
-      final myStudentIds = studentSpecialists
-          .where((s) => s.specialistId == current.id && s.isActive)
-          .map((s) => s.studentId)
-          .toSet();
-      students = students.where((s) => myStudentIds.contains(s.id)).toList();
-    }
-
-    await _loadCenterMetrics();
-    final currentSelection = selectedStudent;
-    selectedStudent = currentSelection != null &&
-            students.any((student) => student.id == currentSelection.id)
-        ? currentSelection
-        : null;
-    await selectStudent(selectedStudent);
   }
 
   Future<void> _loadTherapyStructure() async {
@@ -397,16 +480,26 @@ class AppProvider extends ChangeNotifier {
       speechSoundTriggers = [];
       return;
     }
-    final scopeCenterId = isGlobalTherapyStructureMode ? '' : activeCenterId;
-    therapyPrograms = await _repository.therapyProgramTemplates(scopeCenterId);
-    assessmentSections =
-        await _repository.assessmentSectionTemplates(scopeCenterId);
-    assessmentItems = await _repository.assessmentItemTemplates(scopeCenterId);
-    assessmentOptions =
-        await _repository.assessmentOptionTemplates(scopeCenterId);
-    skillStepTemplates = await _repository.skillStepTemplates(scopeCenterId);
-    speechSoundTriggers =
-        await _repository.speechSoundTriggerTemplates(scopeCenterId);
+    try {
+      final scopeCenterId = isGlobalTherapyStructureMode ? '' : activeCenterId;
+      therapyPrograms = await _repository.therapyProgramTemplates(scopeCenterId);
+      assessmentSections =
+          await _repository.assessmentSectionTemplates(scopeCenterId);
+      assessmentItems = await _repository.assessmentItemTemplates(scopeCenterId);
+      assessmentOptions =
+          await _repository.assessmentOptionTemplates(scopeCenterId);
+      skillStepTemplates = await _repository.skillStepTemplates(scopeCenterId);
+      speechSoundTriggers =
+          await _repository.speechSoundTriggerTemplates(scopeCenterId);
+    } catch (error) {
+      _debugLog('_loadTherapyStructure: $error');
+      assessmentSections = [];
+      therapyPrograms = [];
+      assessmentItems = [];
+      assessmentOptions = [];
+      skillStepTemplates = [];
+      speechSoundTriggers = [];
+    }
   }
 
   Future<void> enterSupportMode(SanadCenter center) async {
@@ -448,8 +541,6 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<void> selectStudent(Student? student) async {
-    if (student != null) _ensureStudentAccess(student);
-    selectedStudent = student;
     if (student == null) {
       sessions = [];
       evaluations = [];
@@ -457,6 +548,7 @@ class AppProvider extends ChangeNotifier {
       goalSkillSteps = [];
       exercises = [];
       reports = [];
+      studentFollowups = [];
       clinicalAssessments = [];
       clinicalFindingsByAssessment = {};
       auditLogs = isOwner || isCenterManager
@@ -465,8 +557,15 @@ class AppProvider extends ChangeNotifier {
           : [];
       reward = null;
       studentProgramIds = [];
-    } else {
+      selectedStudent = null;
+      notifyListeners();
+      return;
+    }
+    try {
+      _ensureStudentAccess(student);
+      selectedStudent = student;
       sessions = await _repository.sessions(student.id);
+      studentFollowups = await _repository.studentFollowups(student.id);
       evaluations = await _repository.evaluations(student.id);
       plans = await _repository.plans(student.id);
       goalSkillSteps = await _repository.goalSkillSteps(student.id);
@@ -484,8 +583,16 @@ class AppProvider extends ChangeNotifier {
           : [];
       reward = await _repository.reward(student.id);
       studentProgramIds = await _repository.studentProgramIds(student.id);
+    } catch (error) {
+      _debugLog('فشل تحميل بيانات الطالب ${student.id}: $error');
+      selectedStudent = null;
     }
     notifyListeners();
+  }
+
+  void _debugLog(String message) {
+    // ignore: avoid_print
+    print('[Sanad] $message');
   }
 
   Future<void> _loadCenterMetrics() async {
@@ -493,9 +600,14 @@ class AppProvider extends ChangeNotifier {
     centerEvaluations = [];
     centerExercises = [];
     for (final student in students) {
-      centerSessions.addAll(await _repository.sessions(student.id));
-      centerEvaluations.addAll(await _repository.evaluations(student.id));
-      centerExercises.addAll(await _repository.exercises(student.id));
+      try {
+        centerSessions.addAll(await _repository.sessions(student.id));
+        centerEvaluations.addAll(await _repository.evaluations(student.id));
+        centerExercises.addAll(await _repository.exercises(student.id));
+      } catch (error) {
+        _debugLog(
+            'فشل تحميل بيانات الطالب ${student.id} في _loadCenterMetrics: $error');
+      }
     }
   }
 
@@ -506,14 +618,18 @@ class AppProvider extends ChangeNotifier {
     centerLastActivities = {};
     if (!isOwner) return;
     for (final center in centers) {
-      centerStudentCounts[center.id] =
-          await _repository.centerStudentCount(center.id);
-      centerSpecialistCounts[center.id] =
-          await _repository.centerSpecialistCount(center.id);
-      centerSessionCounts[center.id] =
-          await _repository.centerSessionCount(center.id);
-      centerLastActivities[center.id] =
-          await _repository.centerLastActivity(center.id);
+      try {
+        centerStudentCounts[center.id] =
+            await _repository.centerStudentCount(center.id);
+        centerSpecialistCounts[center.id] =
+            await _repository.centerSpecialistCount(center.id);
+        centerSessionCounts[center.id] =
+            await _repository.centerSessionCount(center.id);
+        centerLastActivities[center.id] =
+            await _repository.centerLastActivity(center.id);
+      } catch (error) {
+        _debugLog('فشل تحميل إحصائيات المركز ${center.id}: $error');
+      }
     }
   }
 
@@ -521,11 +637,25 @@ class AppProvider extends ChangeNotifier {
     if (_centerPlansLoaded) return;
     centerPlans = [];
     centerGoalSteps = [];
+    centerStudentFollowups = [];
     for (final student in students) {
       centerPlans.addAll(await _repository.plans(student.id));
       centerGoalSteps.addAll(await _repository.goalSkillSteps(student.id));
+      centerStudentFollowups
+          .addAll(await _repository.studentFollowups(student.id));
     }
     _centerPlansLoaded = true;
+    notifyListeners();
+  }
+
+  Future<void> loadCenterAssessments() async {
+    if (_centerAssessmentsLoaded) return;
+    centerClinicalAssessments = [];
+    for (final student in students) {
+      centerClinicalAssessments
+          .addAll(await _repository.clinicalAssessments(student.id));
+    }
+    _centerAssessmentsLoaded = true;
     notifyListeners();
   }
 
@@ -540,16 +670,36 @@ class AppProvider extends ChangeNotifier {
         entityId: center.id,
         centerId: center.id,
         details: center.name);
-    await loadHome();
+    final idx = centers.indexWhere((c) => c.id == center.id);
+    if (idx != -1) {
+      centers[idx] = center;
+    } else {
+      centers = await _repository.centers();
+    }
+    if (currentCenter?.id == center.id) currentCenter = center;
+    notifyListeners();
   }
 
   Future<void> deleteCenter(String id) async {
     _ensure(canManageCenters, 'حذف المراكز خاص بمالك النظام فقط.');
     await _repository.deleteCenter(id);
-    if (currentCenter?.id == id) currentCenter = null;
+    if (currentCenter?.id == id) {
+      currentCenter = null;
+      staff = [];
+      students = [];
+      sessions = [];
+      evaluations = [];
+      plans = [];
+      goalSkillSteps = [];
+      exercises = [];
+      reports = [];
+      clinicalAssessments = [];
+      clinicalFindingsByAssessment = {};
+    }
     await _log(
         action: 'حذف مركز', entityType: 'center', entityId: id, centerId: id);
-    await loadHome();
+    centers.removeWhere((c) => c.id == id);
+    notifyListeners();
   }
 
   Future<void> saveStaffUser(AppUser account) async {
@@ -581,7 +731,13 @@ class AppProvider extends ChangeNotifier {
         entityId: account.id,
         centerId: account.centerId,
         details: '${account.name} - ${account.role.label}');
-    await loadHome();
+    final idx = staff.indexWhere((u) => u.id == account.id);
+    if (idx != -1) {
+      staff[idx] = account;
+    } else {
+      staff.add(account);
+    }
+    notifyListeners();
   }
 
   Future<void> setStaffUserActive(AppUser account, bool isActive) async {
@@ -603,7 +759,9 @@ class AppProvider extends ChangeNotifier {
       createdAt: account.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     ));
-    await loadHome();
+    final idx = staff.indexWhere((u) => u.id == account.id);
+    if (idx != -1) staff[idx] = account;
+    notifyListeners();
   }
 
   Future<void> changeStaffPassword(AppUser account, String newPassword) async {
@@ -619,7 +777,7 @@ class AppProvider extends ChangeNotifier {
           'مالك النظام يغير كلمة مرور مدراء المراكز فقط من هذه الشاشة.');
     }
     await _repository.changeUserPassword(account.id, newPassword);
-    await loadHome();
+    notifyListeners();
   }
 
   Future<void> deleteStaffUser(AppUser account) async {
@@ -627,8 +785,15 @@ class AppProvider extends ChangeNotifier {
     if (!isOwner && account.centerId != activeCenterId) {
       throw StateError('لا يمكن حذف موظف خارج مركزك.');
     }
+    if (account.role == UserRole.sanadOwner) {
+      throw StateError('لا يمكن حذف مالك سند.');
+    }
+    if (user?.id == account.id) {
+      throw StateError('لا يمكن حذف حسابك الحالي.');
+    }
     await _repository.deleteUser(account.id);
-    await loadHome();
+    staff.removeWhere((u) => u.id == account.id);
+    notifyListeners();
   }
 
   Future<Student> saveStudent(Student student) async {
@@ -658,12 +823,15 @@ class AppProvider extends ChangeNotifier {
         entityId: centerStudent.id,
         centerId: centerStudent.centerId,
         details: centerStudent.name);
-    await loadHome();
-    final saved = students.firstWhere((item) => item.id == student.id,
-        orElse: () => centerStudent);
-    selectedStudent = saved;
+    final idx = students.indexWhere((s) => s.id == centerStudent.id);
+    if (idx != -1) {
+      students[idx] = centerStudent;
+    } else {
+      students = await _repository.students(activeCenterId);
+    }
+    selectedStudent = centerStudent;
     notifyListeners();
-    return saved;
+    return centerStudent;
   }
 
   Future<void> deleteStudent(String id) async {
@@ -675,7 +843,8 @@ class AppProvider extends ChangeNotifier {
         entityId: id,
         centerId: activeCenterId);
     selectedStudent = null;
-    await loadHome();
+    students.removeWhere((s) => s.id == id);
+    notifyListeners();
   }
 
   Future<void> assignStudentProgram(
@@ -755,14 +924,103 @@ class AppProvider extends ChangeNotifier {
               '${session.studentId} - ${session.sessionType} - ${session.cardTitle}');
       await _grantXp(
           session.studentId,
-          session.quickResult == 'صحيح' ||
-                  session.quickResult == 'ناجح' ||
-                  session.quickResult == 'أتقن' ||
-                  session.quickResult == 'يؤدي جيدًا'
-              ? 12
-              : 6);
+          session.quickResult == 'متقن'
+              ? 2
+              : session.quickResult == 'بمساعدة'
+                  ? 1
+                  : 0);
     }
-    await selectStudent(selectedStudent);
+    final idx = sessions.indexWhere((s) => s.id == session.id);
+    if (idx != -1) { sessions[idx] = session; } else { sessions.add(session); }
+    final centerIdx = centerSessions.indexWhere((s) => s.id == session.id);
+    if (centerIdx != -1) { centerSessions[centerIdx] = session; } else { centerSessions.add(session); }
+    notifyListeners();
+  }
+
+  Future<void> saveSessionSkillResult(SessionSkillResult result) async {
+    await _repository.saveSessionSkillResult(result);
+  }
+
+  Future<void> correctSessionResult({
+    required String sessionId,
+    required String newQuickResult,
+    required int newSuccessRate,
+  }) async {
+    _ensure(canRunSessions, 'تصحيح النتيجة متاح للأخصائي فقط.');
+    final idx = sessions.indexWhere((s) => s.id == sessionId);
+    if (idx == -1) throw StateError('الجلسة غير موجودة.');
+    final old = sessions[idx];
+
+    final isCreator = old.specialistId == user?.id;
+    if (!isCreator && !isCenterManager) {
+      throw StateError('يمكن لكاتب الجلسة أو مدير المركز فقط تصحيح النتيجة.');
+    }
+
+    final createdAt = DateTime.tryParse(old.startedAt);
+    if (createdAt != null) {
+      final hoursSince = DateTime.now().difference(createdAt).inHours;
+      if (hoursSince >= 24) {
+        throw StateError('انتهت فترة التصحيح (24 ساعة).');
+      }
+    }
+
+    final corrected = TherapySession(
+      id: old.id,
+      centerId: old.centerId,
+      studentId: old.studentId,
+      specialistId: old.specialistId,
+      planId: old.planId,
+      programId: old.programId,
+      skillId: old.skillId,
+      activityResults: old.activityResults,
+      sessionType: old.sessionType,
+      targetLetter: old.targetLetter,
+      letterPosition: old.letterPosition,
+      errorType: old.errorType,
+      practiceItems: old.practiceItems,
+      attempts: old.attempts,
+      successRate: newSuccessRate,
+      startedAt: old.startedAt,
+      durationSeconds: old.durationSeconds,
+      cardTitle: old.cardTitle,
+      quickResult: newQuickResult,
+      notes: old.notes,
+      summary: old.summary,
+      createdAt: old.createdAt,
+      updatedAt: DateTime.now().toIso8601String(),
+    );
+    await _repository.saveSession(corrected);
+    sessions[idx] = corrected;
+
+    await syncGoalProgress(old.planId);
+
+    if (newQuickResult == 'متقن') {
+      await _repository.resolveFollowupsByPlan(old.planId);
+    } else if (old.quickResult == 'متقن') {
+      final now = DateTime.now().toIso8601String();
+      final existing =
+          await _repository.pendingFollowupForPlan(old.planId);
+      if (existing == null) {
+        await _repository.saveStudentFollowup(StudentFollowup(
+          id: 'fu_${old.planId}_${now.hashCode}',
+          studentId: old.studentId,
+          specialistId: user?.id ?? old.specialistId,
+          programId: old.programId,
+          sourceType: '',
+          planId: old.planId,
+          goalSkillStepId: '',
+          reason: newQuickResult == 'بمساعدة' ? 'assisted' : 'retry',
+          createdAt: now,
+          lastOpenedAt: now,
+        ));
+      }
+    }
+
+    if (selectedStudent != null) {
+      studentFollowups =
+          await _repository.studentFollowups(selectedStudent!.id);
+    }
+    notifyListeners();
   }
 
   Future<void> saveEvaluation(Evaluation evaluation) async {
@@ -776,9 +1034,9 @@ class AppProvider extends ChangeNotifier {
         centerId: evaluation.centerId,
         details:
             '${evaluation.studentId} - ${evaluation.letter} - ${evaluation.errorType}');
-    await _grantXp(evaluation.studentId,
-        evaluation.score == 'صحيح' || evaluation.score == 'ناجح' ? 8 : 4);
-    await selectStudent(selectedStudent);
+    final idx = evaluations.indexWhere((e) => e.id == evaluation.id);
+    if (idx != -1) { evaluations[idx] = evaluation; } else { evaluations.add(evaluation); }
+    notifyListeners();
   }
 
   Future<void> savePlan(TrainingPlan plan) async {
@@ -792,7 +1050,9 @@ class AppProvider extends ChangeNotifier {
         entityId: plan.id,
         centerId: plan.centerId,
         details: '${plan.studentId} - ${plan.goal}');
-    await selectStudent(selectedStudent);
+    final idx = plans.indexWhere((p) => p.id == plan.id);
+    if (idx != -1) { plans[idx] = plan; } else { plans.add(plan); }
+    notifyListeners();
   }
 
   List<GoalSkillStep> stepsForGoal(String goalId) =>
@@ -801,30 +1061,55 @@ class AppProvider extends ChangeNotifier {
 
   int goalProgress(String goalId) {
     final steps = stepsForGoal(goalId);
-    if (steps.isEmpty) {
+    if (steps.isNotEmpty) {
+      final completed = steps.where((step) => step.status == 'متقن').length;
+      return ((completed / steps.length) * 100).round();
+    }
+    final goalSessions = sessions.where((s) => s.planId == goalId).toList()
+      ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+    if (goalSessions.isEmpty) {
       final matches = plans.where((item) => item.id == goalId).toList();
       return matches.isEmpty ? 0 : matches.first.progress;
     }
-    final completed = steps.where((step) => step.status == 'متقن').length;
-    return ((completed / steps.length) * 100).round();
+    switch (goalSessions.first.quickResult) {
+      case 'متقن':
+        return 100;
+      case 'بمساعدة':
+        return 50;
+      default:
+        return 0;
+    }
   }
 
   String goalStatus(String goalId) {
     final progress = goalProgress(goalId);
-    if (progress >= 100) return 'مكتمل';
-    if (progress >= 70) return 'متحسن';
-    if (progress > 0) return 'قيد التدريب';
-    final hasStarted = stepsForGoal(goalId)
-        .any((step) => step.status != 'لم يبدأ' && step.status.isNotEmpty);
-    return hasStarted ? 'يحتاج متابعة' : 'جديد';
+    if (progress >= 100) return 'متقن';
+    final steps = stepsForGoal(goalId);
+    if (steps.any((s) => s.status == 'يحتاج إعادة')) return 'يحتاج إعادة';
+    if (steps.any((s) => s.status == 'بمساعدة')) return 'يحتاج مساعدة';
+    if (steps.isEmpty) {
+      final goalSessions = sessions.where((s) => s.planId == goalId).toList()
+        ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      if (goalSessions.isNotEmpty) {
+        final lastResult = goalSessions.first.quickResult;
+        if (lastResult == 'يحتاج إعادة') return 'يحتاج إعادة';
+        if (lastResult == 'بمساعدة') return 'يحتاج مساعدة';
+      }
+    }
+    if (progress > 0) return 'قيد العلاج';
+    final hasStarted =
+        steps.any((step) => step.status != 'لم يبدأ' && step.status.isNotEmpty);
+    return hasStarted ? 'قيد العلاج' : 'جديد';
   }
 
   Future<void> saveGoalSkillStep(GoalSkillStep step) async {
     _ensure(canUpdateGoalProgress, 'تتبع الأهداف يحدّثه الأخصائي فقط.');
     _ensureClinicalAccess(step.studentId, step.centerId);
     await _repository.saveGoalSkillStep(step);
+    final stepIdx = goalSkillSteps.indexWhere((s) => s.id == step.id);
+    if (stepIdx != -1) { goalSkillSteps[stepIdx] = step; } else { goalSkillSteps.add(step); }
     await syncGoalProgress(step.goalId);
-    await selectStudent(selectedStudent);
+    notifyListeners();
   }
 
   Future<void> updateGoalSkillStepStatus({
@@ -901,27 +1186,102 @@ class AppProvider extends ChangeNotifier {
     if (planIdx != -1) plans[planIdx] = updated;
   }
 
+  List<StudentFollowup> get pendingFollowups =>
+      studentFollowups.where((f) => f.status == 'pending').toList();
+
+  List<StudentFollowup> get centerPendingFollowups =>
+      centerStudentFollowups.where((f) => f.status == 'pending').toList();
+
+  Future<void> upsertFollowup({
+    required String studentId,
+    required String specialistId,
+    required String programId,
+    required String sourceType,
+    required String planId,
+    required String goalSkillStepId,
+    required String reason,
+  }) async {
+    final now = DateTime.now().toIso8601String();
+    final existing =
+        await _repository.pendingFollowupForStep(studentId, goalSkillStepId);
+    if (existing != null) {
+      final updated = existing.copyWith(
+        lastOpenedAt: now,
+      );
+      await _repository.saveStudentFollowup(updated);
+    } else {
+      await _repository.saveStudentFollowup(StudentFollowup(
+        id: 'fu_${goalSkillStepId}_${now.hashCode}',
+        studentId: studentId,
+        specialistId: specialistId,
+        programId: programId,
+        sourceType: sourceType,
+        planId: planId,
+        goalSkillStepId: goalSkillStepId,
+        reason: reason,
+        createdAt: now,
+        lastOpenedAt: now,
+      ));
+    }
+    studentFollowups = await _repository.studentFollowups(studentId);
+    notifyListeners();
+  }
+
+  Future<void> resolveFollowupForStep(
+      String studentId, String goalSkillStepId) async {
+    await _repository.resolveFollowupForStep(studentId, goalSkillStepId);
+    if (selectedStudent != null) {
+      studentFollowups =
+          await _repository.studentFollowups(selectedStudent!.id);
+    }
+    notifyListeners();
+  }
+
+  Future<StudentFollowup?> pendingFollowupForStep(
+          String studentId, String goalSkillStepId) =>
+      _repository.pendingFollowupForStep(studentId, goalSkillStepId);
+
   Future<void> saveClinicalAssessment({
     required ClinicalAssessment assessment,
     required List<ClinicalFinding> findings,
   }) async {
     _ensure(canWriteClinical, 'التقييم العلاجي يضيفه الأخصائي فقط.');
     _ensureClinicalAccess(assessment.studentId, assessment.centerId);
-    await _repository.saveClinicalAssessment(assessment);
+    try {
+      await _repository.saveClinicalAssessment(assessment);
+    } catch (e) {
+      _debugLog('saveClinicalAssessment: فشل حفظ التقييم: $e');
+      _debugLog('assessment data: ${assessment.toMap()}');
+      rethrow;
+    }
+    final existingPlans = await _repository.plans(assessment.studentId);
     for (final finding in findings) {
-      await _repository.saveClinicalFinding(finding);
+      try {
+        await _repository.saveClinicalFinding(finding);
+      } catch (e) {
+        _debugLog('saveClinicalAssessment: فشل حفظ finding ${finding.id}: $e');
+        _debugLog('finding data: ${finding.toMap()}');
+        rethrow;
+      }
       if (!finding.isNormal && finding.goal.trim().isNotEmpty) {
+        // Skip if an active plan with the same goal + programId already exists
+        final isDuplicate = existingPlans.any((p) =>
+            p.programId == finding.programId &&
+            p.goal == finding.goal &&
+            goalProgress(p.id) < 100);
+        if (isDuplicate) continue;
         final planId = 'plan_${finding.id}';
         final now = DateTime.now().toIso8601String();
       final training =
           finding.training.trim().isEmpty ? finding.goal : finding.training;
-      await _repository.savePlan(
-        TrainingPlan(
-          id: planId,
-          centerId: finding.centerId,
-          studentId: finding.studentId,
-          goal: finding.goal,
-          treatment: training,
+      try {
+        await _repository.savePlan(
+          TrainingPlan(
+            id: planId,
+            centerId: finding.centerId,
+            studentId: finding.studentId,
+            goal: finding.goal,
+            treatment: training,
             targetDate: DateTime.now()
                 .add(const Duration(days: 45))
                 .toIso8601String()
@@ -934,20 +1294,29 @@ class AppProvider extends ChangeNotifier {
             updatedAt: now,
           ),
         );
+      } catch (e) {
+        _debugLog('saveClinicalAssessment: فشل حفظ training_plan $planId: $e');
+        rethrow;
+      }
         final templateSteps = _skillStepTemplatesForFinding(finding);
         for (var index = 0; index < templateSteps.length; index++) {
-          await _repository.saveGoalSkillStep(GoalSkillStep(
-            id: 'step_${finding.id}_${index + 1}',
-            centerId: finding.centerId,
-            studentId: finding.studentId,
-            goalId: planId,
-            title: templateSteps[index].title,
-            sortOrder: index,
-            programId: finding.programId,
-            sourceType: finding.sourceType,
-            createdAt: now,
-            updatedAt: now,
-          ));
+          try {
+            await _repository.saveGoalSkillStep(GoalSkillStep(
+              id: 'step_${finding.id}_${index + 1}',
+              centerId: finding.centerId,
+              studentId: finding.studentId,
+              goalId: planId,
+              title: templateSteps[index].title,
+              sortOrder: index,
+              programId: finding.programId,
+              sourceType: finding.sourceType,
+              createdAt: now,
+              updatedAt: now,
+            ));
+          } catch (e) {
+            _debugLog('saveClinicalAssessment: فشل حفظ goal_skill_step step_${finding.id}_${index + 1}: $e');
+            rethrow;
+          }
         }
       }
     }
@@ -958,7 +1327,16 @@ class AppProvider extends ChangeNotifier {
       centerId: assessment.centerId,
       details: '${assessment.studentId} - ${findings.length} بنود',
     );
-    await selectStudent(selectedStudent);
+    if (selectedStudent != null) {
+      plans = await _repository.plans(selectedStudent!.id);
+      goalSkillSteps = await _repository.goalSkillSteps(selectedStudent!.id);
+    }
+    clinicalAssessments.add(assessment);
+    clinicalFindingsByAssessment[assessment.id] =
+        findings.where((f) => f.assessmentId == assessment.id).toList();
+    centerClinicalAssessments.add(assessment);
+    _centerAssessmentsLoaded = false;
+    notifyListeners();
   }
 
   Future<void> saveAssessmentSectionTemplate(
@@ -1227,6 +1605,67 @@ class AppProvider extends ChangeNotifier {
 
   List<SkillStepTemplate> _skillStepTemplatesForFinding(
       ClinicalFinding finding) {
+    if (finding.templateId.isNotEmpty) {
+      final option = assessmentOptions.firstWhere(
+        (o) => o.id == finding.templateId,
+        orElse: () => const AssessmentOptionTemplate(
+          id: '',
+          centerId: '',
+          itemId: '',
+          label: '',
+          generatesTherapy: false,
+          sortOrder: 0,
+        ),
+      );
+      if (option.id.isNotEmpty) {
+        final steps = skillStepTemplates
+            .where((step) =>
+                step.ownerType == 'option' && step.ownerId == option.id)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        return steps;
+      }
+
+      final trigger = speechSoundTriggers.firstWhere(
+        (t) => t.id == finding.templateId,
+        orElse: () => const SpeechSoundTriggerTemplate(
+          id: '',
+          centerId: '',
+          programId: '',
+          letter: '',
+          errorType: '',
+          position: '',
+          generatesTherapy: false,
+          sortOrder: 0,
+        ),
+      );
+      if (trigger.id.isNotEmpty) {
+        final steps = skillStepTemplates
+            .where((step) =>
+                step.ownerType == 'sound' && step.ownerId == trigger.id)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+        if (steps.isEmpty && trigger.skillStepTemplates.isNotEmpty) {
+          for (var i = 0; i < trigger.skillStepTemplates.length; i++) {
+            steps.add(SkillStepTemplate(
+              id: '${trigger.id}_step_$i',
+              centerId: '',
+              ownerType: 'sound',
+              ownerId: trigger.id,
+              title: trigger.skillStepTemplates[i],
+              sortOrder: i,
+              createdAt: '',
+              updatedAt: '',
+            ));
+          }
+        }
+
+        return steps;
+      }
+    }
+
+    // Fallback: text matching for legacy findings without templateId
     final optionIds = assessmentOptions
         .where((option) =>
             option.goalTemplate == finding.goal &&
@@ -1287,14 +1726,17 @@ class AppProvider extends ChangeNotifier {
         entityId: exercise.id,
         centerId: exercise.centerId,
         details: '${exercise.studentId} - ${exercise.title}');
-    await selectStudent(selectedStudent);
+    final idx = exercises.indexWhere((e) => e.id == exercise.id);
+    if (idx != -1) { exercises[idx] = exercise; } else { exercises.add(exercise); }
+    notifyListeners();
   }
 
   Future<void> saveReward(Reward reward) async {
     _ensure(canUpdateGoalProgress, 'المكافآت يعدلها الأخصائي فقط.');
     _ensureClinicalAccess(reward.studentId, reward.centerId);
     await _repository.saveReward(reward);
-    await selectStudent(selectedStudent);
+    this.reward = reward;
+    notifyListeners();
   }
 
   Future<void> saveSignResource(SignResource resource) async {
@@ -1343,17 +1785,17 @@ class AppProvider extends ChangeNotifier {
     final xp = current.xp + value;
     final badges =
         current.badges.isEmpty && xp >= 50 ? 'بداية قوية' : current.badges;
-    await _repository.saveReward(
-      Reward(
-        id: current.id,
-        centerId: current.centerId,
-        studentId: studentId,
-        xp: xp,
-        level: (xp ~/ 100) + 1,
-        badges: badges,
-        dailyStreak: current.dailyStreak,
-      ),
+    final updated = Reward(
+      id: current.id,
+      centerId: current.centerId,
+      studentId: studentId,
+      xp: xp,
+      level: (xp ~/ 100) + 1,
+      badges: badges,
+      dailyStreak: current.dailyStreak,
     );
+    await _repository.saveReward(updated);
+    reward = updated;
   }
 
   Future<AssessmentDraft?> assessmentDraft(
@@ -1411,7 +1853,8 @@ class AppProvider extends ChangeNotifier {
       specialistSignature: specialistSignature,
       managerSignature: managerSignature,
     );
-    await selectStudent(student);
+    reports.add(report);
+    notifyListeners();
   }
 
   Future<void> printReportForSessions({
@@ -1451,7 +1894,8 @@ class AppProvider extends ChangeNotifier {
       specialistSignature: specialistSignature,
       managerSignature: managerSignature,
     );
-    await selectStudent(student);
+    reports.add(report);
+    notifyListeners();
   }
 
   String recommendationFor({required String errorType, required int severity}) {
@@ -1567,8 +2011,15 @@ class AppProvider extends ChangeNotifier {
     );
   }
 
-  String _cleanError(Object error) => error
-      .toString()
-      .replaceFirst('Bad state: ', '')
-      .replaceFirst('Exception: ', '');
+  String _cleanError(Object error) {
+    final message = error
+        .toString()
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('Exception: ', '');
+    if (message.contains('DatabaseException') ||
+        message.contains('DatabaseError')) {
+      return 'حدث خطأ في قاعدة البيانات. يرجى المحاولة مرة أخرى.';
+    }
+    return message;
+  }
 }

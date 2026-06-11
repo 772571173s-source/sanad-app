@@ -2,10 +2,23 @@ import 'package:flutter/material.dart';
 
 import 'app_widgets.dart';
 
-String readableError(Object error) => error
-    .toString()
-    .replaceFirst('Bad state: ', '')
-    .replaceFirst('Exception: ', '');
+String readableError(Object error) {
+  final message = error
+      .toString()
+      .replaceFirst('Bad state: ', '')
+      .replaceFirst('Exception: ', '');
+  if (message.contains('DatabaseException') ||
+      message.contains('DatabaseError')) {
+    return 'حدث خطأ في قاعدة البيانات. يرجى المحاولة مرة أخرى.';
+  }
+  if (message.contains('FormatException')) {
+    return 'خطأ في صيغة البيانات. يرجى التواصل مع الدعم الفني.';
+  }
+  if (message.contains('type') && message.contains('null')) {
+    return 'خطأ في البيانات المخزنة. يرجى التواصل مع الدعم الفني.';
+  }
+  return message;
+}
 
 Future<void> runWithFeedback(
     BuildContext context, Future<void> Function() action,

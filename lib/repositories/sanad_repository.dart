@@ -81,7 +81,7 @@ class SanadRepository {
   Future<void> saveCenter(SanadCenter center) =>
       _db.upsert('centers', center.toMap());
 
-  Future<void> deleteCenter(String id) => _db.delete('centers', id);
+  Future<void> deleteCenter(String id) => _db.deleteCenter(id);
 
   Future<int> totalStudents() =>
       _db.countWhere('students', 'deleted_at = ?', ['']);
@@ -263,6 +263,25 @@ class SanadRepository {
 
   Future<void> saveSession(TherapySession session) =>
       _db.upsert('sessions', session.toMap());
+
+  Future<void> saveSessionSkillResult(SessionSkillResult result) =>
+      _db.upsert('session_skill_results', result.toMap());
+
+  Future<List<SessionSkillResult>> sessionSkillResults(
+          String sessionId) async =>
+      (await _db.where('session_skill_results',
+              where: 'session_id = ?', whereArgs: [sessionId]))
+          .map(SessionSkillResult.fromMap)
+          .toList();
+
+  Future<List<SessionSkillResult>> sessionSkillResultsForGoal(
+          String planId) async =>
+      (await _db.where('session_skill_results',
+              where: 'goal_id = ?',
+              whereArgs: [planId],
+              orderBy: 'created_at DESC'))
+          .map(SessionSkillResult.fromMap)
+          .toList();
 
   Future<List<Evaluation>> evaluations(String studentId) async {
     final rows = await _db.where('evaluations',
@@ -653,6 +672,68 @@ class SanadRepository {
       'student_id = ? AND specialist_id = ?',
       [studentId, specialistId],
     );
+  }
+
+  Future<List<StudentFollowup>> studentFollowups(String studentId) async {
+    final rows = await _db.where('student_followups',
+        where: 'student_id = ?', whereArgs: [studentId],
+        orderBy: 'created_at DESC');
+    return rows.map(StudentFollowup.fromMap).toList();
+  }
+
+  Future<StudentFollowup?> pendingFollowupForStep(
+      String studentId, String goalSkillStepId) async {
+    final row = await _db.first('student_followups',
+        where: 'student_id = ? AND goal_skill_step_id = ? AND status = ?',
+        whereArgs: [studentId, goalSkillStepId, 'pending']);
+    return row != null ? StudentFollowup.fromMap(row) : null;
+  }
+
+  Future<void> saveStudentFollowup(StudentFollowup followup) async {
+    final existing = await _db.first('student_followups',
+        where:
+            'student_id = ? AND goal_skill_step_id = ? AND status = ?',
+        whereArgs: [
+          followup.studentId,
+          followup.goalSkillStepId,
+          'pending'
+        ]);
+    if (existing != null) {
+      await _db.updateWhere('student_followups', followup.toMap(),
+          'id = ?', [existing['id']]);
+    } else {
+      await _db.upsert('student_followups', followup.toMap());
+    }
+  }
+
+  Future<void> resolveFollowupForStep(
+      String studentId, String goalSkillStepId) async {
+    final existing = await _db.first('student_followups',
+        where:
+            'student_id = ? AND goal_skill_step_id = ? AND status = ?',
+        whereArgs: [studentId, goalSkillStepId, 'pending']);
+    if (existing == null) return;
+    final now = DateTime.now().toIso8601String();
+    await _db.updateWhere('student_followups', {
+      'status': 'completed',
+      'resolved_at': now,
+    }, 'id = ?', [existing['id']]);
+  }
+
+  Future<void> resolveFollowupsByPlan(String planId) async {
+    await _db.updateWhere(
+      'student_followups',
+      {'status': 'resolved', 'resolved_at': DateTime.now().toIso8601String()},
+      'plan_id = ? AND status = ?',
+      [planId, 'pending'],
+    );
+  }
+
+  Future<StudentFollowup?> pendingFollowupForPlan(String planId) async {
+    final row = await _db.first('student_followups',
+        where: 'plan_id = ? AND goal_skill_step_id = ? AND status = ?',
+        whereArgs: [planId, '', 'pending']);
+    return row != null ? StudentFollowup.fromMap(row) : null;
   }
 
   Future<void> exportBackup(String targetPath) => _db.exportBackup(targetPath);

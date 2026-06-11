@@ -1,3 +1,5 @@
+> ⚠️ **هذا الملف قديم (كان أداة تعقب مؤقتة).** الرجاء الرجوع إلى `docs/project_master_reference.md` للمرجع الرسمي الشامل.
+
 ## Goal
 Implement a stable guided clinical sessions flow with three-button evaluation, auto-homework, and auto-advancement across goals/steps, plus a major architectural refactor to bind students to therapy programs, filter content by `sourceType`, and centralize student management through the data-entry screen.
 

@@ -265,7 +265,9 @@ class _AppShellState extends State<AppShell> {
           Icons.fact_check_outlined,
           ClinicalAssessmentWizardScreen(),
         ),
-        const _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen()),
+        _NavItem('الجلسات', Icons.timer_outlined, SessionsScreen(
+          onReturnToProfile: () => setState(() => index = 1),
+        )),
         const _NavItem(
           'الواجبات',
           Icons.assignment_outlined,

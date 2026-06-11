@@ -63,6 +63,7 @@ class StaffScreen extends StatelessWidget {
                     onEdit: () => _showForm(context, account: account),
                     onPassword: () => _changePassword(context, account),
                     onToggle: () => _toggleAccount(context, account),
+                    onDelete: () => _deleteManager(context, account),
                   ))
               .toList(),
         ),
@@ -265,6 +266,37 @@ class StaffScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _deleteManager(BuildContext context, AppUser account) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('حذف المدير'),
+            content: const Text(
+                'هل أنت متأكد من حذف هذا المدير؟\nسيتم حذف حساب الدخول الخاص به'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white),
+                child: const Text('حذف'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !context.mounted) return;
+    await runWithFeedback(
+      context,
+      () => context.read<AppProvider>().deleteStaffUser(account),
+      success: 'تم حذف المدير.',
+    );
+  }
+
   String _centerName(List<SanadCenter> centers, String id) {
     for (final center in centers) {
       if (center.id == id) return center.name;
@@ -288,6 +320,7 @@ class _ManagerProfileCard extends StatefulWidget {
     required this.onEdit,
     required this.onPassword,
     required this.onToggle,
+    required this.onDelete,
   });
 
   final AppUser account;
@@ -295,6 +328,7 @@ class _ManagerProfileCard extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onPassword;
   final VoidCallback onToggle;
+  final VoidCallback onDelete;
 
   @override
   State<_ManagerProfileCard> createState() => _ManagerProfileCardState();
@@ -395,6 +429,14 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
                         ? Icons.pause_circle_outline
                         : Icons.play_circle_outline),
                     label: Text(account.isActive ? 'إيقاف' : 'تفعيل'),
+                  ),
+                  FilledButton.tonalIcon(
+                    onPressed: widget.onDelete,
+                    icon: const Icon(Icons.delete_outline),
+                    style: FilledButton.styleFrom(
+                        backgroundColor: Colors.red.shade50,
+                        foregroundColor: Colors.red),
+                    label: const Text('حذف المدير'),
                   ),
                 ],
               ),

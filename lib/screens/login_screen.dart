@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_provider.dart';
+import '../services/database_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -47,11 +48,42 @@ class _LoginScreenState extends State<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text('سند',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: narrow ? 34 : 42,
-                                  fontWeight: FontWeight.w900)),
+                          GestureDetector(
+                            onLongPress: () async {
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (c) => AlertDialog(
+                                  title: const Text('مسح الحسابات'),
+                                  content: const Text(
+                                      'سيتم مسح جميع الحسابات وسجلات الدخول. هل أنت متأكد؟'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () => Navigator.pop(c, false),
+                                        child: const Text('إلغاء')),
+                                    TextButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('تأكيد المسح',
+                                            style: TextStyle(color: Colors.red))),
+                                  ],
+                                ),
+                              );
+                              if (confirmed == true) {
+                                await DatabaseService.instance.clearAccounts();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content:
+                                            Text('تم مسح الحسابات بنجاح.')),
+                                  );
+                                }
+                              }
+                            },
+                            child: Text('سند',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: narrow ? 34 : 42,
+                                    fontWeight: FontWeight.w900)),
+                          ),
                           const SizedBox(height: 10),
                           const Text(
                               'نظام إدارة التخاطب والتأهيل للمراكز: مراكز، موظفون، طلاب، جلسات، واجبات، وتقارير.',

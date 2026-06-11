@@ -168,11 +168,11 @@ class AppUser {
   final String updatedAt;
 
   static AppUser fromMap(Map<String, Object?> row) => AppUser(
-        id: row['id'] as String,
-        email: row['email'] as String,
+        id: (row['id'] ?? '') as String,
+        email: (row['email'] ?? '') as String,
         passwordHash: (row['password_hash'] ?? row['password'] ?? '') as String,
-        name: row['name'] as String,
-        role: UserRoleX.fromDb(row['role'] as String),
+        name: (row['name'] ?? '') as String,
+        role: UserRoleX.fromDb((row['role'] ?? '') as String),
         centerId: (row['center_id'] ?? '') as String,
         studentId: row['student_id'] as String?,
         forcePasswordChange: ((row['force_password_change'] ?? 0) as int) == 1,
@@ -222,8 +222,8 @@ class SanadCenter {
   final String updatedAt;
 
   static SanadCenter fromMap(Map<String, Object?> row) => SanadCenter(
-        id: row['id'] as String,
-        name: row['name'] as String,
+        id: (row['id'] ?? '') as String,
+        name: (row['name'] ?? '') as String,
         logoPath: (row['logo_path'] ?? '') as String,
         address: (row['address'] ?? '') as String,
         phone: (row['phone'] ?? '') as String,
@@ -284,19 +284,19 @@ class Student {
   final String updatedAt;
 
   static Student fromMap(Map<String, Object?> row) => Student(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        name: row['name'] as String,
-        age: row['age'] as int,
-        status: row['status'] as String,
-        diagnosis: row['diagnosis'] as String,
+        name: (row['name'] ?? '') as String,
+        age: (row['age'] ?? 0) as int,
+        status: (row['status'] ?? '') as String,
+        diagnosis: (row['diagnosis'] ?? '') as String,
         programType: (row['program_type'] ?? 'نطق وتخاطب') as String,
-        parentName: row['parent_name'] as String,
-        parentPhone: row['parent_phone'] as String,
-        portalEmail: row['portal_email'] as String,
-        portalPassword: row['portal_password'] as String,
-        photoPath: row['photo_path'] as String,
-        notes: row['notes'] as String,
+        parentName: (row['parent_name'] ?? '') as String,
+        parentPhone: (row['parent_phone'] ?? '') as String,
+        portalEmail: (row['portal_email'] ?? '') as String,
+        portalPassword: (row['portal_password'] ?? '') as String,
+        photoPath: (row['photo_path'] ?? '') as String,
+        notes: (row['notes'] ?? '') as String,
         deletedAt: (row['deleted_at'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -340,12 +340,12 @@ class ParentProfile {
   final String email;
 
   static ParentProfile fromMap(Map<String, Object?> row) => ParentProfile(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        name: row['name'] as String,
-        phone: row['phone'] as String,
-        email: row['email'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        name: (row['name'] ?? '') as String,
+        phone: (row['phone'] ?? '') as String,
+        email: (row['email'] ?? '') as String,
       );
 
   Map<String, Object?> toMap() => {
@@ -410,9 +410,9 @@ class TherapySession {
   final String updatedAt;
 
   static TherapySession fromMap(Map<String, Object?> row) => TherapySession(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
+        studentId: (row['student_id'] ?? '') as String,
         specialistId: (row['specialist_id'] ?? '') as String,
         planId: (row['plan_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
@@ -425,11 +425,11 @@ class TherapySession {
         practiceItems: (row['practice_items'] ?? '') as String,
         attempts: (row['attempts'] ?? 0) as int,
         successRate: (row['success_rate'] ?? 0) as int,
-        startedAt: row['started_at'] as String,
-        durationSeconds: row['duration_seconds'] as int,
-        cardTitle: row['card_title'] as String,
-        quickResult: row['quick_result'] as String,
-        notes: row['notes'] as String,
+        startedAt: (row['started_at'] ?? '') as String,
+        durationSeconds: (row['duration_seconds'] ?? 0) as int,
+        cardTitle: (row['card_title'] ?? '') as String,
+        quickResult: (row['quick_result'] ?? '') as String,
+        notes: (row['notes'] ?? '') as String,
         summary: (row['summary'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -492,15 +492,15 @@ class Evaluation {
   final String updatedAt;
 
   static Evaluation fromMap(Map<String, Object?> row) => Evaluation(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        letter: row['letter'] as String,
-        position: row['position'] as String,
-        errorType: row['error_type'] as String,
-        score: row['score'] as String,
-        createdAt: row['created_at'] as String,
-        notes: row['notes'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        letter: (row['letter'] ?? '') as String,
+        position: (row['position'] ?? '') as String,
+        errorType: (row['error_type'] ?? '') as String,
+        score: (row['score'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        notes: (row['notes'] ?? '') as String,
         severity: (row['severity'] ?? 1) as int,
         recommendation: (row['recommendation'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -550,13 +550,13 @@ class TrainingPlan {
   final String updatedAt;
 
   static TrainingPlan fromMap(Map<String, Object?> row) => TrainingPlan(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        goal: row['goal'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        goal: (row['goal'] ?? '') as String,
         treatment: (row['treatment'] ?? '') as String,
-        targetDate: row['target_date'] as String,
-        progress: row['progress'] as int,
+        targetDate: (row['target_date'] ?? '') as String,
+        progress: (row['progress'] ?? 0) as int,
         programId: (row['program_id'] ?? '') as String,
         sourceType: (row['source_type'] ?? 'standard') as String,
         createdAt: (row['created_at'] ?? '') as String,
@@ -631,11 +631,11 @@ class GoalSkillStep {
   final String updatedAt;
 
   static GoalSkillStep fromMap(Map<String, Object?> row) => GoalSkillStep(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        goalId: row['goal_id'] as String,
-        title: row['title'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        goalId: (row['goal_id'] ?? '') as String,
+        title: (row['title'] ?? '') as String,
         status: (row['status'] ?? 'لم يبدأ') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         notes: (row['notes'] ?? '') as String,
@@ -687,6 +687,51 @@ class GoalSkillStep {
       );
 }
 
+class SessionSkillResult {
+  const SessionSkillResult({
+    required this.id,
+    required this.sessionId,
+    required this.goalSkillStepId,
+    required this.goalId,
+    required this.stepTitle,
+    required this.result,
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String sessionId;
+  final String goalSkillStepId;
+  final String goalId;
+  final String stepTitle;
+  final String result;
+  final String createdAt;
+  final String updatedAt;
+
+  static SessionSkillResult fromMap(Map<String, Object?> row) =>
+      SessionSkillResult(
+        id: (row['id'] ?? '') as String,
+        sessionId: (row['session_id'] ?? '') as String,
+        goalSkillStepId: (row['goal_skill_step_id'] ?? '') as String,
+        goalId: (row['goal_id'] ?? '') as String,
+        stepTitle: (row['step_title'] ?? '') as String,
+        result: (row['result'] ?? 'لم يبدأ') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'session_id': sessionId,
+        'goal_skill_step_id': goalSkillStepId,
+        'goal_id': goalId,
+        'step_title': stepTitle,
+        'result': result,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+}
+
 class Exercise {
   const Exercise({
     required this.id,
@@ -735,14 +780,14 @@ class Exercise {
   final String updatedAt;
 
   static Exercise fromMap(Map<String, Object?> row) => Exercise(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        title: row['title'] as String,
-        instructions: row['instructions'] as String,
-        dueDate: row['due_date'] as String,
-        status: row['status'] as String,
-        audioPath: row['audio_path'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        title: (row['title'] ?? '') as String,
+        instructions: (row['instructions'] ?? '') as String,
+        dueDate: (row['due_date'] ?? '') as String,
+        status: (row['status'] ?? '') as String,
+        audioPath: (row['audio_path'] ?? '') as String,
         parentNote: (row['parent_note'] ?? '') as String,
         stars: (row['stars'] ?? 0) as int,
         programId: (row['program_id'] ?? '') as String,
@@ -841,13 +886,13 @@ class Reward {
   final int dailyStreak;
 
   static Reward fromMap(Map<String, Object?> row) => Reward(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        xp: row['xp'] as int,
-        level: row['level'] as int,
-        badges: row['badges'] as String,
-        dailyStreak: row['daily_streak'] as int,
+        studentId: (row['student_id'] ?? '') as String,
+        xp: (row['xp'] ?? 0) as int,
+        level: (row['level'] ?? 0) as int,
+        badges: (row['badges'] ?? '') as String,
+        dailyStreak: (row['daily_streak'] ?? 0) as int,
       );
 
   Map<String, Object?> toMap() => {
@@ -887,13 +932,13 @@ class ReportRecord {
   final String updatedAt;
 
   static ReportRecord fromMap(Map<String, Object?> row) => ReportRecord(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        type: row['type'] as String,
-        createdAt: row['created_at'] as String,
-        improvementRate: row['improvement_rate'] as int,
-        specialistSignature: row['specialist_signature'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        type: (row['type'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        improvementRate: (row['improvement_rate'] ?? 0) as int,
+        specialistSignature: (row['specialist_signature'] ?? '') as String,
         managerSignature: (row['manager_signature'] ?? '') as String,
         filePath: (row['file_path'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -944,9 +989,9 @@ class ClinicalAssessment {
 
   static ClinicalAssessment fromMap(Map<String, Object?> row) =>
       ClinicalAssessment(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
+        studentId: (row['student_id'] ?? '') as String,
         specialistId: (row['specialist_id'] ?? '') as String,
         specialistName: (row['specialist_name'] ?? '') as String,
         type: (row['type'] ?? 'speech') as String,
@@ -989,6 +1034,7 @@ class ClinicalFinding {
     this.training = '',
     this.programId = '',
     this.sourceType = 'standard',
+    this.templateId = '',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -1006,23 +1052,25 @@ class ClinicalFinding {
   final String training;
   final String programId;
   final String sourceType;
+  final String templateId;
   final String createdAt;
   final String updatedAt;
 
   static ClinicalFinding fromMap(Map<String, Object?> row) => ClinicalFinding(
-        id: row['id'] as String,
-        assessmentId: row['assessment_id'] as String,
+        id: (row['id'] ?? '') as String,
+        assessmentId: (row['assessment_id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        studentId: row['student_id'] as String,
-        domain: row['domain'] as String,
-        itemTitle: row['item_title'] as String,
-        result: row['result'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        domain: (row['domain'] ?? '') as String,
+        itemTitle: (row['item_title'] ?? '') as String,
+        result: (row['result'] ?? '') as String,
         isNormal: ((row['is_normal'] ?? 0) as int) == 1,
         weakness: (row['weakness'] ?? '') as String,
         goal: (row['goal'] ?? '') as String,
         training: (row['training'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
         sourceType: (row['source_type'] ?? 'standard') as String,
+        templateId: (row['template_id'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -1041,6 +1089,7 @@ class ClinicalFinding {
         'training': training,
         'program_id': programId,
         'source_type': sourceType,
+        'template_id': templateId,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -1069,9 +1118,9 @@ class TherapyProgramTemplate {
 
   static TherapyProgramTemplate fromMap(Map<String, Object?> row) =>
       TherapyProgramTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        name: row['name'] as String,
+        name: (row['name'] ?? '') as String,
         description: (row['description'] ?? '') as String,
         usesSpeechSounds: ((row['uses_speech_sounds'] ?? 0) as int) == 1,
         sortOrder: (row['sort_order'] ?? 0) as int,
@@ -1114,10 +1163,10 @@ class AssessmentSectionTemplate {
 
   static AssessmentSectionTemplate fromMap(Map<String, Object?> row) =>
       AssessmentSectionTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
-        title: row['title'] as String,
+        title: (row['title'] ?? '') as String,
         description: (row['description'] ?? '') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         createdAt: (row['created_at'] ?? '') as String,
@@ -1163,10 +1212,10 @@ class AssessmentItemTemplate {
 
   static AssessmentItemTemplate fromMap(Map<String, Object?> row) =>
       AssessmentItemTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        sectionId: row['section_id'] as String,
-        title: row['title'] as String,
+        sectionId: (row['section_id'] ?? '') as String,
+        title: (row['title'] ?? '') as String,
         responseType: (row['response_type'] ?? 'custom') as String,
         responseMode: (row['response_mode'] ?? 'singleChoice') as String,
         prompt: (row['prompt'] ?? '') as String,
@@ -1218,10 +1267,10 @@ class AssessmentOptionTemplate {
 
   static AssessmentOptionTemplate fromMap(Map<String, Object?> row) =>
       AssessmentOptionTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        itemId: row['item_id'] as String,
-        label: row['label'] as String,
+        itemId: (row['item_id'] ?? '') as String,
+        label: (row['label'] ?? '') as String,
         generatesTherapy: ((row['generates_therapy'] ?? 0) as int) == 1,
         weaknessTemplate: (row['weakness_template'] ?? '') as String,
         goalTemplate: (row['goal_template'] ?? '') as String,
@@ -1269,11 +1318,11 @@ class SkillStepTemplate {
 
   static SkillStepTemplate fromMap(Map<String, Object?> row) =>
       SkillStepTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        ownerType: row['owner_type'] as String,
-        ownerId: row['owner_id'] as String,
-        title: row['title'] as String,
+        ownerType: (row['owner_type'] ?? '') as String,
+        ownerId: (row['owner_id'] ?? '') as String,
+        title: (row['title'] ?? '') as String,
         sortOrder: (row['sort_order'] ?? 0) as int,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
@@ -1347,12 +1396,12 @@ class SpeechSoundTriggerTemplate {
 
   static SpeechSoundTriggerTemplate fromMap(Map<String, Object?> row) =>
       SpeechSoundTriggerTemplate(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
-        letter: row['letter'] as String,
-        errorType: row['error_type'] as String,
-        position: row['position'] as String,
+        letter: (row['letter'] ?? '') as String,
+        errorType: (row['error_type'] ?? '') as String,
+        position: (row['position'] ?? '') as String,
         generatesTherapy: ((row['generates_therapy'] ?? 0) as int) == 1,
         weaknessTemplate: (row['weakness_template'] ?? '') as String,
         goalTemplate: (row['goal_template'] ?? '') as String,
@@ -1456,13 +1505,13 @@ class SignResource {
   final bool isFavorite;
 
   static SignResource fromMap(Map<String, Object?> row) => SignResource(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        title: row['title'] as String,
-        category: row['category'] as String,
-        mediaType: row['media_type'] as String,
-        mediaPath: row['media_path'] as String,
-        notes: row['notes'] as String,
+        title: (row['title'] ?? '') as String,
+        category: (row['category'] ?? '') as String,
+        mediaType: (row['media_type'] ?? '') as String,
+        mediaPath: (row['media_path'] ?? '') as String,
+        notes: (row['notes'] ?? '') as String,
         level: (row['level'] ?? 'مبتدئ') as String,
         isFavorite: ((row['is_favorite'] ?? 0) as int) == 1,
       );
@@ -1504,15 +1553,15 @@ class AuditLog {
   final String createdAt;
 
   static AuditLog fromMap(Map<String, Object?> row) => AuditLog(
-        id: row['id'] as String,
+        id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
-        userId: row['user_id'] as String,
-        userName: row['user_name'] as String,
-        action: row['action'] as String,
-        entityType: row['entity_type'] as String,
-        entityId: row['entity_id'] as String,
+        userId: (row['user_id'] ?? '') as String,
+        userName: (row['user_name'] ?? '') as String,
+        action: (row['action'] ?? '') as String,
+        entityType: (row['entity_type'] ?? '') as String,
+        entityId: (row['entity_id'] ?? '') as String,
         details: (row['details'] ?? '') as String,
-        createdAt: row['created_at'] as String,
+        createdAt: (row['created_at'] ?? '') as String,
       );
 
   Map<String, Object?> toMap() => {
@@ -1575,8 +1624,8 @@ class AssessmentDraft {
 
   static AssessmentDraft fromMap(Map<String, Object?> row) =>
       AssessmentDraft(
-        studentId: row['student_id'] as String,
-        programId: row['program_id'] as String,
+        studentId: (row['student_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
         phase: (row['phase'] ?? 'sections') as String,
         stepIndex: (row['step_index'] ?? 0) as int,
         currentLetter: (row['current_letter'] ?? '') as String,
@@ -1625,10 +1674,10 @@ class StudentTherapyProgram {
 
   static StudentTherapyProgram fromMap(Map<String, Object?> row) =>
       StudentTherapyProgram(
-        id: row['id'] as String,
-        studentId: row['student_id'] as String,
-        programId: row['program_id'] as String,
-        assignedAt: row['assigned_at'] as String,
+        id: (row['id'] ?? '') as String,
+        studentId: (row['student_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        assignedAt: (row['assigned_at'] ?? '') as String,
         assignedByUserId: (row['assigned_by_user_id'] ?? '') as String,
         isActive: ((row['is_active'] ?? 1) as int) == 1,
         sortOrder: (row['sort_order'] ?? 0) as int,
@@ -1643,6 +1692,90 @@ class StudentTherapyProgram {
         'is_active': isActive ? 1 : 0,
         'sort_order': sortOrder,
       };
+}
+
+class StudentFollowup {
+  const StudentFollowup({
+    required this.id,
+    required this.studentId,
+    required this.specialistId,
+    required this.programId,
+    required this.sourceType,
+    required this.planId,
+    required this.goalSkillStepId,
+    required this.reason,
+    this.status = 'pending',
+    this.createdAt = '',
+    this.resolvedAt = '',
+    this.lastOpenedAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String studentId;
+  final String specialistId;
+  final String programId;
+  final String sourceType;
+  final String planId;
+  final String goalSkillStepId;
+  final String reason;
+  final String status;
+  final String createdAt;
+  final String resolvedAt;
+  final String lastOpenedAt;
+  final String updatedAt;
+
+  static StudentFollowup fromMap(Map<String, Object?> row) => StudentFollowup(
+        id: (row['id'] ?? '') as String,
+        studentId: (row['student_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        sourceType: (row['source_type'] ?? '') as String,
+        planId: (row['plan_id'] ?? '') as String,
+        goalSkillStepId: (row['goal_skill_step_id'] ?? '') as String,
+        reason: (row['reason'] ?? 'retry') as String,
+        status: (row['status'] ?? 'pending') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        resolvedAt: (row['resolved_at'] ?? '') as String,
+        lastOpenedAt: (row['last_opened_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'student_id': studentId,
+        'specialist_id': specialistId,
+        'program_id': programId,
+        'source_type': sourceType,
+        'plan_id': planId,
+        'goal_skill_step_id': goalSkillStepId,
+        'reason': reason,
+        'status': status,
+        'created_at': createdAt,
+        'resolved_at': resolvedAt,
+        'last_opened_at': lastOpenedAt,
+        'updated_at': updatedAt,
+      };
+
+  StudentFollowup copyWith({
+    String? status,
+    String? resolvedAt,
+    String? lastOpenedAt,
+  }) =>
+      StudentFollowup(
+        id: id,
+        studentId: studentId,
+        specialistId: specialistId,
+        programId: programId,
+        sourceType: sourceType,
+        planId: planId,
+        goalSkillStepId: goalSkillStepId,
+        reason: reason,
+        status: status ?? this.status,
+        createdAt: createdAt,
+        resolvedAt: resolvedAt ?? this.resolvedAt,
+        lastOpenedAt: lastOpenedAt ?? this.lastOpenedAt,
+      );
 }
 
 class StudentSpecialist {
@@ -1664,9 +1797,9 @@ class StudentSpecialist {
 
   static StudentSpecialist fromMap(Map<String, Object?> row) =>
       StudentSpecialist(
-        id: row['id'] as String,
-        studentId: row['student_id'] as String,
-        specialistId: row['specialist_id'] as String,
+        id: (row['id'] ?? '') as String,
+        studentId: (row['student_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         assignedByUserId: (row['assigned_by_user_id'] ?? '') as String,
         assignedAt: (row['assigned_at'] ?? '') as String,
         isActive: ((row['is_active'] ?? 1) as int) == 1,

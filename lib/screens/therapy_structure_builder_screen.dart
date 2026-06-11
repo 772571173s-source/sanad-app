@@ -17,7 +17,13 @@ class TherapyStructureBuilderScreen extends StatefulWidget {
 class _TherapyStructureBuilderScreenState
     extends State<TherapyStructureBuilderScreen> {
   String? selectedProgramId;
-  int tab = 0;
+  bool _showDetail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showDetail = false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,6 +44,103 @@ class _TherapyStructureBuilderScreenState
         : selected.first;
     selectedProgramId = program?.id;
 
+    if (programs.isEmpty) _showDetail = false;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth >= 800;
+
+        if (isWide) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 320,
+                  child: _ProgramListPanel(
+                    app: app,
+                    selectedProgramId: selectedProgramId,
+                    onSelect: (id) => setState(() {
+                      selectedProgramId = id;
+                    }),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  child: program == null
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: EmptyState(
+                            icon: Icons.add_box_outlined,
+                            title: 'أنشئ أول برنامج علاجي',
+                            message:
+                                'مثال: برنامج العلاج النطقي. بعد إنشاء البرنامج ستظهر أقسام التقييم وتقييم الحروف حسب نوع البرنامج.',
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 40),
+                          child: Center(
+                            child: SizedBox(
+                              width: 640,
+                              child: _ProgramDetailPanel(
+                                key: ValueKey(program.id),
+                                app: app,
+                                program: program,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          if (!_showDetail || program == null) {
+            return SingleChildScrollView(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: _ProgramListPanel(
+                app: app,
+                selectedProgramId: selectedProgramId,
+                onSelect: (id) => setState(() {
+                  selectedProgramId = id;
+                  _showDetail = true;
+                }),
+              ),
+            );
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 40),
+            child: _ProgramDetailPanel(
+              key: ValueKey(program.id),
+              app: app,
+              program: program,
+              onBack: () => setState(() => _showDetail = false),
+            ),
+          );
+        }
+      },
+    );
+  }
+}
+
+class _ProgramListPanel extends StatelessWidget {
+  const _ProgramListPanel({
+    super.key,
+    required this.app,
+    required this.selectedProgramId,
+    required this.onSelect,
+  });
+
+  final AppProvider app;
+  final String? selectedProgramId;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -51,73 +154,175 @@ class _TherapyStructureBuilderScreenState
               ? 'ابدأ بإنشاء برنامج علاجي عام. أي برنامج تضيفه هنا يظهر لكل المراكز.'
               : 'ابدأ بإنشاء برنامج خاص بالمركز أو استخدم برامج سند العامة. القوالب العامة تظهر للقراءة فقط داخل المركز.',
         ),
-        const SizedBox(height: AppSpacing.md),
-        _ProgramsPanel(
-          app: app,
-          selectedProgramId: selectedProgramId,
-          onSelect: (id) => setState(() {
-            selectedProgramId = id;
-            tab = 0;
-          }),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Icon(Icons.auto_stories_outlined,
+                  color: colorScheme.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text('البرامج العلاجية',
+                  style: SanadText.subtitle(context)),
+            ),
+            FilledButton.icon(
+              onPressed: () => _showProgramDialog(context, app),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('إضافة برنامج'),
+              style: FilledButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                textStyle: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: AppSpacing.md),
-        if (program == null)
-          const EmptyState(
-            icon: Icons.add_box_outlined,
-            title: 'أنشئ أول برنامج علاجي',
-            message:
-                'مثال: برنامج العلاج النطقي. بعد إنشاء البرنامج ستظهر أقسام التقييم وتقييم الحروف حسب نوع البرنامج.',
+        const SizedBox(height: 18),
+        if (app.therapyPrograms.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('لا توجد برامج علاجية بعد.',
+                style: SanadText.secondary(context)),
           )
         else
-          _ProgramEditor(
-            app: app,
-            program: program,
-            tab: tab,
-            onTabChanged: (value) => setState(() => tab = value),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: app.therapyPrograms.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
+            itemBuilder: (context, index) {
+              final program = app.therapyPrograms[index];
+              final canEditProgram =
+                  app.canEditTherapyTemplate(program.centerId);
+              final sectionCount = app.assessmentSections
+                  .where((s) => s.programId == program.id)
+                  .length;
+              final letterCount = app.speechSoundTriggers
+                  .where((t) => t.programId == program.id)
+                  .map((t) => t.letter)
+                  .toSet()
+                  .length;
+
+              return Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(program.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: SanadText.title(context)),
+                              const SizedBox(height: 6),
+                              _ScopeBadge(centerId: program.centerId),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (program.description.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(program.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SanadText.secondary(context)),
+                    ],
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _StatChip(
+                          icon: program.usesSpeechSounds
+                              ? Icons.record_voice_over_outlined
+                              : Icons.psychology_alt_outlined,
+                          label: program.usesSpeechSounds
+                              ? 'يعتمد على الحروف'
+                              : 'بدون حروف',
+                          selected: program.usesSpeechSounds,
+                        ),
+                        _StatChip(
+                          icon: Icons.fact_check_outlined,
+                          label: '$sectionCount أقسام',
+                        ),
+                        if (letterCount > 0)
+                          _StatChip(
+                            icon: Icons.grid_on_outlined,
+                            label: '$letterCount حروف',
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        if (canEditProgram)
+                          SizedBox(
+                            height: 38,
+                            child: OutlinedButton.icon(
+                              onPressed: () =>
+                                  app.deleteTherapyProgramTemplate(program.id),
+                              icon: const Icon(Icons.delete_outline,
+                                  size: 16),
+                              label: const Text('حذف',
+                                  style: TextStyle(fontSize: 13)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: colorScheme.error,
+                                side: BorderSide(
+                                    color: colorScheme.error
+                                        .withValues(alpha: .4)),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 12),
+                              ),
+                            ),
+                          ),
+                        const Spacer(),
+                        FilledButton.tonalIcon(
+                          onPressed: () => onSelect(program.id),
+                          icon: const Icon(Icons.open_in_new, size: 16),
+                          label: const Text('فتح',
+                              style: TextStyle(fontSize: 13)),
+                          style: FilledButton.styleFrom(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 14),
+                            minimumSize: const Size(0, 38),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
       ],
-    );
-  }
-}
-
-class _ProgramsPanel extends StatelessWidget {
-  const _ProgramsPanel({
-    required this.app,
-    required this.selectedProgramId,
-    required this.onSelect,
-  });
-
-  final AppProvider app;
-  final String? selectedProgramId;
-  final ValueChanged<String> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    return TherapyCard(
-      icon: Icons.auto_stories_outlined,
-      title: 'البرامج العلاجية',
-      trailing: FilledButton.icon(
-        onPressed: () => _showProgramDialog(context, app),
-        icon: const Icon(Icons.add),
-        label: const Text('إضافة برنامج علاجي'),
-      ),
-      child: app.therapyPrograms.isEmpty
-          ? const Text('لا توجد برامج علاجية بعد.')
-          : Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: app.therapyPrograms.map((program) {
-                final selected = selectedProgramId == program.id;
-                return FilterChip(
-                  selected: selected,
-                  label: Text(program.name),
-                  avatar: Icon(program.usesSpeechSounds
-                      ? Icons.record_voice_over_outlined
-                      : Icons.psychology_alt_outlined),
-                  onSelected: (_) => onSelect(program.id),
-                );
-              }).toList(),
-            ),
     );
   }
 
@@ -139,12 +344,12 @@ class _ProgramsPanel extends StatelessWidget {
                   controller: name,
                   decoration: const InputDecoration(labelText: 'اسم البرنامج'),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: 14),
                 TextField(
                   controller: description,
                   decoration: const InputDecoration(labelText: 'وصف مختصر'),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: 14),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   value: usesSpeechSounds,
@@ -191,52 +396,156 @@ class _ProgramsPanel extends StatelessWidget {
   }
 }
 
-class _ProgramEditor extends StatelessWidget {
-  const _ProgramEditor({
+class _ProgramDetailPanel extends StatefulWidget {
+  const _ProgramDetailPanel({
+    super.key,
     required this.app,
     required this.program,
-    required this.tab,
-    required this.onTabChanged,
+    this.onBack,
   });
 
   final AppProvider app;
   final TherapyProgramTemplate program;
-  final int tab;
-  final ValueChanged<int> onTabChanged;
+  final VoidCallback? onBack;
+
+  @override
+  State<_ProgramDetailPanel> createState() => _ProgramDetailPanelState();
+}
+
+class _ProgramDetailPanelState extends State<_ProgramDetailPanel>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  int get _tabCount => 2 + (widget.program.usesSpeechSounds ? 1 : 0);
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: _tabCount, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  @override
+  void didUpdateWidget(_ProgramDetailPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.program.id != widget.program.id ||
+        oldWidget.program.usesSpeechSounds != widget.program.usesSpeechSounds) {
+      final newCount = _tabCount;
+      _tabController.removeListener(_onTabChanged);
+      _tabController.dispose();
+      _tabController = TabController(length: newCount, vsync: this);
+      _tabController.addListener(_onTabChanged);
+    }
+  }
+
+  void _onTabChanged() {
+    if (!_tabController.indexIsChanging) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final app = widget.app;
+    final program = widget.program;
+    final canEdit = app.canEditTherapyTemplate(program.centerId);
+
     final tabs = [
       const Tab(text: 'معلومات البرنامج'),
       const Tab(text: 'أقسام التقييم'),
       if (program.usesSpeechSounds) const Tab(text: 'تقييم الحروف'),
     ];
-    final safeTab = tab >= tabs.length ? 0 : tab;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AppCard(
+        if (widget.onBack != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_forward),
+                  onPressed: widget.onBack,
+                  tooltip: 'رجوع',
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(program.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.headlineSmall),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.schema_outlined,
+                        color: colorScheme.primary, size: 22),
                   ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(program.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w900)),
+                        if (program.description.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(program.description,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: SanadText.secondary(context)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   _ScopeBadge(centerId: program.centerId),
                 ],
               ),
-              if (program.description.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Text(program.description, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
-              ],
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: 16),
               Wrap(
-                spacing: AppSpacing.sm,
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   AppPill(
                     label: program.usesSpeechSounds
@@ -245,38 +554,87 @@ class _ProgramEditor extends StatelessWidget {
                     icon: Icons.record_voice_over_outlined,
                     selected: program.usesSpeechSounds,
                   ),
-                  if (app.canEditTherapyTemplate(program.centerId))
+                  if (canEdit)
                     OutlinedButton.icon(
                       onPressed: () =>
                           app.deleteTherapyProgramTemplate(program.id),
-                      icon: const Icon(Icons.delete_outline),
+                      icon: const Icon(Icons.delete_outline, size: 18),
                       label: const Text('حذف البرنامج'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.error,
+                        side: BorderSide(
+                            color: colorScheme.error.withValues(alpha: .4)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                      ),
                     ),
                 ],
               ),
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        DefaultTabController(
-          length: tabs.length,
-          initialIndex: safeTab,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TabBar(
-                tabs: tabs,
-                onTap: onTabChanged,
-                labelColor: Theme.of(context).colorScheme.primary,
-                unselectedLabelColor:
-                    Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (safeTab == 0) _ProgramInfo(program: program),
-              if (safeTab == 1) _SectionsEditor(app: app, program: program),
-              if (safeTab == 2 && program.usesSpeechSounds)
-                _SpeechSoundsEditor(app: app, program: program),
-            ],
+        const SizedBox(height: 20),
+        Container(
+          decoration: BoxDecoration(
+            color:
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          padding: const EdgeInsets.all(3),
+          child: Row(
+            children: List.generate(tabs.length, (index) {
+              final isSelected = _tabController.index == index;
+              return Expanded(
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  decoration: BoxDecoration(
+                    color: isSelected ? colorScheme.primary : Colors.transparent,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(11),
+                      onTap: () => _tabController.animateTo(index),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(tabs[index].text ?? '',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13,
+                              color: isSelected
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurfaceVariant,
+                            )),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        const SizedBox(height: 20),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          switchInCurve: Curves.easeInOut,
+          switchOutCurve: Curves.easeInOut,
+          child: Builder(
+            key: ValueKey(_tabController.index),
+            builder: (context) {
+              if (_tabController.index == 0) {
+                return _ProgramInfo(program: program);
+              }
+              if (_tabController.index == 1) {
+                return _SectionsView(app: app, program: program);
+              }
+              if (_tabController.index == 2 && program.usesSpeechSounds) {
+                return _SpeechSoundsView(app: app, program: program);
+              }
+              return const SizedBox.shrink();
+            },
           ),
         ),
       ],
@@ -301,40 +659,523 @@ class _ProgramInfo extends StatelessWidget {
   }
 }
 
-class _SectionsEditor extends StatelessWidget {
-  const _SectionsEditor({required this.app, required this.program});
+class _SectionsView extends StatelessWidget {
+  const _SectionsView({required this.app, required this.program});
 
   final AppProvider app;
   final TherapyProgramTemplate program;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final sections = app.assessmentSections
         .where((section) => section.programId == program.id)
         .toList();
     final canEdit = app.canEditTherapyTemplate(program.centerId);
-    return TherapyCard(
-      icon: Icons.fact_check_outlined,
-      title: 'أقسام التقييم',
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.fact_check_outlined,
+                    color: colorScheme.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text('أقسام التقييم',
+                  style: SanadText.subtitle(context)),
+              if (sections.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('${sections.length}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        color: colorScheme.onPrimaryContainer,
+                      )),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
           if (canEdit)
             _SectionAddRow(
                 app: app, program: program, nextOrder: sections.length),
-          const SizedBox(height: AppSpacing.md),
+          if (canEdit && sections.isNotEmpty)
+            const SizedBox(height: 18),
           if (sections.isEmpty)
-            const EmptyState(
-              icon: Icons.library_add_outlined,
-              title: 'أضف أول قسم تقييم',
-              message: 'مثال: الوجه، الفك، الشفاه، اللسان، التنفس، الصوت.',
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: const EmptyState(
+                icon: Icons.library_add_outlined,
+                title: 'أضف أول قسم تقييم',
+                message: 'مثال: الوجه، الفك، الشفاه، اللسان، التنفس، الصوت.',
+              ),
             )
           else
-            ...sections.map((section) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                  child: _SectionTemplateCard(app: app, section: section),
+            ...sections.asMap().entries.map((entry) => Padding(
+                  padding: EdgeInsets.only(top: entry.key > 0 ? 16 : 0),
+                  child: _SectionCard(
+                    app: app,
+                    section: entry.value,
+                  ),
                 )),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatefulWidget {
+  const _SectionCard({required this.app, required this.section});
+
+  final AppProvider app;
+  final AssessmentSectionTemplate section;
+
+  @override
+  State<_SectionCard> createState() => _SectionCardState();
+}
+
+class _SectionCardState extends State<_SectionCard> {
+  final _addItemKey = GlobalKey<_ItemAddRowState>();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final app = widget.app;
+    final section = widget.section;
+    final canEdit = app.canEditTherapyTemplate(section.centerId);
+    final items =
+        app.assessmentItems.where((item) => item.sectionId == section.id);
+    final itemList = items.toList();
+
+    return ExpansionTile(
+      initiallyExpanded: false,
+      collapsedShape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: .5)),
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: .5)),
+      ),
+      collapsedBackgroundColor: colorScheme.surface,
+      backgroundColor: colorScheme.surface,
+      tilePadding:
+          const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+      childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      title: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 280;
+          return Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.folder_outlined,
+                    color: colorScheme.onSecondaryContainer, size: 16),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(section.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: SanadText.title(context)),
+                    if (section.description.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text(section.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: SanadText.secondary(context)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: _ScopeBadge(
+                    centerId: section.centerId, compact: compact),
+              ),
+            ],
+          );
+        },
+      ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (itemList.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('${itemList.length}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      color: colorScheme.onSecondaryContainer,
+                    )),
+              ),
+            ),
+          Icon(Icons.expand_more, size: 20,
+              color: colorScheme.onSurfaceVariant),
+        ],
+      ),
+      children: [
+        if (itemList.isEmpty && canEdit)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: EmptyState(
+              icon: Icons.library_add_outlined,
+              title: 'لا توجد بنود بعد',
+              message: 'أضف أول بند تقييم داخل هذا القسم.',
+              action: FilledButton.icon(
+                onPressed: () => _addItemKey.currentState?.focusFirst(),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('إضافة بند'),
+              ),
+            ),
+          )
+        else if (itemList.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: EmptyState(
+              icon: Icons.inbox_outlined,
+              title: 'لا توجد بنود',
+              message: 'هذا القسم لا يحتوي على بنود تقييم بعد.',
+            ),
+          ),
+        if (canEdit)
+          Padding(
+            padding: EdgeInsets.only(
+                bottom: itemList.isNotEmpty ? 16 : 0),
+            child: _ItemAddRow(
+              key: _addItemKey,
+              app: app,
+              section: section,
+              nextOrder: itemList.length,
+            ),
+          ),
+        if (itemList.isNotEmpty)
+          ...itemList.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ItemCard(app: app, item: item),
+              )),
+        if (canEdit && itemList.isNotEmpty)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () =>
+                  app.deleteAssessmentSectionTemplate(section.id),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('حذف القسم'),
+              style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.error),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ItemCard extends StatelessWidget {
+  const _ItemCard({required this.app, required this.item});
+
+  final AppProvider app;
+  final AssessmentItemTemplate item;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final canEdit = app.canEditTherapyTemplate(item.centerId);
+    final options =
+        app.assessmentOptions.where((option) => option.itemId == item.id);
+    final optionCount = options.length;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.checklist_rtl_outlined,
+                    size: 16, color: colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        )),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        AppPill(
+                          label: _responseTypeLabel(item.responseType),
+                          icon: Icons.tune_outlined,
+                        ),
+                        AppPill(
+                          label: _responseModeLabel(item.responseMode),
+                          icon: item.responseMode == 'multiResponse'
+                              ? Icons.list_alt_outlined
+                              : Icons.radio_button_checked_outlined,
+                          selected: item.responseMode == 'multiResponse',
+                        ),
+                      ],
+                    ),
+                    if (item.prompt.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(item.prompt,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: SanadText.secondary(context)),
+                    ],
+                  ],
+                ),
+              ),
+              if (canEdit)
+                IconButton(
+                  tooltip: 'حذف البند',
+                  onPressed: () =>
+                      app.deleteAssessmentItemTemplate(item.id),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.error),
+                )
+              else
+                Icon(Icons.lock_outline,
+                    size: 20, color: colorScheme.onSurfaceVariant),
+            ],
+          ),
+          if (optionCount > 0 || canEdit) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: () => _showOptionsSheet(context),
+                  icon: const Icon(Icons.list_alt_outlined, size: 18),
+                  label: Text('$optionCount خيارات'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showOptionsSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => _OptionBottomSheet(
+        app: app,
+        item: item,
+      ),
+    );
+  }
+}
+
+class _OptionBottomSheet extends StatefulWidget {
+  const _OptionBottomSheet({required this.app, required this.item});
+
+  final AppProvider app;
+  final AssessmentItemTemplate item;
+
+  @override
+  State<_OptionBottomSheet> createState() => _OptionBottomSheetState();
+}
+
+class _OptionBottomSheetState extends State<_OptionBottomSheet> {
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final app = widget.app;
+    final item = widget.item;
+    final canEdit = app.canEditTherapyTemplate(item.centerId);
+    final options = app.assessmentOptions
+        .where((option) => option.itemId == item.id)
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      expand: false,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: .2),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(Icons.list_alt_outlined,
+                        color: colorScheme.primary, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text('خيارات "${item.title}"',
+                        style: SanadText.subtitle(context)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text('${options.length}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        )),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: [
+                    if (canEdit && item.responseType == 'custom')
+                      _OptionAddRow(
+                          app: app, item: item, nextOrder: options.length),
+                    if (canEdit &&
+                        item.responseType == 'custom' &&
+                        options.isNotEmpty)
+                      const SizedBox(height: 16),
+                    if (options.isEmpty && item.responseType != 'custom')
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Text(
+                            'خيارات هذا البند مضمنة مسبقاً.',
+                            style: SanadText.secondary(context)),
+                      )
+                    else if (options.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        child: Text('أضف احتمالات هذا البند.',
+                            style: SanadText.secondary(context)),
+                      )
+                    else
+                      ...options.map((option) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child:
+                                _OptionCard(app: app, option: option),
+                          )),
+                    SizedBox(
+                        height: MediaQuery.of(context).viewInsets.bottom +
+                            16),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -368,30 +1209,50 @@ class _SectionAddRowState extends State<_SectionAddRow> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.sm,
-        crossAxisAlignment: WrapCrossAlignment.center,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 260,
-            child: TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'اسم القسم'),
-            ),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: TextField(
-              controller: description,
-              decoration: const InputDecoration(labelText: 'وصف مختصر'),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: () => _save(context),
-            icon: const Icon(Icons.add),
-            label: const Text('إضافة قسم'),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 240,
+                child: TextField(
+                  controller: title,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم القسم',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: description,
+                  decoration: const InputDecoration(
+                    labelText: 'وصف مختصر',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              FilledButton.icon(
+                onPressed: () => _save(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('إضافة قسم'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -418,63 +1279,9 @@ class _SectionAddRowState extends State<_SectionAddRow> {
   }
 }
 
-class _SectionTemplateCard extends StatelessWidget {
-  const _SectionTemplateCard({required this.app, required this.section});
-
-  final AppProvider app;
-  final AssessmentSectionTemplate section;
-
-  @override
-  Widget build(BuildContext context) {
-    final canEdit = app.canEditTherapyTemplate(section.centerId);
-    final items =
-        app.assessmentItems.where((item) => item.sectionId == section.id);
-    return AppCard(
-      highlight: true,
-      child: ExpansionTile(
-        initiallyExpanded: true,
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: EdgeInsets.zero,
-        title: Row(
-          children: [
-            Expanded(
-                child: Text(section.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: SanadText.title(context))),
-            _ScopeBadge(centerId: section.centerId),
-          ],
-        ),
-        subtitle: section.description.isEmpty
-            ? const Text('قسم تقييم')
-            : Text(section.description, maxLines: 2, overflow: TextOverflow.ellipsis),
-        trailing: canEdit
-            ? IconButton(
-                tooltip: 'حذف القسم',
-                onPressed: () =>
-                    app.deleteAssessmentSectionTemplate(section.id),
-                icon: const Icon(Icons.delete_outline),
-              )
-            : const Icon(Icons.lock_outline),
-        children: [
-          if (canEdit)
-            _ItemAddRow(app: app, section: section, nextOrder: items.length),
-          const SizedBox(height: AppSpacing.sm),
-          if (items.isEmpty)
-            const Text('أضف بنود التقييم داخل هذا القسم.')
-          else
-            ...items.map((item) => Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: _ItemTemplateCard(app: app, item: item),
-                )),
-        ],
-      ),
-    );
-  }
-}
-
 class _ItemAddRow extends StatefulWidget {
   const _ItemAddRow({
+    super.key,
     required this.app,
     required this.section,
     required this.nextOrder,
@@ -490,73 +1297,100 @@ class _ItemAddRow extends StatefulWidget {
 
 class _ItemAddRowState extends State<_ItemAddRow> {
   final title = TextEditingController();
+  final titleFocus = FocusNode();
   final prompt = TextEditingController();
   String responseType = 'custom';
   String responseMode = 'singleChoice';
 
+  void focusFirst() {
+    titleFocus.requestFocus();
+  }
+
   @override
   void dispose() {
     title.dispose();
+    titleFocus.dispose();
     prompt.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(AppRadii.control),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
       ),
-      child: Wrap(
-        spacing: AppSpacing.sm,
-        runSpacing: AppSpacing.sm,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 240,
-            child: TextField(
-              controller: title,
-              decoration: const InputDecoration(labelText: 'بند تقييم'),
-            ),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: TextField(
-              controller: prompt,
-              decoration: const InputDecoration(labelText: 'تعليمات الملاحظة'),
-            ),
-          ),
-          SizedBox(
-            width: 260,
-            child: DropdownButtonFormField<String>(
-              initialValue: responseMode,
-              isExpanded: true,
-              alignment: AlignmentDirectional.centerStart,
-              decoration: const InputDecoration(
-                labelText: 'نوع الاستجابة',
-                helperText: 'اختيار واحد أم تقييم كل احتمال',
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 220,
+                child: TextField(
+                  controller: title,
+                  focusNode: titleFocus,
+                  decoration: const InputDecoration(
+                    labelText: 'بند تقييم',
+                    isDense: true,
+                  ),
+                ),
               ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'singleChoice',
-                  child: Text('اختيار واحد'),
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: prompt,
+                  decoration: const InputDecoration(
+                    labelText: 'تعليمات الملاحظة',
+                    isDense: true,
+                  ),
                 ),
-                DropdownMenuItem(
-                  value: 'multiResponse',
-                  child: Text('تقييم كل احتمال'),
+              ),
+              SizedBox(
+                width: 200,
+                child: DropdownButtonFormField<String>(
+                  initialValue: responseMode,
+                  isExpanded: true,
+                  alignment: AlignmentDirectional.centerStart,
+                  decoration: const InputDecoration(
+                    labelText: 'نوع الاستجابة',
+                    helperText: 'اختيار واحد أم تقييم كل احتمال',
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'singleChoice',
+                      child: Text('اختيار واحد'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'multiResponse',
+                      child: Text('تقييم كل احتمال'),
+                    ),
+                  ],
+                  onChanged: (value) =>
+                      setState(() => responseMode = value ?? responseMode),
                 ),
-              ],
-              onChanged: (value) =>
-                  setState(() => responseMode = value ?? responseMode),
-            ),
-          ),
-          FilledButton.tonalIcon(
-            onPressed: () => _save(context),
-            icon: const Icon(Icons.add),
-            label: const Text('إضافة بند'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () => _save(context),
+                icon: const Icon(Icons.add, size: 18),
+                label: const Text('إضافة بند'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -603,97 +1437,6 @@ class _ItemAddRowState extends State<_ItemAddRow> {
   }
 }
 
-String _responseTypeLabel(String value) {
-  switch (value) {
-    case 'yesNo':
-      return 'نعم / لا';
-    case 'speechMatrix':
-      return 'تقييم الحروف';
-    case 'scale':
-      return 'درجات / Scale';
-    case 'custom':
-    default:
-      return 'احتمالات مخصصة';
-  }
-}
-
-String _responseModeLabel(String value) {
-  switch (value) {
-    case 'multiResponse':
-      return 'تقييم كل احتمال';
-    case 'singleChoice':
-    default:
-      return 'اختيار واحد';
-  }
-}
-
-class _ItemTemplateCard extends StatelessWidget {
-  const _ItemTemplateCard({required this.app, required this.item});
-
-  final AppProvider app;
-  final AssessmentItemTemplate item;
-
-  @override
-  Widget build(BuildContext context) {
-    final canEdit = app.canEditTherapyTemplate(item.centerId);
-    final options =
-        app.assessmentOptions.where((option) => option.itemId == item.id);
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.subtitle(context)),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      children: [
-                        AppPill(
-                          label: _responseTypeLabel(item.responseType),
-                          icon: Icons.tune_outlined,
-                        ),
-                        AppPill(
-                          label: _responseModeLabel(item.responseMode),
-                          icon: item.responseMode == 'multiResponse'
-                              ? Icons.list_alt_outlined
-                              : Icons.radio_button_checked_outlined,
-                          selected: item.responseMode == 'multiResponse',
-                        ),
-                      ],
-                    ),
-                    if (item.prompt.isNotEmpty)
-                      Text(item.prompt, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
-                  ],
-                ),
-              ),
-              if (canEdit)
-                IconButton(
-                  tooltip: 'حذف البند',
-                  onPressed: () => app.deleteAssessmentItemTemplate(item.id),
-                  icon: const Icon(Icons.delete_outline),
-                )
-              else
-                const Icon(Icons.lock_outline),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          if (canEdit && item.responseType == 'custom')
-            _OptionAddRow(app: app, item: item, nextOrder: options.length),
-          const SizedBox(height: AppSpacing.sm),
-          if (options.isEmpty)
-            const Text('أضف احتمالات هذا البند.')
-          else
-            ...options.map((option) => _OptionPanel(app: app, option: option)),
-        ],
-      ),
-    );
-  }
-}
-
 class _OptionAddRow extends StatefulWidget {
   const _OptionAddRow({
     required this.app,
@@ -721,19 +1464,28 @@ class _OptionAddRowState extends State<_OptionAddRow> {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: AppSpacing.sm,
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SizedBox(
           width: 240,
           child: TextField(
             controller: label,
-            decoration: const InputDecoration(labelText: 'احتمال'),
+            decoration: const InputDecoration(
+              labelText: 'احتمال',
+              isDense: true,
+            ),
           ),
         ),
         FilledButton.tonalIcon(
-          onPressed: () => _save(),
-          icon: const Icon(Icons.add),
+          onPressed: _save,
+          icon: const Icon(Icons.add, size: 18),
           label: const Text('إضافة احتمال'),
+          style: FilledButton.styleFrom(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          ),
         ),
       ],
     );
@@ -758,17 +1510,17 @@ class _OptionAddRowState extends State<_OptionAddRow> {
   }
 }
 
-class _OptionPanel extends StatefulWidget {
-  const _OptionPanel({required this.app, required this.option});
+class _OptionCard extends StatefulWidget {
+  const _OptionCard({required this.app, required this.option});
 
   final AppProvider app;
   final AssessmentOptionTemplate option;
 
   @override
-  State<_OptionPanel> createState() => _OptionPanelState();
+  State<_OptionCard> createState() => _OptionCardState();
 }
 
-class _OptionPanelState extends State<_OptionPanel> {
+class _OptionCardState extends State<_OptionCard> {
   late bool generatesTherapy = widget.option.generatesTherapy;
   late final weakness =
       TextEditingController(text: widget.option.weaknessTemplate);
@@ -786,6 +1538,7 @@ class _OptionPanelState extends State<_OptionPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final option = widget.option;
     final app = widget.app;
     final canEdit = app.canEditTherapyTemplate(option.centerId);
@@ -793,52 +1546,106 @@ class _OptionPanelState extends State<_OptionPanel> {
         .where(
             (step) => step.ownerType == 'option' && step.ownerId == option.id)
         .toList();
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.sm),
-      child: AppCard(
-        padding: AppSpacing.md,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                    child:
-                        Text(option.label, maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.subtitle(context))),
-                Switch.adaptive(
-                  value: generatesTherapy,
-                  onChanged: canEdit ? (value) => _save(value) : null,
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: generatesTherapy
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                Text(generatesTherapy ? 'يولد علاج' : 'لا يولد علاج',
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (canEdit)
-                  IconButton(
-                    onPressed: () =>
-                        app.deleteAssessmentOptionTemplate(option.id),
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-              ],
-            ),
-            if (generatesTherapy) ...[
-              const SizedBox(height: AppSpacing.sm),
-              _TherapyTemplateFields(
-                enabled: canEdit,
-                weakness: weakness,
-                goal: goal,
-                therapy: therapy,
-                onSave: () => _save(true),
+                child: Text(option.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: generatesTherapy
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    )),
               ),
+              Switch.adaptive(
+                value: generatesTherapy,
+                onChanged: canEdit ? (value) => _save(value) : null,
+              ),
+              Text(generatesTherapy ? 'يولد علاج' : 'لا يولد علاج',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: generatesTherapy
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  )),
               if (canEdit)
-                _SkillStepAddRow(
-                  app: app,
-                  ownerType: 'option',
-                  ownerId: option.id,
-                  nextOrder: steps.length,
+                IconButton(
+                  onPressed: () =>
+                      app.deleteAssessmentOptionTemplate(option.id),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.error),
                 ),
-              ...steps.map((step) => _SkillStepTile(app: app, step: step)),
             ],
+          ),
+          if (generatesTherapy) ...[
+            const SizedBox(height: 16),
+            _TherapyTemplateFields(
+              enabled: canEdit,
+              weakness: weakness,
+              goal: goal,
+              therapy: therapy,
+              onSave: () => _save(true),
+            ),
+            if (canEdit) ...[
+              const SizedBox(height: 16),
+              _SkillStepAddRow(
+                app: app,
+                ownerType: 'option',
+                ownerId: option.id,
+                nextOrder: steps.length,
+              ),
+            ],
+            if (steps.isNotEmpty) const SizedBox(height: 12),
+            ...steps.asMap().entries.map((entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _SkillStepTile(
+                    app: app,
+                    step: entry.value,
+                    index: entry.key,
+                    total: steps.length,
+                  ),
+                )),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -863,17 +1670,17 @@ class _OptionPanelState extends State<_OptionPanel> {
   }
 }
 
-class _SpeechSoundsEditor extends StatefulWidget {
-  const _SpeechSoundsEditor({required this.app, required this.program});
+class _SpeechSoundsView extends StatefulWidget {
+  const _SpeechSoundsView({required this.app, required this.program});
 
   final AppProvider app;
   final TherapyProgramTemplate program;
 
   @override
-  State<_SpeechSoundsEditor> createState() => _SpeechSoundsEditorState();
+  State<_SpeechSoundsView> createState() => _SpeechSoundsViewState();
 }
 
-class _SpeechSoundsEditorState extends State<_SpeechSoundsEditor> {
+class _SpeechSoundsViewState extends State<_SpeechSoundsView> {
   String? selectedLetter;
   final letterField = TextEditingController();
 
@@ -902,80 +1709,166 @@ class _SpeechSoundsEditorState extends State<_SpeechSoundsEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final letters = _letters;
     final canEdit =
         widget.app.canEditTherapyTemplate(widget.program.centerId);
-    return TherapyCard(
-      icon: Icons.grid_on_outlined,
-      title: 'تقييم الحروف',
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.grid_on_outlined,
+                    color: colorScheme.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Text('تقييم الحروف',
+                  style: SanadText.subtitle(context)),
+              if (letters.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text('${letters.length}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                        color: colorScheme.onPrimaryContainer,
+                      )),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
           if (canEdit)
-            Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
-              child: Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
-                crossAxisAlignment: WrapCrossAlignment.center,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: letterField,
-                      textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        labelText: 'إضافة حرف',
-                        hintText: 'مثال: أ',
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 100,
+                        child: TextField(
+                          controller: letterField,
+                          textAlign: TextAlign.center,
+                          decoration: const InputDecoration(
+                            labelText: 'إضافة حرف',
+                            hintText: 'مثال: أ',
+                            isDense: true,
+                          ),
+                        ),
                       ),
-                    ),
+                      FilledButton.tonalIcon(
+                        onPressed: () {
+                          final l = letterField.text.trim();
+                          if (l.isEmpty) return;
+                          setState(() {
+                            selectedLetter = l;
+                            letterField.clear();
+                          });
+                        },
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('إضافة حرف'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 18, vertical: 12),
+                        ),
+                      ),
+                      if (selectedLetter != null)
+                        AppPill(
+                          label: selectedLetter!,
+                          icon: Icons.check,
+                          selected: true,
+                        ),
+                    ],
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () {
-                      final l = letterField.text.trim();
-                      if (l.isEmpty) return;
-                      setState(() {
-                        selectedLetter = l;
-                        letterField.clear();
-                      });
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text('إضافة حرف'),
-                  ),
-                  if (selectedLetter != null)
-                    AppPill(
-                      label: selectedLetter!,
-                      icon: Icons.check,
-                      selected: true,
-                    ),
                 ],
               ),
             ),
+          if (canEdit && letters.isNotEmpty) const SizedBox(height: 16),
           if (letters.isNotEmpty)
             SizedBox(
-              height: 40,
+              height: 42,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: letters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, index) {
                   final l = letters[index];
+                  final isSelected = l == selectedLetter;
                   return FilterChip(
-                    selected: l == selectedLetter,
-                    label: Text(l),
+                    selected: isSelected,
+                    label: Text(l,
+                        style: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                        )),
                     onSelected: (_) =>
                         setState(() => selectedLetter = l),
+                    showCheckmark: false,
+                    selectedColor: colorScheme.primaryContainer,
+                    checkmarkColor: colorScheme.primary,
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? colorScheme.onPrimaryContainer
+                          : colorScheme.onSurfaceVariant,
+                    ),
+                    side: BorderSide(
+                      color: isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant,
+                    ),
                   );
                 },
               ),
             ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 20),
           if (selectedLetter == null)
-            const EmptyState(
-              icon: Icons.touch_app_outlined,
-              title: 'اختر حرفاً',
-              message:
-                  'اختر حرفاً من القائمة أعلاه، أو أضف حرفاً جديداً ثم حدد له خلية.',
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: const EmptyState(
+                icon: Icons.touch_app_outlined,
+                title: 'اختر حرفاً',
+                message:
+                    'اختر حرفاً من القائمة أعلاه، أو أضف حرفاً جديداً ثم حدد له خلية.',
+              ),
             )
           else
             _LetterDetail(
@@ -1010,19 +1903,22 @@ class _LetterDetail extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (triggers.isEmpty)
-          const EmptyState(
-            icon: Icons.grid_view_outlined,
-            title: 'لا توجد خلايا',
-            message:
-                'لم يتم تعريف أي خلايا لهذا الحرف. أضف الخلية الأولى أدناه.',
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: const EmptyState(
+              icon: Icons.grid_view_outlined,
+              title: 'لا توجد خلايا',
+              message:
+                  'لم يتم تعريف أي خلايا لهذا الحرف. أضف الخلية الأولى أدناه.',
+            ),
           )
         else
-          ...triggers.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: _SoundCard(app: app, trigger: t),
+          ...triggers.asMap().entries.map((entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _TriggerCard(app: app, trigger: entry.value),
               )),
         if (canEdit)
-          _SoundAddRow(
+          _TriggerAddRow(
             app: app,
             program: program,
             letter: letter,
@@ -1033,8 +1929,8 @@ class _LetterDetail extends StatelessWidget {
   }
 }
 
-class _SoundAddRow extends StatefulWidget {
-  const _SoundAddRow({
+class _TriggerAddRow extends StatefulWidget {
+  const _TriggerAddRow({
     required this.app,
     required this.program,
     required this.letter,
@@ -1047,10 +1943,10 @@ class _SoundAddRow extends StatefulWidget {
   final int nextOrder;
 
   @override
-  State<_SoundAddRow> createState() => _SoundAddRowState();
+  State<_TriggerAddRow> createState() => _TriggerAddRowState();
 }
 
-class _SoundAddRowState extends State<_SoundAddRow> {
+class _TriggerAddRowState extends State<_TriggerAddRow> {
   final weakness = TextEditingController();
   final goal = TextEditingController();
   final therapy = TextEditingController();
@@ -1071,106 +1967,140 @@ class _SoundAddRowState extends State<_SoundAddRow> {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
             children: [
-              Text(widget.letter,
-                  style: Theme.of(context).textTheme.titleLarge),
-              _menu('نوع الخطأ', errorType,
-                  ['حذف', 'إبدال', 'إضافة', 'تشويه'],
-                  (value) => setState(() => errorType = value)),
-              _menu('الموضع', position, ['أول', 'وسط', 'آخر'],
-                  (value) => setState(() => position = value)),
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(widget.letter,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onPrimaryContainer,
+                    )),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 140,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: errorType,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'نوع الخطأ',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        items: ['حذف', 'إبدال', 'إضافة', 'تشويه']
+                            .map((item) => DropdownMenuItem(
+                                value: item, child: Text(item)))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => errorType = value ?? errorType),
+                      ),
+                    ),
+                    SizedBox(
+                      width: 120,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: position,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'الموضع',
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        items: ['أول', 'وسط', 'آخر']
+                            .map((item) => DropdownMenuItem(
+                                value: item, child: Text(item)))
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => position = value ?? position),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 18),
           TextField(
             controller: weakness,
             decoration: const InputDecoration(labelText: 'نقطة الضعف'),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 14),
           TextField(
             controller: goal,
             decoration: const InputDecoration(labelText: 'الهدف العلاجي'),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 14),
           TextField(
             controller: therapy,
             decoration: const InputDecoration(labelText: 'العلاج / التدريب'),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text('الخطوات المهارية:',
+          const SizedBox(height: 20),
+          Text('الخطوات المهارية',
               style: SanadText.subtitle(context)),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 12),
           if (_skillStepList.isNotEmpty)
             ..._skillStepList.asMap().entries.map((entry) =>
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        child: Text('${entry.key + 1}',
-                            style: const TextStyle(fontSize: 11)),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _editingIndex == entry.key
-                            ? TextField(
-                                controller: skillInput,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 8),
-                                ),
-                                autofocus: true,
-                                onSubmitted: (_) => _saveEdit(entry.key),
-                              )
-                            : Text(entry.value, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (_editingIndex == entry.key) ...[
-                        IconButton(
-                          icon: const Icon(Icons.check, size: 20),
-                          onPressed: () => _saveEdit(entry.key),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _editingIndex = null;
-                              skillInput.clear();
-                            });
-                          },
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ] else ...[
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                          onPressed: () {
-                            setState(() {
-                              _editingIndex = entry.key;
-                              skillInput.text = entry.value;
-                            });
-                          },
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
-                          onPressed: () => _deleteStep(entry.key),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ],
-                    ],
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildSkillStepTimeline(
+                    context: context,
+                    index: entry.key,
+                    total: _skillStepList.length,
+                    text: entry.value,
+                    isEditing: _editingIndex == entry.key,
+                    editingController: skillInput,
+                    onSave: () => _saveEdit(entry.key),
+                    onCancel: () {
+                      setState(() {
+                        _editingIndex = null;
+                        skillInput.clear();
+                      });
+                    },
+                    onEdit: () {
+                      setState(() {
+                        _editingIndex = entry.key;
+                        skillInput.text = entry.value;
+                      });
+                    },
+                    onDelete: () => _deleteStep(entry.key),
+                    colorScheme: colorScheme,
                   ),
                 )),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -1179,25 +2109,34 @@ class _SoundAddRowState extends State<_SoundAddRow> {
                   decoration: const InputDecoration(
                     labelText: 'مهارة علاجية',
                     hintText: 'اكتب مهارة ثم اضغط إضافة',
+                    isDense: true,
                   ),
                   onSubmitted: (_) => _addStep(),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: 12),
               FilledButton.tonalIcon(
                 onPressed: _addStep,
-                icon: const Icon(Icons.add_task_outlined),
+                icon: const Icon(Icons.add_task_outlined, size: 18),
                 label: const Text('إضافة مهارة'),
+                style: FilledButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
+          const SizedBox(height: 20),
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FilledButton.icon(
               onPressed: _save,
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add, size: 18),
               label: const Text('إضافة خلية'),
+              style: FilledButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              ),
             ),
           ),
         ],
@@ -1234,26 +2173,12 @@ class _SoundAddRowState extends State<_SoundAddRow> {
     });
   }
 
-  Widget _menu(String label, String value, List<String> values,
-      ValueChanged<String> onChanged) {
-    return SizedBox(
-      width: 140,
-      child: DropdownButtonFormField<String>(
-        initialValue: value,
-        decoration: InputDecoration(labelText: label),
-        items: values
-            .map((item) => DropdownMenuItem(value: item, child: Text(item)))
-            .toList(),
-        onChanged: (item) => onChanged(item ?? value),
-      ),
-    );
-  }
-
   Future<void> _save() async {
     final now = DateTime.now().toIso8601String();
+    final triggerId = 'sound_${DateTime.now().microsecondsSinceEpoch}';
     await widget.app.saveSpeechSoundTriggerTemplate(
       SpeechSoundTriggerTemplate(
-        id: 'sound_${DateTime.now().microsecondsSinceEpoch}',
+        id: triggerId,
         centerId: widget.program.centerId,
         programId: widget.program.id,
         letter: widget.letter,
@@ -1269,6 +2194,18 @@ class _SoundAddRowState extends State<_SoundAddRow> {
         updatedAt: now,
       ),
     );
+    for (var i = 0; i < _skillStepList.length; i++) {
+      await widget.app.saveSkillStepTemplate(SkillStepTemplate(
+        id: '${triggerId}_step_$i',
+        centerId: widget.program.centerId,
+        ownerType: 'sound',
+        ownerId: triggerId,
+        title: _skillStepList[i],
+        sortOrder: i,
+        createdAt: now,
+        updatedAt: now,
+      ));
+    }
     weakness.clear();
     goal.clear();
     therapy.clear();
@@ -1277,17 +2214,17 @@ class _SoundAddRowState extends State<_SoundAddRow> {
   }
 }
 
-class _SoundCard extends StatefulWidget {
-  const _SoundCard({required this.app, required this.trigger});
+class _TriggerCard extends StatefulWidget {
+  const _TriggerCard({required this.app, required this.trigger});
 
   final AppProvider app;
   final SpeechSoundTriggerTemplate trigger;
 
   @override
-  State<_SoundCard> createState() => _SoundCardState();
+  State<_TriggerCard> createState() => _TriggerCardState();
 }
 
-class _SoundCardState extends State<_SoundCard> {
+class _TriggerCardState extends State<_TriggerCard> {
   final skillInput = TextEditingController();
   int? _editingIndex;
 
@@ -1302,12 +2239,31 @@ class _SoundCardState extends State<_SoundCard> {
 
   Future<void> _updateSteps(List<String> steps) async {
     final now = DateTime.now().toIso8601String();
+    final triggerId = _trigger.id;
     await _app.saveSpeechSoundTriggerTemplate(
       _trigger.copyWith(
         skillStepTemplates: steps,
         updatedAt: now,
       ),
     );
+    final existing = _app.skillStepTemplates
+        .where((s) => s.ownerType == 'sound' && s.ownerId == triggerId)
+        .toList();
+    for (final step in existing) {
+      await _app.deleteSkillStepTemplate(step.id);
+    }
+    for (var i = 0; i < steps.length; i++) {
+      await _app.saveSkillStepTemplate(SkillStepTemplate(
+        id: '${triggerId}_step_$i',
+        centerId: _trigger.centerId,
+        ownerType: 'sound',
+        ownerId: triggerId,
+        title: steps[i],
+        sortOrder: i,
+        createdAt: now,
+        updatedAt: now,
+      ));
+    }
   }
 
   Future<void> _addStep() async {
@@ -1339,105 +2295,103 @@ class _SoundCardState extends State<_SoundCard> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final canEdit = _app.canEditTherapyTemplate(_trigger.centerId);
     final steps = _trigger.skillStepTemplates;
-    return AppCard(
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Text(_trigger.letter,
-                  style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(width: AppSpacing.md),
+              Container(
+                width: 40,
+                height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(_trigger.letter,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onPrimaryContainer,
+                    )),
+              ),
               AppPill(label: _trigger.errorType, selected: true),
-              const SizedBox(width: AppSpacing.xs),
               AppPill(label: _trigger.position),
-              const Spacer(),
               _ScopeBadge(centerId: _trigger.centerId),
               if (canEdit)
                 IconButton(
                   onPressed: () =>
                       _app.deleteSpeechSoundTriggerTemplate(_trigger.id),
-                  icon: const Icon(Icons.delete_outline),
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.error),
                 ),
             ],
           ),
-          _TemplatePreview(
-              label: 'نقطة الضعف', value: _trigger.weaknessTemplate),
-          _TemplatePreview(
-              label: 'الهدف العلاجي', value: _trigger.goalTemplate),
-          _TemplatePreview(
-              label: 'العلاج / التدريب', value: _trigger.therapyTemplate),
-          const SizedBox(height: AppSpacing.sm),
-          Text('الخطوات المهارية:',
-              style: SanadText.subtitle(context)),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 16),
+          _buildFieldPreview(context, 'نقطة الضعف', _trigger.weaknessTemplate),
+          _buildFieldPreview(
+              context, 'الهدف العلاجي', _trigger.goalTemplate),
+          _buildFieldPreview(
+              context, 'العلاج / التدريب', _trigger.therapyTemplate),
+          if (steps.isNotEmpty || canEdit) const SizedBox(height: 18),
+          if (steps.isNotEmpty || canEdit)
+            Text('الخطوات المهارية',
+                style: SanadText.subtitle(context)),
+          if (steps.isNotEmpty || canEdit) const SizedBox(height: 12),
           if (steps.isNotEmpty)
             ...steps.asMap().entries.map((entry) =>
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        child: Text('${entry.key + 1}',
-                            style: const TextStyle(fontSize: 11)),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: _editingIndex == entry.key
-                            ? TextField(
-                                controller: skillInput,
-                                decoration: const InputDecoration(
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 8),
-                                ),
-                                autofocus: true,
-                                onSubmitted: (_) => _saveEdit(entry.key),
-                              )
-                            : Text(entry.value, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (canEdit)
-                        if (_editingIndex == entry.key) ...[
-                          IconButton(
-                            icon: const Icon(Icons.check, size: 20),
-                            onPressed: () => _saveEdit(entry.key),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 20),
-                            onPressed: () {
-                              setState(() {
-                                _editingIndex = null;
-                                skillInput.clear();
-                              });
-                            },
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ] else ...[
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                            onPressed: () {
-                              setState(() {
-                                _editingIndex = entry.key;
-                                skillInput.text = entry.value;
-                              });
-                            },
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.close, size: 20),
-                            onPressed: () => _deleteStep(entry.key),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                    ],
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildSkillStepTimeline(
+                    context: context,
+                    index: entry.key,
+                    total: steps.length,
+                    text: entry.value,
+                    isEditing: _editingIndex == entry.key,
+                    editingController: skillInput,
+                    onSave: () => _saveEdit(entry.key),
+                    onCancel: () {
+                      setState(() {
+                        _editingIndex = null;
+                        skillInput.clear();
+                      });
+                    },
+                    onEdit: () {
+                      setState(() {
+                        _editingIndex = entry.key;
+                        skillInput.text = entry.value;
+                      });
+                    },
+                    onDelete: () => _deleteStep(entry.key),
+                    canEdit: canEdit,
+                    colorScheme: colorScheme,
                   ),
                 )),
           if (canEdit) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -1446,19 +2400,74 @@ class _SoundCardState extends State<_SoundCard> {
                     decoration: const InputDecoration(
                       labelText: 'مهارة علاجية',
                       hintText: 'اكتب مهارة ثم اضغط إضافة',
+                      isDense: true,
                     ),
                     onSubmitted: (_) => _addStep(),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: 12),
                 FilledButton.tonalIcon(
                   onPressed: _addStep,
-                  icon: const Icon(Icons.add_task_outlined),
+                  icon: const Icon(Icons.add_task_outlined, size: 18),
                   label: const Text('إضافة مهارة'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                  ),
                 ),
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    this.selected = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final background = selected
+        ? colorScheme.primaryContainer
+        : colorScheme.surfaceContainerHighest;
+    final foreground = selected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: selected
+              ? colorScheme.primary.withValues(alpha: .3)
+              : Colors.transparent,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: foreground),
+          const SizedBox(width: 4),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: foreground,
+              )),
         ],
       ),
     );
@@ -1489,13 +2498,13 @@ class _TherapyTemplateFields extends StatelessWidget {
           controller: weakness,
           decoration: const InputDecoration(labelText: 'نقطة الضعف'),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 14),
         TextField(
           enabled: enabled,
           controller: goal,
           decoration: const InputDecoration(labelText: 'الهدف العلاجي'),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 14),
         TextField(
           enabled: enabled,
           controller: therapy,
@@ -1506,7 +2515,7 @@ class _TherapyTemplateFields extends StatelessWidget {
             alignment: AlignmentDirectional.centerStart,
             child: TextButton.icon(
               onPressed: onSave,
-              icon: const Icon(Icons.save_outlined),
+              icon: const Icon(Icons.save_outlined, size: 18),
               label: const Text('حفظ القالب العلاجي'),
             ),
           ),
@@ -1544,20 +2553,28 @@ class _SkillStepAddRowState extends State<_SkillStepAddRow> {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
+      spacing: 12,
+      runSpacing: 12,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+        SizedBox(
+          width: 360,
           child: TextField(
             controller: title,
-            decoration: const InputDecoration(labelText: 'مهارة علاجية'),
+            decoration: const InputDecoration(
+              labelText: 'مهارة علاجية',
+              isDense: true,
+            ),
           ),
         ),
         FilledButton.tonalIcon(
           onPressed: _save,
-          icon: const Icon(Icons.add_task_outlined),
+          icon: const Icon(Icons.add_task_outlined, size: 18),
           label: const Text('إضافة مهارة'),
+          style: FilledButton.styleFrom(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
         ),
       ],
     );
@@ -1583,36 +2600,98 @@ class _SkillStepAddRowState extends State<_SkillStepAddRow> {
 }
 
 class _SkillStepTile extends StatelessWidget {
-  const _SkillStepTile({required this.app, required this.step});
+  const _SkillStepTile({
+    required this.app,
+    required this.step,
+    this.index = 0,
+    this.total = 1,
+  });
 
   final AppProvider app;
   final SkillStepTemplate step;
+  final int index;
+  final int total;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final canEdit = app.canEditTherapyTemplate(step.centerId);
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(child: Text('${step.sortOrder + 1}')),
-      title: Text(step.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: canEdit
-          ? Row(
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 32,
+            child: Column(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text('${index + 1}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: colorScheme.onPrimary,
+                      )),
+                ),
+                if (index < total - 1)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: colorScheme.surfaceContainerHighest,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Text(step.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                    height: 1.4,
+                  )),
+            ),
+          ),
+          if (canEdit)
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, size: 20),
+                  icon: const Icon(Icons.edit_outlined, size: 17),
                   onPressed: () => _edit(context),
                   visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.onSurfaceVariant),
                 ),
                 IconButton(
-                  onPressed: () => app.deleteSkillStepTemplate(step.id),
-                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () =>
+                      app.deleteSkillStepTemplate(step.id),
+                  icon: const Icon(Icons.delete_outline, size: 17),
                   visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                      foregroundColor: colorScheme.error),
                 ),
               ],
             )
-          : const Icon(Icons.lock_outline),
+          else
+            Padding(
+              padding: const EdgeInsets.only(top: 5),
+              child: Icon(Icons.lock_outline,
+                  size: 18, color: colorScheme.onSurfaceVariant),
+            ),
+        ],
+      ),
     );
   }
 
@@ -1624,7 +2703,8 @@ class _SkillStepTile extends StatelessWidget {
         title: const Text('تعديل المهارة'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(labelText: 'المهارة العلاجية'),
+          decoration:
+              const InputDecoration(labelText: 'المهارة العلاجية'),
           autofocus: true,
         ),
         actions: [
@@ -1633,7 +2713,8 @@ class _SkillStepTile extends StatelessWidget {
             child: const Text('إلغاء'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            onPressed: () =>
+                Navigator.pop(ctx, controller.text.trim()),
             child: const Text('حفظ'),
           ),
         ],
@@ -1646,34 +2727,183 @@ class _SkillStepTile extends StatelessWidget {
   }
 }
 
-class _TemplatePreview extends StatelessWidget {
-  const _TemplatePreview({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    if (value.trim().isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.xs),
-      child: Text('$label: $value', maxLines: 2, overflow: TextOverflow.ellipsis, style: SanadText.secondary(context)),
-    );
-  }
-}
-
 class _ScopeBadge extends StatelessWidget {
-  const _ScopeBadge({required this.centerId});
+  const _ScopeBadge({required this.centerId, this.compact = false});
 
   final String centerId;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final global = centerId.isEmpty;
     return AppPill(
-      label: global ? 'عام من سند' : 'خاص بالمركز',
+      label: global
+          ? (compact ? 'عام' : 'عام من سند')
+          : (compact ? 'خاص' : 'خاص بالمركز'),
       icon: global ? Icons.public_outlined : Icons.business_outlined,
       selected: global,
     );
   }
+}
+
+String _responseTypeLabel(String value) {
+  switch (value) {
+    case 'yesNo':
+      return 'نعم / لا';
+    case 'speechMatrix':
+      return 'تقييم الحروف';
+    case 'scale':
+      return 'درجات / Scale';
+    case 'custom':
+    default:
+      return 'احتمالات مخصصة';
+  }
+}
+
+String _responseModeLabel(String value) {
+  switch (value) {
+    case 'multiResponse':
+      return 'تقييم كل احتمال';
+    case 'singleChoice':
+    default:
+      return 'اختيار واحد';
+  }
+}
+
+Widget _buildSkillStepTimeline({
+  required BuildContext context,
+  required int index,
+  required int total,
+  required String text,
+  required bool isEditing,
+  required TextEditingController editingController,
+  required VoidCallback onSave,
+  required VoidCallback onCancel,
+  required VoidCallback onEdit,
+  required VoidCallback onDelete,
+  bool canEdit = true,
+  required ColorScheme colorScheme,
+}) {
+  return IntrinsicHeight(
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 32,
+          child: Column(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text('${index + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onPrimary,
+                    )),
+              ),
+              if (index < total - 1)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    color: colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: isEditing
+              ? TextField(
+                  controller: editingController,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                  onSubmitted: (_) => onSave(),
+                )
+              : Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                        height: 1.4,
+                      )),
+                ),
+        ),
+        if (canEdit)
+          if (isEditing) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.check, size: 18),
+              onPressed: onSave,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                  foregroundColor: colorScheme.primary),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: onCancel,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                  foregroundColor: colorScheme.onSurfaceVariant),
+            ),
+          ] else ...[
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 17),
+              onPressed: onEdit,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                  foregroundColor:
+                      colorScheme.onSurfaceVariant),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, size: 17),
+              onPressed: onDelete,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                  foregroundColor: colorScheme.error),
+            ),
+          ],
+      ],
+    ),
+  );
+}
+
+Widget _buildFieldPreview(
+    BuildContext context, String label, String value) {
+  if (value.trim().isEmpty) return const SizedBox.shrink();
+  return Padding(
+    padding: const EdgeInsets.only(top: 6),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            )),
+        Expanded(
+          child: Text(value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: SanadText.secondary(context)),
+        ),
+      ],
+    ),
+  );
 }
