@@ -13,28 +13,32 @@ class SettingsHubScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        AppCard(
-          child: SwitchListTile(
-            value: app.darkMode,
-            onChanged: (_) => app.toggleTheme(),
-            secondary: const Icon(Icons.dark_mode_outlined),
-            title: const Text('الوضع الليلي'),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppCard(
+            child: SwitchListTile(
+              value: app.darkMode,
+              onChanged: (_) => app.toggleTheme(),
+              secondary: const Icon(Icons.dark_mode_outlined),
+              title: const Text('الوضع الليلي'),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        const PasswordScreen(),
-        if (app.isCenterManager) ...[
           const SizedBox(height: 12),
-          const CenterSettingsScreen(),
+          const PasswordScreen(),
+          if (app.isCenterManager) ...[
+            const SizedBox(height: 12),
+            const CenterSettingsScreen(),
+          ],
+          if (app.isOwner || app.isCenterManager) ...[
+            const SizedBox(height: 12),
+            const BackupScreen(),
+          ],
+          const SizedBox(height: 80),
         ],
-        if (app.isOwner || app.isCenterManager) ...[
-          const SizedBox(height: 12),
-          const BackupScreen(),
-        ],
-      ],
+      ),
     );
   }
 }

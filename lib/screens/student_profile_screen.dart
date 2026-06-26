@@ -40,17 +40,258 @@ class StudentProfileScreen extends StatelessWidget {
       return _ParentStudentProfile(app: app, student: student);
     }
 
-    final assessments = app.clinicalAssessments;
+    return _ProfileBody(
+      app: app,
+      student: student,
+      onOpenSession: onOpenSession,
+    );
+  }
+}
+
+class _ProfileBody extends StatefulWidget {
+  const _ProfileBody({
+    required this.app,
+    required this.student,
+    this.onOpenSession,
+  });
+
+  final AppProvider app;
+  final Student student;
+  final VoidCallback? onOpenSession;
+
+  @override
+  State<_ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends State<_ProfileBody> {
+  String? _selectedProgramId;
+
+  AppProvider get app => widget.app;
+  Student get student => widget.student;
+  VoidCallback? get onOpenSession => widget.onOpenSession;
+
+  @override
+  void initState() {
+    super.initState();
+    if (app.isSpecialist) {
+      final assignedIds = app.studentProgramAssignments
+          .where((a) =>
+              a.studentId == student.id &&
+              a.specialistId == app.user?.id &&
+              a.isActive)
+          .map((a) => a.programId)
+          .toSet();
+      if (assignedIds.contains(app.currentProgramId)) {
+        _selectedProgramId = app.currentProgramId;
+      } else {
+        _selectedProgramId =
+            assignedIds.isNotEmpty ? assignedIds.first : null;
+      }
+    } else {
+      // Manager/supervisor: always default to all-programs grouped mode
+      _selectedProgramId = null;
+    }
+  }
+
+  List<TherapyProgramTemplate> _filteredPrograms() {
+    if (app.isSpecialist) {
+      final assignedIds = app.studentProgramAssignments
+          .where((a) =>
+              a.studentId == student.id &&
+              a.specialistId == app.user?.id &&
+              a.isActive)
+          .map((a) => a.programId)
+          .toSet();
+      return app.therapyPrograms
+          .where((p) => assignedIds.contains(p.id))
+          .toList();
+    }
+    final enrolledIds = app.studentProgramIds;
+    return app.therapyPrograms
+        .where((p) => enrolledIds.contains(p.id))
+        .toList();
+  }
+
+  String _specialistForProgram(String programId) {
+    final assignment = app.studentProgramAssignments.firstWhere(
+      (a) => a.studentId == student.id && a.programId == programId && a.isActive,
+      orElse: () => StudentProgramAssignment(
+        id: '',
+        centerId: student.centerId,
+        studentId: student.id,
+        programId: programId,
+        specialistId: '',
+      ),
+    );
+    if (assignment.specialistId.isEmpty) return '';
+    final user = app.staff.where((u) => u.id == assignment.specialistId).firstOrNull;
+    return user?.name ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final programs = _filteredPrograms();
+    final allData = _selectedProgramId == null;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!app.isParent)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+              child: Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => app.selectStudent(null),
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('رجوع لاختيار طالب آخر'),
+                  ),
+                ],
+              ),
+            ),
+          StudentHeaderCard(
+            app: app,
+            student: student,
+            programIdFilter: _selectedProgramId,
+          ),
+          const SizedBox(height: 16),
+          _TherapyTeamCard(app: app, student: student),
+          const SizedBox(height: 12),
+
+          // ── Program filter chips ──
+          if (programs.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    if (!app.isSpecialist)
+                      _FilterChip(
+                        label: 'الكل',
+                        selected: allData,
+                        colorScheme: colorScheme,
+                        onTap: () => setState(() => _selectedProgramId = null),
+                      ),
+                    if (!app.isSpecialist && programs.isNotEmpty)
+                      const SizedBox(width: 8),
+                    ...programs.map((p) => Padding(
+                      padding: const EdgeInsets.only(left: 8),
+                      child: _FilterChip(
+                        label: p.name,
+                        selected: _selectedProgramId == p.id,
+                        colorScheme: colorScheme,
+                        onTap: () =>
+                            setState(() => _selectedProgramId = p.id),
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ),
+
+          // ── Content ──
+          if (allData)
+            _AllProgramsSummary(
+              app: app,
+              student: student,
+              programs: programs,
+              specialistForProgram: _specialistForProgram,
+            )
+          else
+            _ProgramSpecificProfile(
+              app: app,
+              student: student,
+              programId: _selectedProgramId!,
+              onOpenSession: onOpenSession,
+              backToAll: app.isSpecialist
+                  ? null
+                  : () => setState(() => _selectedProgramId = null),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.colorScheme,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(AppRadii.control),
+          border: Border.all(
+            color: selected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            fontSize: 13,
+            color: selected
+                ? colorScheme.onPrimaryContainer
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgramSpecificProfile extends StatelessWidget {
+  const _ProgramSpecificProfile({
+    required this.app,
+    required this.student,
+    required this.programId,
+    this.onOpenSession,
+    this.backToAll,
+  });
+
+  final AppProvider app;
+  final Student student;
+  final String programId;
+  final VoidCallback? onOpenSession;
+  final VoidCallback? backToAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final assessments = app.clinicalAssessments
+        .where((a) => a.programId == programId)
+        .toList();
     final assessmentSummary = assessments.isEmpty
         ? 'لا توجد تقييمات'
         : 'آخر تقييم: ${_formatDateTime(assessments.first.createdAt)}';
 
-    final plans = app.plans;
+    final plans = app.plans.where((p) => p.programId == programId).toList();
     final goalSummary = plans.isEmpty
         ? 'لا توجد أهداف'
         : '${plans.length} أهداف قيد المتابعة';
 
-    final exercises = app.exercises;
+    final exercises =
+        app.exercises.where((e) => e.programId == programId).toList();
     final pendingCount =
         exercises.where((e) => e.status == 'pending').length;
     final reviewCount =
@@ -61,7 +302,10 @@ class StudentProfileScreen extends StatelessWidget {
         ? 'لا توجد واجبات'
         : '$pendingCount بانتظار  |  $reviewCount للمراجعة  |  $reviewedCount تمت مراجعتها';
 
-    final followups = app.pendingFollowups;
+    final allFollowups = app.pendingFollowups;
+    final followups = allFollowups.isEmpty
+        ? allFollowups
+        : allFollowups.where((f) => f.programId == programId).toList();
     final followupSummary = followups.isEmpty
         ? 'لا توجد متابعات'
         : '${followups.length} مهارات تحتاج إعادة';
@@ -72,11 +316,12 @@ class StudentProfileScreen extends StatelessWidget {
         ? 'لا توجد ملاحظات'
         : '${notesExercises.length} ملاحظات';
 
-    final timelineCount = app.sessions.length +
+    final sessions = app.sessions.where((s) => s.programId == programId).toList();
+    final timelineCount = sessions.length +
         app.evaluations.length +
-        app.clinicalAssessments.length +
-        app.exercises.length +
-        app.reports.length +
+        assessments.length +
+        exercises.length +
+        (app.reports.where((r) => r.studentId == student.id).toList().length) +
         (app.reward != null ? 1 : 0);
     final timelineSummary = timelineCount == 0
         ? 'لا توجد أحداث'
@@ -85,27 +330,24 @@ class StudentProfileScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (!app.isParent)
+        if (backToAll != null)
           Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-            child: Row(
-              children: [
-                TextButton.icon(
-                  onPressed: () => app.selectStudent(null),
-                  icon: const Icon(Icons.arrow_forward),
-                  label: const Text('رجوع لاختيار طالب آخر'),
-                ),
-              ],
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TextButton.icon(
+              onPressed: backToAll,
+              icon: const Icon(Icons.arrow_right),
+              label: const Text('الرجوع لعرض الكل'),
             ),
           ),
-        StudentHeaderCard(app: app, student: student),
-        const SizedBox(height: 16),
         _CollapsibleCard(
           icon: Icons.fact_check_outlined,
           title: 'التقييم العلاجي',
           summary: assessmentSummary,
           count: assessments.length,
-          child: _ClinicalAssessmentProfileSection(app: app),
+          child: _ClinicalAssessmentProfileSection(
+            app: app,
+            programIdFilter: programId,
+          ),
         ),
         const SizedBox(height: 12),
         _CollapsibleCard(
@@ -113,7 +355,11 @@ class StudentProfileScreen extends StatelessWidget {
           title: 'الأهداف النشطة',
           summary: goalSummary,
           count: plans.where((p) => app.goalProgress(p.id) < 100).length,
-          child: _GoalProgressSection(app: app, onOpenSession: onOpenSession),
+          child: _GoalProgressSection(
+            app: app,
+            onOpenSession: onOpenSession,
+            programIdFilter: programId,
+          ),
         ),
         const SizedBox(height: 12),
         if (plans.any((p) => app.goalProgress(p.id) >= 100))
@@ -123,7 +369,10 @@ class StudentProfileScreen extends StatelessWidget {
             summary:
                 '${plans.where((p) => app.goalProgress(p.id) >= 100).length} أهداف مكتملة',
             count: plans.where((p) => app.goalProgress(p.id) >= 100).length,
-            child: _MasteredGoalsSection(app: app),
+            child: _MasteredGoalsSection(
+              app: app,
+              programIdFilter: programId,
+            ),
           ),
         if (plans.any((p) => app.goalProgress(p.id) >= 100)) const SizedBox(height: 12),
         if (followups.isNotEmpty)
@@ -133,7 +382,10 @@ class StudentProfileScreen extends StatelessWidget {
             summary: followupSummary,
             count: followups.length,
             child: _FollowupsSection(
-                app: app, onOpenSession: onOpenSession),
+              app: app,
+              onOpenSession: onOpenSession,
+              programIdFilter: programId,
+            ),
           ),
         if (followups.isNotEmpty) const SizedBox(height: 12),
         _CollapsibleCard(
@@ -141,7 +393,10 @@ class StudentProfileScreen extends StatelessWidget {
           title: 'الواجبات المنزلية',
           summary: homeworkSummary,
           count: exercises.length,
-          child: _HomeworkSummary(app: app),
+          child: _HomeworkSummary(
+            app: app,
+            programIdFilter: programId,
+          ),
         ),
         const SizedBox(height: 12),
         _CollapsibleCard(
@@ -157,15 +412,217 @@ class StudentProfileScreen extends StatelessWidget {
           title: 'الخط الزمني',
           summary: timelineSummary,
           count: timelineCount,
-          child: _Timeline(app: app),
+          child: _Timeline(
+            app: app,
+            programIdFilter: programId,
+          ),
         ),
         const SizedBox(height: 16),
-        _QuickActions(app: app, student: student),
-        const SizedBox(height: 16),
-        _PreviousSessions(app: app),
+        _PreviousSessions(
+          app: app,
+          programIdFilter: programId,
+        ),
         const SizedBox(height: 16),
         _ReportsFromProfile(app: app),
       ],
+    );
+  }
+}
+
+class _AllProgramsSummary extends StatelessWidget {
+  const _AllProgramsSummary({
+    required this.app,
+    required this.student,
+    required this.programs,
+    required this.specialistForProgram,
+  });
+
+  final AppProvider app;
+  final Student student;
+  final List<TherapyProgramTemplate> programs;
+  final String Function(String programId) specialistForProgram;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (programs.isEmpty) {
+      return const _CollapsibleCard(
+        icon: Icons.auto_stories_outlined,
+        title: 'البرامج العلاجية',
+        summary: 'لا توجد برامج علاجية',
+        count: 0,
+        child: Text('لم يتم تخصيص برامج علاجية لهذا الطالب بعد.'),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionHeader(context, 'الملخص العام للبرامج', Icons.dashboard_outlined),
+        const SizedBox(height: 12),
+        ...programs.map((program) {
+          final assessments = app.clinicalAssessments
+              .where((a) => a.programId == program.id)
+              .toList();
+          final plans = app.plans
+              .where((p) => p.programId == program.id)
+              .toList();
+          final activePlans = plans.where((p) => app.goalProgress(p.id) < 100).toList();
+          final masteredPlans = plans.where((p) => app.goalProgress(p.id) >= 100).toList();
+          final sessions = app.sessions
+              .where((s) => s.programId == program.id)
+              .toList();
+          final exercises = app.exercises
+              .where((e) => e.programId == program.id)
+              .toList();
+          final specialistName = specialistForProgram(program.id);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        program.usesSpeechSounds
+                            ? Icons.record_voice_over_outlined
+                            : Icons.psychology_alt_outlined,
+                        color: colorScheme.onPrimaryContainer,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            program.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          if (specialistName.isNotEmpty)
+                            Text(
+                              'الأخصائي: $specialistName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _SummaryChip(
+                      icon: Icons.fact_check_outlined,
+                      label: 'تقييمات',
+                      value: '${assessments.length}',
+                      color: colorScheme.primary,
+                    ),
+                    _SummaryChip(
+                      icon: Icons.track_changes_outlined,
+                      label: 'أهداف نشطة',
+                      value: '${activePlans.length}',
+                      color: colorScheme.primary,
+                    ),
+                    if (masteredPlans.isNotEmpty)
+                      _SummaryChip(
+                        icon: Icons.emoji_events_outlined,
+                        label: 'منجز',
+                        value: '${masteredPlans.length}',
+                        color: Colors.amber,
+                      ),
+                    if (sessions.isNotEmpty)
+                      _SummaryChip(
+                        icon: Icons.history_edu_outlined,
+                        label: 'جلسات',
+                        value: '${sessions.length}',
+                        color: colorScheme.tertiary,
+                      ),
+                    if (exercises.isNotEmpty)
+                      _SummaryChip(
+                        icon: Icons.assignment_turned_in_outlined,
+                        label: 'واجبات',
+                        value: '${exercises.length}',
+                        color: colorScheme.secondary,
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadii.control),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            '$value $label',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -188,7 +645,8 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
       if (query.trim().isEmpty) return true;
       return student.name.contains(query) || student.diagnosis.contains(query);
     }).toList();
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         EmptyState(
@@ -209,10 +667,13 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
         ),
         const SizedBox(height: AppSpacing.md),
         if (students.isEmpty)
-          const EmptyState(
-            icon: Icons.search_off_outlined,
-            title: 'لا توجد نتائج',
-            message: 'جرّب كتابة اسم أو تشخيص مختلف.',
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: EmptyState(
+              icon: Icons.search_off_outlined,
+              title: 'لا توجد نتائج',
+              message: 'جرّب كتابة اسم أو تشخيص مختلف.',
+            ),
           )
         else
           ResponsiveGrid(
@@ -224,8 +685,9 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              StudentAvatar(student: student, radius: 32),
+                              StudentAvatar(student: student, radius: 28),
                               const SizedBox(width: AppSpacing.sm),
                               Expanded(
                                 child: Column(
@@ -239,7 +701,7 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: AppSpacing.md),
+                          const SizedBox(height: AppSpacing.sm),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
@@ -254,6 +716,7 @@ class _StudentSelectionPromptState extends State<_StudentSelectionPrompt> {
                 .toList(),
           ),
       ],
+      ),
     );
   }
 }
@@ -382,129 +845,25 @@ class _ParentStudentProfile extends StatelessWidget {
   }
 }
 
-class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.app, required this.student});
 
-  final AppProvider app;
-  final Student student;
-
-  @override
-  Widget build(BuildContext context) {
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionHeader(context, 'الإجراءات السريعة', Icons.bolt_outlined),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _reportButton(context, 'تقرير مختصر'),
-              FilledButton.tonalIcon(
-                onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('سيتم تفعيل اختبار جلسة محددة لاحقًا'),
-                  ),
-                ),
-                icon: const Icon(Icons.science_outlined),
-                label: const Text('اختبار جلسة محددة'),
-              ),
-              _reportButton(context, 'تقرير شامل'),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reportButton(BuildContext context, String type) {
-    return FilledButton.tonalIcon(
-      onPressed: app.canViewReports
-          ? () => type == 'تقرير مختصر'
-              ? _chooseSessionReport(context)
-              : runWithFeedback(
-                  context,
-                  () => app.printReportForSessions(
-                    type: type,
-                    selectedSessions: _sessionsForType(type),
-                    specialistSignature: app.user?.name ?? 'الأخصائي',
-                    managerSignature: app.currentCenter?.managerName ?? '',
-                  ),
-                  loading: 'جار إنشاء التقرير...',
-                  success: 'تم إنشاء التقرير.',
-                )
-          : null,
-      icon: const Icon(Icons.picture_as_pdf_outlined),
-      label: Text(type, maxLines: 1, overflow: TextOverflow.ellipsis),
-    );
-  }
-
-  Future<void> _chooseSessionReport(BuildContext context) async {
-    if (app.sessions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لا توجد جلسات للطالب.')),
-      );
-      return;
-    }
-    await showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('اختر جلسة للتقرير'),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width.clamp(300, 560).toDouble(),
-          child: ListView(
-            shrinkWrap: true,
-            children: app.sessions.map((session) {
-              return ListTile(
-                title: Text(session.cardTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(
-                    '${session.startedAt.split('T').first} - نجاح ${session.successRate}%', maxLines: 1, overflow: TextOverflow.ellipsis),
-                trailing: const Icon(Icons.picture_as_pdf_outlined),
-                onTap: () async {
-                  await runWithFeedback(
-                    context,
-                    () => app.printReportForSessions(
-                      type: 'تقرير جلسة',
-                      selectedSessions: [session],
-                      specialistSignature: app.user?.name ?? 'الأخصائي',
-                      managerSignature: app.currentCenter?.managerName ?? '',
-                    ),
-                    loading: 'جار إنشاء التقرير...',
-                    success: 'تم إنشاء التقرير.',
-                  );
-                  if (dialogContext.mounted) Navigator.pop(dialogContext);
-                },
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<TherapySession> _sessionsForType(String type) {
-    if (type == 'تقرير شامل') return app.sessions;
-    final now = DateTime.now();
-    final from = switch (type) {
-      'تقرير مختصر' => now.subtract(const Duration(days: 7)),
-      _ => DateTime(1900),
-    };
-    return app.sessions.where((session) {
-      final date = DateTime.tryParse(session.startedAt);
-      return date != null && !date.isBefore(from);
-    }).toList();
-  }
-}
 
 class _ClinicalAssessmentProfileSection extends StatelessWidget {
-  const _ClinicalAssessmentProfileSection({required this.app});
+  const _ClinicalAssessmentProfileSection({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final assessments = app.clinicalAssessments;
+    final programNameMap = {for (final p in app.therapyPrograms) p.id: p.name};
+    final assessments = programIdFilter != null
+        ? app.clinicalAssessments
+            .where((a) => a.programId == programIdFilter)
+            .toList()
+        : app.clinicalAssessments;
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,7 +900,7 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'تقييم نطقي - ${_formatDateTime(assessment.createdAt)}',
+                              '${programNameMap[assessment.programId] ?? 'تقييم علاجي'} - ${_formatDateTime(assessment.createdAt)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: SanadText.subtitle(context),
@@ -597,9 +956,13 @@ class _ClinicalAssessmentProfileSection extends StatelessWidget {
 }
 
 class _ImprovementSummaryCard extends StatelessWidget {
-  const _ImprovementSummaryCard({required this.app});
+  const _ImprovementSummaryCard({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -760,17 +1123,25 @@ class _ImprovementStat extends StatelessWidget {
 }
 
 class _GoalProgressSection extends StatelessWidget {
-  const _GoalProgressSection({required this.app, this.onOpenSession});
+  const _GoalProgressSection({
+    required this.app,
+    this.onOpenSession,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
   final VoidCallback? onOpenSession;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
+    final plans = programIdFilter != null
+        ? app.plans.where((p) => p.programId == programIdFilter).toList()
+        : app.plans;
     final activePlans =
-        app.plans.where((p) => app.goalProgress(p.id) < 100).toList();
+        plans.where((p) => app.goalProgress(p.id) < 100).toList();
     final masteredPlans =
-        app.plans.where((p) => app.goalProgress(p.id) >= 100).toList();
+        plans.where((p) => app.goalProgress(p.id) >= 100).toList();
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1378,13 +1749,20 @@ class _DetailStat extends StatelessWidget {
 }
 
 class _MasteredGoalsSection extends StatelessWidget {
-  const _MasteredGoalsSection({required this.app});
+  const _MasteredGoalsSection({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final masteredPlans = app.plans.where((p) => app.goalProgress(p.id) >= 100).toList();
+    final plans = programIdFilter != null
+        ? app.plans.where((p) => p.programId == programIdFilter).toList()
+        : app.plans;
+    final masteredPlans = plans.where((p) => app.goalProgress(p.id) >= 100).toList();
     if (masteredPlans.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1448,23 +1826,48 @@ class _MasteredGoalsSection extends StatelessWidget {
 }
 
 class StudentHeaderCard extends StatelessWidget {
-  const StudentHeaderCard({required this.app, required this.student});
+  const StudentHeaderCard({
+    required this.app,
+    required this.student,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
   final Student student;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final programs = app.programsForStudent();
-    final lastSession = app.sessions.isNotEmpty ? app.sessions.first : null;
-    final assessmentStatus = app.studentAssessmentStatus;
+    final sessions = programIdFilter != null
+        ? app.sessions.where((s) => s.programId == programIdFilter).toList()
+        : app.sessions;
+    final plans = programIdFilter != null
+        ? app.plans.where((p) => p.programId == programIdFilter).toList()
+        : app.plans;
+    final exercises = programIdFilter != null
+        ? app.exercises.where((e) => e.programId == programIdFilter).toList()
+        : app.exercises;
+    final followups = programIdFilter != null
+        ? app.pendingFollowups.where((f) => f.programId == programIdFilter).toList()
+        : app.pendingFollowups;
+    final assessments = programIdFilter != null
+        ? app.clinicalAssessments
+            .where((a) => a.programId == programIdFilter)
+            .toList()
+        : app.clinicalAssessments;
+
+    final programs = programIdFilter != null
+        ? app.therapyPrograms.where((p) => p.id == programIdFilter).toList()
+        : app.programsForStudent();
+    final lastSession = sessions.isNotEmpty ? sessions.first : null;
+    final assessmentStatus = assessments.isNotEmpty ? 'مقيّم' : 'غير مقيّم';
     final improvement = app.selectedStudent != null
         ? app.studentGoalAverageProgress(app.selectedStudent!.id)
         : 0;
-    final pendingFollowups = app.pendingFollowups.length;
-    final masteredCount = app.masteredGoalCount;
+    final pendingFollowups = followups.length;
+    final masteredCount = plans.where((p) => app.goalProgress(p.id) >= 100).length.toString();
 
     return AppCard(
       child: Column(
@@ -1583,12 +1986,12 @@ class StudentHeaderCard extends StatelessWidget {
               _StatChip(
                 icon: Icons.calendar_today_outlined,
                 label: 'جلسات',
-                value: '${app.sessions.length}',
+                value: '${sessions.length}',
               ),
               _StatChip(
                 icon: Icons.track_changes_outlined,
                 label: 'أهداف نشطة',
-                value: app.activeGoalCount,
+                value: '${plans.where((p) => app.goalProgress(p.id) < 100).length}',
               ),
               if (masteredCount != '0')
                 _StatChip(
@@ -1604,7 +2007,7 @@ class StudentHeaderCard extends StatelessWidget {
               _StatChip(
                 icon: Icons.assignment_turned_in_outlined,
                 label: 'للمراجعة',
-                value: app.pendingHomeworkReviewCount,
+                value: '${exercises.where((e) => e.status == 'completed_by_parent').length}',
               ),
               _StatChip(
                 icon: assessmentStatus == 'مقيّم'
@@ -1681,15 +2084,23 @@ class _StatChip extends StatelessWidget {
 }
 
 class _FollowupsSection extends StatelessWidget {
-  const _FollowupsSection(
-      {required this.app, required this.onOpenSession});
+  const _FollowupsSection({
+    required this.app,
+    required this.onOpenSession,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
   final VoidCallback? onOpenSession;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final followups = app.pendingFollowups;
+    final followups = programIdFilter != null
+        ? app.pendingFollowups
+            .where((f) => f.programId == programIdFilter)
+            .toList()
+        : app.pendingFollowups;
     if (followups.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
@@ -1842,13 +2253,20 @@ class _FollowupTile extends StatelessWidget {
 }
 
 class _PreviousSessions extends StatelessWidget {
-  const _PreviousSessions({required this.app});
+  const _PreviousSessions({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final sortedSessions = app.sessions.toList()
+    final sessionsFiltered = programIdFilter != null
+        ? app.sessions.where((s) => s.programId == programIdFilter).toList()
+        : app.sessions;
+    final sortedSessions = sessionsFiltered.toList()
       ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
     return AppCard(
       child: Column(
@@ -2168,9 +2586,13 @@ class _SessionTile extends StatelessWidget {
 }
 
 class _ReportsFromProfile extends StatelessWidget {
-  const _ReportsFromProfile({required this.app});
+  const _ReportsFromProfile({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -2197,19 +2619,26 @@ class _ReportsFromProfile extends StatelessWidget {
 }
 
 class _HomeworkSummary extends StatelessWidget {
-  const _HomeworkSummary({required this.app});
+  const _HomeworkSummary({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final pending = app.exercises
+    final exercisesFiltered = programIdFilter != null
+        ? app.exercises.where((e) => e.programId == programIdFilter).toList()
+        : app.exercises;
+    final pending = exercisesFiltered
         .where((e) => e.status == 'pending')
         .toList();
-    final review = app.exercises
+    final review = exercisesFiltered
         .where((e) => e.status == 'completed_by_parent')
         .toList();
-    final reviewed = app.exercises
+    final reviewed = exercisesFiltered
         .where((e) => e.status == 'specialist_reviewed')
         .toList();
 
@@ -2544,13 +2973,17 @@ class _HomeworkTile extends StatelessWidget {
 }
 
 class _Timeline extends StatelessWidget {
-  const _Timeline({required this.app});
+  const _Timeline({
+    required this.app,
+    this.programIdFilter,
+  });
 
   final AppProvider app;
+  final String? programIdFilter;
 
   @override
   Widget build(BuildContext context) {
-    final items = _timeline(app);
+    final items = _timeline(app, programIdFilter: programIdFilter);
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2570,26 +3003,45 @@ class _Timeline extends StatelessWidget {
     );
   }
 
-  List<_TimelineItem> _timeline(AppProvider app) {
+  List<_TimelineItem> _timeline(AppProvider app, {String? programIdFilter}) {
+    final sessions = programIdFilter != null
+        ? app.sessions.where((s) => s.programId == programIdFilter)
+        : app.sessions;
+    final clinicalAssessments = programIdFilter != null
+        ? app.clinicalAssessments.where((a) => a.programId == programIdFilter)
+        : app.clinicalAssessments;
+    final exercises = programIdFilter != null
+        ? app.exercises.where((e) => e.programId == programIdFilter)
+        : app.exercises;
+    final evaluations = programIdFilter != null
+        ? app.evaluations.where((e) => e.programId == programIdFilter)
+        : app.evaluations;
     final items = <_TimelineItem>[
-      ...app.sessions.map((session) => _TimelineItem(
+      ...sessions.map((session) => _TimelineItem(
           Icons.record_voice_over_outlined,
           'جلسة ${session.sessionType}',
           '${session.cardTitle} - نجاح ${session.successRate}%',
           session.startedAt)),
-      ...app.evaluations.map((evaluation) => _TimelineItem(
+      ...evaluations.map((evaluation) => _TimelineItem(
           Icons.fact_check_outlined,
           'تقييم حرف ${evaluation.letter}',
           '${evaluation.position} - ${evaluation.errorType} - شدة ${evaluation.severity}',
           evaluation.createdAt)),
-      ...app.clinicalAssessments.map((assessment) => _TimelineItem(
-          Icons.psychology_alt_outlined,
-          'تقييم علاجي نطقي',
-          assessment.weaknessesSummary.isEmpty
-              ? 'لا توجد نقاط ضعف في البنود المقيمة.'
-              : assessment.weaknessesSummary,
-          assessment.createdAt)),
-      ...app.exercises.map((exercise) => _TimelineItem(
+      ...clinicalAssessments.map((assessment) {
+        final progName = app.therapyPrograms
+            .firstWhere((p) => p.id == assessment.programId,
+                orElse: () => TherapyProgramTemplate(
+                    id: '', centerId: '', name: 'تقييم علاجي', sortOrder: 0))
+            .name;
+        return _TimelineItem(
+            Icons.psychology_alt_outlined,
+            progName,
+            assessment.weaknessesSummary.isEmpty
+                ? 'لا توجد نقاط ضعف في البنود المقيمة.'
+                : assessment.weaknessesSummary,
+            assessment.createdAt);
+      }),
+      ...exercises.map((exercise) => _TimelineItem(
           Icons.assignment_outlined,
           'واجب منزلي',
           '${exercise.title} - ${exercise.status}',
@@ -2926,6 +3378,105 @@ class _ParentNotesCard extends StatelessWidget {
           ],
         ),
       )).toList(),
+    );
+  }
+}
+
+class _TherapyTeamCard extends StatelessWidget {
+  const _TherapyTeamCard({required this.app, required this.student});
+
+  final AppProvider app;
+  final Student student;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final assignments = app.studentProgramAssignments
+        .where((a) => a.studentId == student.id && a.isActive)
+        .toList();
+
+    if (assignments.isEmpty) return const SizedBox.shrink();
+
+    return _CollapsibleCard(
+      icon: Icons.group_outlined,
+      title: 'الفريق العلاجي',
+      summary: '${assignments.length} إسناد',
+      count: assignments.length,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final a in assignments)
+            _TeamMemberTile(
+              programName: _programName(app, a.programId),
+              specialistName: _specialistName(app, a.specialistId),
+              role: a.role == 'primary' ? 'أخصائي أساسي' : 'مساعد',
+              colorScheme: colorScheme,
+              textTheme: textTheme,
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _programName(AppProvider app, String programId) {
+    final program = app.therapyPrograms
+        .where((p) => p.id == programId)
+        .toList();
+    return program.isNotEmpty ? program.first.name : programId;
+  }
+
+  String _specialistName(AppProvider app, String specialistId) {
+    final users = app.staff.where((u) => u.id == specialistId).toList();
+    return users.isNotEmpty ? users.first.name : specialistId;
+  }
+}
+
+class _TeamMemberTile extends StatelessWidget {
+  const _TeamMemberTile({
+    required this.programName,
+    required this.specialistName,
+    required this.role,
+    required this.colorScheme,
+    required this.textTheme,
+  });
+
+  final String programName;
+  final String specialistName;
+  final String role;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(Icons.person, size: 20, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  specialistName,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '$programName — $role',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

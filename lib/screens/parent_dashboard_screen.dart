@@ -17,7 +17,8 @@ class ParentDashboardScreen extends StatelessWidget {
     if (student == null) {
       return _ChildPicker(app: app);
     }
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SelectedChildHeader(app: app, student: student),
@@ -26,6 +27,7 @@ class ParentDashboardScreen extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         const StudentProfileScreen(),
       ],
+      ),
     );
   }
 }
@@ -44,7 +46,8 @@ class _ChildPicker extends StatelessWidget {
         message: 'راجع المركز للتأكد من ربط حساب ولي الأمر بملف الطفل.',
       );
     }
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const EmptyState(
@@ -59,6 +62,7 @@ class _ChildPicker extends StatelessWidget {
               .toList(),
         ),
       ],
+      ),
     );
   }
 }

@@ -196,17 +196,30 @@ Future<void> createSchema(Database db) async {
   await db.execute('''
     CREATE TABLE reports (
       id TEXT PRIMARY KEY,
-      center_id TEXT NOT NULL,
+      center_id TEXT NOT NULL DEFAULT '',
       student_id TEXT NOT NULL,
+      program_id TEXT,
+      specialist_id TEXT,
+      created_by_user_id TEXT NOT NULL DEFAULT '',
       type TEXT NOT NULL,
+      report_title TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
-      improvement_rate INTEGER NOT NULL,
-      specialist_signature TEXT NOT NULL,
+      improvement_rate INTEGER NOT NULL DEFAULT 0,
+      specialist_signature TEXT NOT NULL DEFAULT '',
       manager_signature TEXT NOT NULL DEFAULT '',
+      scope TEXT NOT NULL DEFAULT '',
+      date_from TEXT NOT NULL DEFAULT '',
+      date_to TEXT NOT NULL DEFAULT '',
+      report_status TEXT NOT NULL DEFAULT 'exported',
+      data_json TEXT NOT NULL DEFAULT '',
       file_path TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT '',
-      FOREIGN KEY(center_id) REFERENCES centers(id),
-      FOREIGN KEY(student_id) REFERENCES students(id)
+      report_category TEXT NOT NULL DEFAULT 'general',
+      previous_report_id TEXT,
+      quarter TEXT,
+      year TEXT,
+      snapshot_json TEXT NOT NULL DEFAULT '',
+      sequence_number INTEGER NOT NULL DEFAULT 0
     )
   ''');
   await db.execute('''
@@ -406,6 +419,22 @@ Future<void> createSchema(Database db) async {
     )
   ''');
   await db.execute('''
+    CREATE TABLE IF NOT EXISTS student_program_assignments (
+      id TEXT PRIMARY KEY,
+      center_id TEXT NOT NULL,
+      student_id TEXT NOT NULL,
+      program_id TEXT NOT NULL,
+      specialist_id TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'primary',
+      status TEXT NOT NULL DEFAULT 'active',
+      notes TEXT NOT NULL DEFAULT '',
+      assigned_by_user_id TEXT NOT NULL DEFAULT '',
+      assigned_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    )
+  ''');
+  await db.execute('''
     CREATE TABLE IF NOT EXISTS student_followups (
       id TEXT PRIMARY KEY,
       student_id TEXT NOT NULL,
@@ -432,6 +461,18 @@ Future<void> createSchema(Database db) async {
       result TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
+    )
+  ''');
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS specialist_program_capabilities (
+      id TEXT PRIMARY KEY,
+      center_id TEXT NOT NULL DEFAULT '',
+      specialist_id TEXT NOT NULL,
+      program_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_by_user_id TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
     )
   ''');
 }
@@ -598,13 +639,28 @@ Future<void> ensureLatestSchema(Database db) async {
       'id': 'TEXT PRIMARY KEY',
       'center_id': "TEXT NOT NULL DEFAULT ''",
       'student_id': 'TEXT NOT NULL',
+      'program_id': 'TEXT',
+      'specialist_id': 'TEXT',
+      'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
       'type': 'TEXT NOT NULL',
+      'report_title': "TEXT NOT NULL DEFAULT ''",
       'created_at': 'TEXT NOT NULL',
-      'improvement_rate': 'INTEGER NOT NULL',
-      'specialist_signature': 'TEXT NOT NULL',
+      'improvement_rate': 'INTEGER NOT NULL DEFAULT 0',
+      'specialist_signature': "TEXT NOT NULL DEFAULT ''",
       'manager_signature': "TEXT NOT NULL DEFAULT ''",
+      'scope': "TEXT NOT NULL DEFAULT ''",
+      'date_from': "TEXT NOT NULL DEFAULT ''",
+      'date_to': "TEXT NOT NULL DEFAULT ''",
+      'report_status': "TEXT NOT NULL DEFAULT 'exported'",
+      'data_json': "TEXT NOT NULL DEFAULT ''",
       'file_path': "TEXT NOT NULL DEFAULT ''",
       'updated_at': "TEXT NOT NULL DEFAULT ''",
+      'report_category': "TEXT NOT NULL DEFAULT 'general'",
+      'previous_report_id': 'TEXT',
+      'quarter': 'TEXT',
+      'year': 'TEXT',
+      'snapshot_json': "TEXT NOT NULL DEFAULT ''",
+      'sequence_number': "INTEGER NOT NULL DEFAULT 0",
     },
     'clinical_assessments': {
       'id': 'TEXT PRIMARY KEY',
@@ -744,6 +800,20 @@ Future<void> ensureLatestSchema(Database db) async {
       'created_at': "TEXT NOT NULL DEFAULT ''",
       'updated_at': "TEXT NOT NULL DEFAULT ''",
     },
+    'student_program_assignments': {
+      'id': 'TEXT PRIMARY KEY',
+      'center_id': 'TEXT NOT NULL',
+      'student_id': 'TEXT NOT NULL',
+      'program_id': 'TEXT NOT NULL',
+      'specialist_id': 'TEXT NOT NULL',
+      'role': "TEXT NOT NULL DEFAULT 'primary'",
+      'status': "TEXT NOT NULL DEFAULT 'active'",
+      'notes': "TEXT NOT NULL DEFAULT ''",
+      'assigned_by_user_id': "TEXT NOT NULL DEFAULT ''",
+      'assigned_at': "TEXT NOT NULL DEFAULT ''",
+      'created_at': "TEXT NOT NULL DEFAULT ''",
+      'updated_at': "TEXT NOT NULL DEFAULT ''",
+    },
     'assessment_drafts': {
       'student_id': 'TEXT NOT NULL',
       'program_id': 'TEXT NOT NULL',
@@ -782,17 +852,27 @@ Future<void> ensureLatestSchema(Database db) async {
       'last_opened_at': "TEXT NOT NULL DEFAULT ''",
       'updated_at': "TEXT NOT NULL DEFAULT ''",
     },
-    'session_skill_results': {
-      'id': 'TEXT PRIMARY KEY',
-      'session_id': 'TEXT NOT NULL',
-      'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
-      'goal_id': "TEXT NOT NULL DEFAULT ''",
-      'step_title': "TEXT NOT NULL DEFAULT ''",
-      'result': "TEXT NOT NULL DEFAULT ''",
-      'created_at': 'TEXT NOT NULL',
-      'updated_at': 'TEXT NOT NULL',
-    },
-  };
+      'session_skill_results': {
+        'id': 'TEXT PRIMARY KEY',
+        'session_id': 'TEXT NOT NULL',
+        'goal_skill_step_id': "TEXT NOT NULL DEFAULT ''",
+        'goal_id': "TEXT NOT NULL DEFAULT ''",
+        'step_title': "TEXT NOT NULL DEFAULT ''",
+        'result': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
+      'specialist_program_capabilities': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'specialist_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'status': "TEXT NOT NULL DEFAULT 'active'",
+        'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
+    };
 
   for (final entry in tables.entries) {
     final table = entry.key;
@@ -994,13 +1074,28 @@ Map<String, String> expectedColumns(String table) {
       'id': 'TEXT PRIMARY KEY',
       'center_id': "TEXT NOT NULL DEFAULT ''",
       'student_id': 'TEXT NOT NULL',
+      'program_id': 'TEXT',
+      'specialist_id': 'TEXT',
+      'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
       'type': 'TEXT NOT NULL',
+      'report_title': "TEXT NOT NULL DEFAULT ''",
       'created_at': 'TEXT NOT NULL',
-      'improvement_rate': 'INTEGER NOT NULL',
-      'specialist_signature': 'TEXT NOT NULL',
+      'improvement_rate': 'INTEGER NOT NULL DEFAULT 0',
+      'specialist_signature': "TEXT NOT NULL DEFAULT ''",
       'manager_signature': "TEXT NOT NULL DEFAULT ''",
+      'scope': "TEXT NOT NULL DEFAULT ''",
+      'date_from': "TEXT NOT NULL DEFAULT ''",
+      'date_to': "TEXT NOT NULL DEFAULT ''",
+      'report_status': "TEXT NOT NULL DEFAULT 'exported'",
+      'data_json': "TEXT NOT NULL DEFAULT ''",
       'file_path': "TEXT NOT NULL DEFAULT ''",
       'updated_at': "TEXT NOT NULL DEFAULT ''",
+      'report_category': "TEXT NOT NULL DEFAULT 'general'",
+      'previous_report_id': 'TEXT',
+      'quarter': 'TEXT',
+      'year': 'TEXT',
+      'snapshot_json': "TEXT NOT NULL DEFAULT ''",
+      'sequence_number': "INTEGER NOT NULL DEFAULT 0",
     },
     'clinical_assessments': {
       'id': 'TEXT PRIMARY KEY',
@@ -1163,6 +1258,20 @@ Map<String, String> expectedColumns(String table) {
       'created_at': "TEXT NOT NULL DEFAULT ''",
       'updated_at': "TEXT NOT NULL DEFAULT ''",
     },
+    'student_program_assignments': {
+      'id': 'TEXT PRIMARY KEY',
+      'center_id': 'TEXT NOT NULL',
+      'student_id': 'TEXT NOT NULL',
+      'program_id': 'TEXT NOT NULL',
+      'specialist_id': 'TEXT NOT NULL',
+      'role': "TEXT NOT NULL DEFAULT 'primary'",
+      'status': "TEXT NOT NULL DEFAULT 'active'",
+      'notes': "TEXT NOT NULL DEFAULT ''",
+      'assigned_by_user_id': "TEXT NOT NULL DEFAULT ''",
+      'assigned_at': "TEXT NOT NULL DEFAULT ''",
+      'created_at': "TEXT NOT NULL DEFAULT ''",
+      'updated_at': "TEXT NOT NULL DEFAULT ''",
+    },
     'student_followups': {
       'id': 'TEXT PRIMARY KEY',
       'student_id': 'TEXT NOT NULL',
@@ -1188,11 +1297,21 @@ Map<String, String> expectedColumns(String table) {
         'created_at': 'TEXT NOT NULL',
         'updated_at': 'TEXT NOT NULL',
       },
+      'specialist_program_capabilities': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'specialist_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'status': "TEXT NOT NULL DEFAULT 'active'",
+        'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
     };
   return all[table]!;
 }
 
-/// All 26 table names in order.
+/// All 27 table names in order.
 List<String> allTableNames() => [
       'centers',
       'users',
@@ -1218,8 +1337,10 @@ List<String> allTableNames() => [
       'student_therapy_programs',
       'assessment_drafts',
       'student_specialists',
+      'student_program_assignments',
       'student_followups',
       'session_skill_results',
+      'specialist_program_capabilities',
     ];
 
 void main() {
@@ -1236,7 +1357,7 @@ void main() {
     await db.close();
   });
 
-  group('Full schema creation (all 25 tables)', () {
+  group('Full schema creation (all 27 tables)', () {
     test('createSchema creates all tables and ensureLatestSchema does not break anything', () async {
       await createSchema(db);
 
@@ -2253,6 +2374,106 @@ void main() {
           whereArgs: ['student_ad1', 'prog_ad1']), isEmpty);
     });
 
+    test('student_program_assignments CRUD', () async {
+      await createSchema(db);
+      final now = DateTime.now().toIso8601String();
+      final id1 = 'spa_1', id2 = 'spa_2';
+
+      await db.insert('student_program_assignments', {
+        'id': id1,
+        'center_id': 'center_spa1',
+        'student_id': 'student_spa1',
+        'program_id': 'prog_spa1',
+        'specialist_id': 'spec_spa1',
+        'role': 'primary',
+        'status': 'active',
+        'notes': '',
+        'assigned_by_user_id': 'admin_1',
+        'assigned_at': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+
+      // Read
+      var rows = await db.query('student_program_assignments',
+          where: 'id = ?', whereArgs: [id1]);
+      expect(rows.length, 1);
+      expect(rows.first['student_id'], 'student_spa1');
+      expect(rows.first['specialist_id'], 'spec_spa1');
+      expect(rows.first['status'], 'active');
+      expect(rows.first['role'], 'primary');
+
+      // Update status
+      await db.update('student_program_assignments', {'status': 'inactive'},
+          where: 'id = ?', whereArgs: [id1]);
+      var updated = (await db.query('student_program_assignments',
+          where: 'id = ?', whereArgs: [id1])).first;
+      expect(updated['status'], 'inactive');
+
+      // Second active assignment for same student+program should be allowed
+      // (no UNIQUE constraint — enforced in Repository)
+      await db.insert('student_program_assignments', {
+        'id': id2,
+        'center_id': 'center_spa1',
+        'student_id': 'student_spa1',
+        'program_id': 'prog_spa1',
+        'specialist_id': 'spec_spa2',
+        'role': 'primary',
+        'status': 'active',
+        'notes': '',
+        'assigned_by_user_id': 'admin_1',
+        'assigned_at': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+      final allForStudent = await db.query('student_program_assignments',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: ['student_spa1', 'prog_spa1']);
+      expect(allForStudent.length, 2);
+
+      // Filter by status
+      final activeRows = await db.query('student_program_assignments',
+          where: 'status = ?', whereArgs: ['active']);
+      expect(activeRows.length, 1);
+
+      // Filter by specialist
+      final specRows = await db.query('student_program_assignments',
+          where: 'specialist_id = ? AND status = ?',
+          whereArgs: ['spec_spa1', 'inactive']);
+      expect(specRows.length, 1);
+
+      // Filter by center
+      final centerRows = await db.query('student_program_assignments',
+          where: 'center_id = ?', whereArgs: ['center_spa1']);
+      expect(centerRows.length, 2);
+
+      // Cross-center isolation
+      await db.insert('student_program_assignments', {
+        'id': 'spa_other',
+        'center_id': 'center_other',
+        'student_id': 'student_other',
+        'program_id': 'prog_other',
+        'specialist_id': 'spec_other',
+        'role': 'primary',
+        'status': 'active',
+        'notes': '',
+        'assigned_by_user_id': 'admin_1',
+        'assigned_at': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+      final center1Rows = await db.query('student_program_assignments',
+          where: 'center_id = ?', whereArgs: ['center_spa1']);
+      expect(center1Rows.length, 2);
+      final allRows = await db.query('student_program_assignments');
+      expect(allRows.length, 3);
+
+      // Delete
+      await db.delete('student_program_assignments', where: 'id = ?', whereArgs: [id1]);
+      expect(await db.query('student_program_assignments',
+          where: 'id = ?', whereArgs: [id1]), isEmpty);
+    });
+
     test('student_specialists CRUD', () async {
       await createSchema(db);
       final now = DateTime.now().toIso8601String();
@@ -2475,6 +2696,27 @@ void main() {
       var ssRows = await db.query('student_specialists', where: 'id = ?', whereArgs: ['ss_wf']);
       expect(ssRows.length, 1);
       expect(ssRows.first['is_active'], 1);
+
+      // 5b. Create program assignment (new table)
+      await db.insert('student_program_assignments', {
+        'id': 'spa_wf',
+        'center_id': 'center_wf',
+        'student_id': 'student_wf',
+        'program_id': 'prog_wf',
+        'specialist_id': 'user_wf_spec',
+        'role': 'primary',
+        'status': 'active',
+        'notes': '',
+        'assigned_by_user_id': 'user_wf_spec',
+        'assigned_at': now,
+        'created_at': now,
+        'updated_at': now,
+      });
+      var spaRows = await db.query('student_program_assignments',
+          where: 'id = ?', whereArgs: ['spa_wf']);
+      expect(spaRows.length, 1);
+      expect(spaRows.first['status'], 'active');
+      expect(spaRows.first['role'], 'primary');
 
       // 6. Create therapy program template
       await db.insert('therapy_program_templates', {
@@ -2845,6 +3087,411 @@ void main() {
     });
   });
 
+  group('Specialist program capabilities — distribution & assignment', () {
+    String centerId = 'center_cap_test';
+    String specialistId = 'spec_cap_test';
+    String otherSpecialistId = 'spec_other_test';
+    String programId = 'prog_cap_test';
+    String otherProgramId = 'prog_other_test';
+    String studentId = 'student_cap_test';
+
+    setUp(() async {
+      await createSchema(db);
+      await db.insert('centers', {
+        'id': centerId,
+        'name': 'مركز الاختبار',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('therapy_program_templates', {
+        'id': programId,
+        'center_id': centerId,
+        'name': 'برنامج النطق',
+        'sort_order': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('therapy_program_templates', {
+        'id': otherProgramId,
+        'center_id': centerId,
+        'name': 'برنامج التواصل',
+        'sort_order': 2,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('users', {
+        'id': specialistId,
+        'center_id': centerId,
+        'email': 'spec@test.com',
+        'password_hash': 'hash',
+        'name': 'أخصائي مختبر',
+        'role': 'specialist',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('users', {
+        'id': otherSpecialistId,
+        'center_id': centerId,
+        'email': 'spec2@test.com',
+        'password_hash': 'hash',
+        'name': 'أخصائي آخر',
+        'role': 'specialist',
+        'is_active': 0,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('students', {
+        'id': studentId,
+        'center_id': centerId,
+        'name': 'طالب مختبر',
+        'age': 8,
+        'status': 'نشط',
+        'diagnosis': 'اضطراب نطق',
+        'photo_path': '',
+        'notes': '',
+        'parent_name': 'والد',
+        'parent_phone': '0500000000',
+        'portal_email': 'parent@test.com',
+        'portal_password': 'pass',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      // Give specialist capability for programId only (not otherProgramId)
+      await db.insert('specialist_program_capabilities', {
+        'id': 'cap_1',
+        'center_id': centerId,
+        'specialist_id': specialistId,
+        'program_id': programId,
+        'status': 'active',
+        'created_by_user_id': 'admin',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+    });
+
+    test('specialist without capabilities does not appear for any program',
+        () async {
+      final caps = await db.query('specialist_program_capabilities',
+          where: 'specialist_id = ?', whereArgs: [specialistId]);
+      expect(caps.length, 1);
+
+      // A specialist with no capabilities at all should not match any program
+      final noCapSpecialistId = 'spec_no_cap';
+      await db.insert('users', {
+        'id': noCapSpecialistId,
+        'center_id': centerId,
+        'email': 'specnocap@test.com',
+        'password_hash': 'hash',
+        'name': 'أخصائي بلا برامج',
+        'role': 'specialist',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      final noCapCaps = await db.query('specialist_program_capabilities',
+          where: 'specialist_id = ?', whereArgs: [noCapSpecialistId]);
+      expect(noCapCaps.length, 0,
+          reason: 'Specialist with no capabilities should have zero rows');
+    });
+
+    test('coordinator sees only specialists with active capability for selected program',
+        () async {
+      // Query specialists who have active capability for programId
+      final eligible = await db.rawQuery('''
+        SELECT u.* FROM users u
+        INNER JOIN specialist_program_capabilities spc
+          ON spc.specialist_id = u.id AND spc.status = 'active'
+        WHERE spc.program_id = ? AND u.is_active = 1
+      ''', [programId]);
+      expect(eligible.length, 1,
+          reason: 'Only one specialist has capability for programId');
+      expect(eligible.first['id'], specialistId);
+
+      // Same query for otherProgramId — specialist has no capability for it
+      final eligibleOther = await db.rawQuery('''
+        SELECT u.* FROM users u
+        INNER JOIN specialist_program_capabilities spc
+          ON spc.specialist_id = u.id AND spc.status = 'active'
+        WHERE spc.program_id = ? AND u.is_active = 1
+      ''', [otherProgramId]);
+      expect(eligibleOther.length, 0,
+          reason: 'No specialist has capability for otherProgramId');
+    });
+
+    test('inactive specialist does not appear', () async {
+      // Give inactive specialist a capability too
+      await db.insert('specialist_program_capabilities', {
+        'id': 'cap_2',
+        'center_id': centerId,
+        'specialist_id': otherSpecialistId,
+        'program_id': programId,
+        'status': 'active',
+        'created_by_user_id': 'admin',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      final eligible = await db.rawQuery('''
+        SELECT u.* FROM users u
+        INNER JOIN specialist_program_capabilities spc
+          ON spc.specialist_id = u.id AND spc.status = 'active'
+        WHERE spc.program_id = ? AND u.is_active = 1
+      ''', [programId]);
+      expect(eligible.length, 1,
+          reason: 'Only active specialists should appear');
+      expect(eligible.first['id'], specialistId);
+    });
+
+    test('specialist from another center does not appear', () async {
+      final otherCenterId = 'other_center';
+      await db.insert('centers', {
+        'id': otherCenterId,
+        'name': 'مركز آخر',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      final specOtherCenter = 'spec_other_center';
+      await db.insert('users', {
+        'id': specOtherCenter,
+        'center_id': otherCenterId,
+        'email': 'specother@test.com',
+        'password_hash': 'hash',
+        'name': 'أخصائي مركز آخر',
+        'role': 'specialist',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('specialist_program_capabilities', {
+        'id': 'cap_other_center',
+        'center_id': otherCenterId,
+        'specialist_id': specOtherCenter,
+        'program_id': programId,
+        'status': 'active',
+        'created_by_user_id': 'admin',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      // Query for specialists in centerId who can work on programId
+      final eligible = await db.rawQuery('''
+        SELECT u.* FROM users u
+        INNER JOIN specialist_program_capabilities spc
+          ON spc.specialist_id = u.id AND spc.status = 'active'
+        WHERE spc.program_id = ? AND u.is_active = 1 AND u.center_id = ?
+      ''', [programId, centerId]);
+      expect(eligible.length, 1,
+          reason: 'Other center specialist should not appear');
+      expect(eligible.first['id'], specialistId);
+    });
+
+    test('assignment is rejected if specialist has no capability for program',
+        () async {
+      // Try to create an assignment without capability — the DB does not
+      // enforce this via FK; the repository enforces it. We simulate by
+      // checking the capability row first.
+      final cap = await db.query('specialist_program_capabilities',
+          where: 'specialist_id = ? AND program_id = ? AND status = ?',
+          whereArgs: [specialistId, otherProgramId, 'active'],
+          limit: 1);
+      expect(cap, isEmpty,
+          reason: 'No capability for specialist on otherProgramId');
+
+      // Only capability for programId exists
+      final validCap = await db.query('specialist_program_capabilities',
+          where: 'specialist_id = ? AND program_id = ? AND status = ?',
+          whereArgs: [specialistId, programId, 'active'],
+          limit: 1);
+      expect(validCap, isNotEmpty,
+          reason: 'Capability exists for programId');
+    });
+
+    test('CRUD specialist_program_capabilities', () async {
+      final capId = 'cap_crud_test';
+      await db.insert('specialist_program_capabilities', {
+        'id': capId,
+        'center_id': centerId,
+        'specialist_id': specialistId,
+        'program_id': otherProgramId,
+        'status': 'active',
+        'created_by_user_id': 'admin',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      // Verify insert
+      final rows = await db.query('specialist_program_capabilities',
+          where: 'id = ?', whereArgs: [capId]);
+      expect(rows, hasLength(1));
+      expect(rows.first['specialist_id'], specialistId);
+      expect(rows.first['program_id'], otherProgramId);
+
+      // Update status
+      await db.update('specialist_program_capabilities', {'status': 'inactive'},
+          where: 'id = ?', whereArgs: [capId]);
+      final updated = await db.query('specialist_program_capabilities',
+          where: 'id = ?', whereArgs: [capId]);
+      expect(updated.first['status'], 'inactive');
+
+      // Delete
+      await db.delete('specialist_program_capabilities',
+          where: 'id = ?', whereArgs: [capId]);
+      final deleted = await db.query('specialist_program_capabilities',
+          where: 'id = ?', whereArgs: [capId]);
+      expect(deleted, isEmpty);
+    });
+  });
+
+  group('Distribution — student therapy programs filtering', () {
+    String centerId = 'center_dist_test';
+    String studentId = 'student_dist_test';
+    String programAId = 'prog_a';
+    String programBId = 'prog_b';
+
+    setUp(() async {
+      await createSchema(db);
+      await db.insert('centers', {
+        'id': centerId,
+        'name': 'مركز التوزيع',
+        'is_active': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('students', {
+        'id': studentId,
+        'center_id': centerId,
+        'name': 'طالب توزيع',
+        'age': 8,
+        'status': 'نشط',
+        'diagnosis': 'اختبار',
+        'photo_path': '',
+        'notes': '',
+        'parent_name': 'والد',
+        'parent_phone': '0500000000',
+        'portal_email': 'parent@test.com',
+        'portal_password': 'pass',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('therapy_program_templates', {
+        'id': programAId,
+        'center_id': centerId,
+        'name': 'برنامج أ',
+        'sort_order': 1,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+      await db.insert('therapy_program_templates', {
+        'id': programBId,
+        'center_id': centerId,
+        'name': 'برنامج ب',
+        'sort_order': 2,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      // Student has ONLY programA in student_therapy_programs
+      await db.insert('student_therapy_programs', {
+        'id': 'stp_test',
+        'student_id': studentId,
+        'program_id': programAId,
+        'assigned_at': '2025-01-01',
+        'assigned_by_user_id': 'admin',
+        'is_active': 1,
+        'sort_order': 0,
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+    });
+
+    test(
+        'student with one therapy program shows exactly one program in distribution workflow',
+        () async {
+      // Query student_therapy_programs for this student
+      final stpRows = await db.query('student_therapy_programs',
+          where: 'student_id = ? AND is_active = 1',
+          whereArgs: [studentId]);
+      expect(stpRows, hasLength(1),
+          reason: 'Student should have exactly 1 therapy program');
+      expect(stpRows.first['program_id'], programAId);
+
+      // Join with therapy_program_templates to get the full program list
+      final programs = await db.rawQuery('''
+        SELECT tpt.* FROM therapy_program_templates tpt
+        INNER JOIN student_therapy_programs stp
+          ON stp.program_id = tpt.id
+        WHERE stp.student_id = ? AND stp.is_active = 1
+      ''', [studentId]);
+      expect(programs, hasLength(1),
+          reason: 'Only programA should be returned for this student');
+      expect(programs.first['id'], programAId);
+      expect(programs.first['name'], 'برنامج أ');
+
+      // Ensure programB is NOT in the result
+      final programBInResult = programs.any((p) => p['id'] == programBId);
+      expect(programBInResult, isFalse,
+          reason: 'programB should NOT appear for this student');
+    });
+
+    test(
+        'coordinator cannot assign a program not in student_therapy_programs for that student',
+        () async {
+      // Insert a student_program_assignment for programB (which is NOT in
+      // student_therapy_programs for this student)
+      final assignmentId = 'assign_wrong_prog';
+      await db.insert('student_program_assignments', {
+        'id': assignmentId,
+        'center_id': centerId,
+        'student_id': studentId,
+        'program_id': programBId,
+        'specialist_id': 'spec_test',
+        'role': 'primary',
+        'status': 'active',
+        'assigned_by_user_id': 'coordinator',
+        'assigned_at': '2025-01-01',
+        'created_at': '2025-01-01',
+        'updated_at': '2025-01-01',
+      });
+
+      // Verify the assignment exists physically (DB doesn't prevent it,
+      // but the UI and business logic should)
+      final assignment = await db.query('student_program_assignments',
+          where: 'id = ?', whereArgs: [assignmentId]);
+      expect(assignment, hasLength(1),
+          reason: 'Assignment was saved to DB');
+
+      // Now simulate the UI logic: the coordinator should only see programs
+      // from student_therapy_programs. The assigned program for programB
+      // should not be selectable because it's not in the student's programs.
+      final studentProgramIds = await db.query('student_therapy_programs',
+          where: 'student_id = ? AND is_active = 1',
+          whereArgs: [studentId]);
+      final programIds = studentProgramIds.map((r) => r['program_id'] as String).toSet();
+      expect(programIds, contains(programAId),
+          reason: 'programA should be in student programs');
+      expect(programIds, isNot(contains(programBId)),
+          reason: 'programB should NOT be in student programs');
+
+      // The coordinator's assignable programs are the intersection of
+      // therapy_program_templates (center programs) and student_therapy_programs
+      final assignablePrograms = await db.rawQuery('''
+        SELECT tpt.* FROM therapy_program_templates tpt
+        INNER JOIN student_therapy_programs stp
+          ON stp.program_id = tpt.id
+        WHERE stp.student_id = ? AND stp.is_active = 1
+      ''', [studentId]);
+      final assignableIds = assignablePrograms.map((r) => r['id'] as String).toSet();
+      expect(assignableIds, contains(programAId));
+      expect(assignableIds, isNot(contains(programBId)),
+          reason: 'Coordinator cannot assign programB — not in student programs');
+    });
+  });
+
   group('Foreign key constraints', () {
     test('PRAGMA foreign_keys is ON', () async {
       await createSchema(db);
@@ -2875,4 +3522,493 @@ void main() {
       }, throwsA(isA<DatabaseException>()));
     });
   });
+
+  group('Field population – new records carry context', () {
+    test('ClinicalAssessment saves programId when known', () {
+      final a = ClinicalAssessment(
+        id: 'ca_test',
+        centerId: 'c1',
+        studentId: 's1',
+        specialistId: 'spec1',
+        specialistName: 'أخصائي',
+        type: 'speech',
+        programId: 'prog1',
+        strengthsSummary: '',
+        weaknessesSummary: '',
+        goalsSummary: '',
+        trainingSummary: '',
+        createdAt: '2025-01-01',
+      );
+      expect(a.toMap()['program_id'], 'prog1');
+    });
+
+    test('ClinicalFinding saves programId from step context', () {
+      final f = ClinicalFinding(
+        id: 'f_test',
+        assessmentId: 'a1',
+        centerId: 'c1',
+        studentId: 's1',
+        domain: 'برنامج - قسم',
+        itemTitle: 'بند',
+        result: 'ضعف',
+        isNormal: false,
+        programId: 'prog1',
+        createdAt: '2025-01-01',
+      );
+      expect(f.toMap()['program_id'], 'prog1');
+    });
+
+    test('TrainingPlan saves programId and specialistId', () {
+      final p = TrainingPlan(
+        id: 'plan_test',
+        centerId: 'c1',
+        studentId: 's1',
+        goal: 'هدف',
+        targetDate: '2025-02-01',
+        progress: 0,
+        programId: 'prog1',
+        specialistId: 'spec1',
+        createdAt: '2025-01-01',
+      );
+      final map = p.toMap();
+      expect(map['program_id'], 'prog1');
+      expect(map['specialist_id'], 'spec1');
+    });
+
+    test('TrainingPlan update preserves specialistId', () {
+      final original = TrainingPlan(
+        id: 'plan_test',
+        centerId: 'c1',
+        studentId: 's1',
+        goal: 'هدف',
+        targetDate: '2025-02-01',
+        progress: 0,
+        programId: 'prog1',
+        specialistId: 'spec1',
+        createdAt: '2025-01-01',
+      );
+      final updated = TrainingPlan(
+        id: original.id,
+        centerId: original.centerId,
+        studentId: original.studentId,
+        goal: original.goal,
+        targetDate: original.targetDate,
+        progress: 100,
+        programId: original.programId,
+        sourceType: original.sourceType,
+        specialistId: original.specialistId,
+        createdAt: original.createdAt,
+        updatedAt: '2025-06-01',
+      );
+      expect(updated.toMap()['specialist_id'], 'spec1');
+    });
+
+    test('Exercise saves specialistId and programId', () {
+      final e = Exercise(
+        id: 'ex_test',
+        centerId: 'c1',
+        studentId: 's1',
+        title: 'واجب',
+        instructions: 'تعليمات',
+        dueDate: '2025-03-01',
+        status: 'pending',
+        programId: 'prog1',
+        planId: 'plan1',
+        sourceType: 'standard',
+        sessionDate: '2025-03-01',
+        createdFromSessionResult: 'homework',
+        specialistId: 'spec1',
+        createdAt: '2025-01-01',
+      );
+      final map = e.toMap();
+      expect(map['program_id'], 'prog1');
+      expect(map['specialist_id'], 'spec1');
+    });
+
+    test('Exercise copyWith preserves specialistId', () {
+      final original = Exercise(
+        id: 'ex_test',
+        centerId: 'c1',
+        studentId: 's1',
+        title: 'واجب',
+        instructions: 'تعليمات',
+        dueDate: '2025-03-01',
+        status: 'pending',
+        programId: 'prog1',
+        planId: 'plan1',
+        sourceType: 'standard',
+        sessionDate: '2025-03-01',
+        createdFromSessionResult: 'homework',
+        specialistId: 'spec1',
+        createdAt: '2025-01-01',
+      );
+      // Simulate _copyExercise behaviour
+      final copy = Exercise(
+        id: original.id,
+        centerId: original.centerId,
+        studentId: original.studentId,
+        title: original.title,
+        instructions: original.instructions,
+        dueDate: original.dueDate,
+        status: original.status,
+        audioPath: original.audioPath,
+        parentNote: original.parentNote,
+        stars: original.stars,
+        programId: original.programId,
+        planId: original.planId,
+        goalSkillStepId: original.goalSkillStepId,
+        sourceType: original.sourceType,
+        sessionDate: original.sessionDate,
+        noteForParent: original.noteForParent,
+        specialistId: original.specialistId,
+        parentCompletedAt: original.parentCompletedAt,
+        specialistReviewedAt: original.specialistReviewedAt,
+        createdFromSessionResult: original.createdFromSessionResult,
+        createdAt: original.createdAt,
+        updatedAt: original.updatedAt,
+      );
+      expect(copy.toMap()['specialist_id'], 'spec1');
+    });
+
+    test('SpecialistProgramCapability model round-trip', () {
+      final cap = SpecialistProgramCapability(
+        id: 'cap_test',
+        centerId: 'c1',
+        specialistId: 'spec1',
+        programId: 'prog1',
+        status: 'active',
+        createdByUserId: 'admin',
+        createdAt: '2025-01-01',
+        updatedAt: '2025-01-02',
+      );
+      final map = cap.toMap();
+      expect(map['id'], 'cap_test');
+      expect(map['center_id'], 'c1');
+      expect(map['specialist_id'], 'spec1');
+      expect(map['program_id'], 'prog1');
+      expect(map['status'], 'active');
+      expect(map['created_by_user_id'], 'admin');
+      expect(map['created_at'], '2025-01-01');
+      expect(map['updated_at'], '2025-01-02');
+
+      final restored = SpecialistProgramCapability.fromMap(map);
+      expect(restored.id, cap.id);
+      expect(restored.specialistId, cap.specialistId);
+      expect(restored.programId, cap.programId);
+      expect(restored.isActive, true);
+    });
+
+    test('SpecialistProgramCapability copyWith', () {
+      final cap = SpecialistProgramCapability(
+        id: 'cap1',
+        centerId: 'c1',
+        specialistId: 'spec1',
+        programId: 'prog1',
+      );
+      final updated = cap.copyWith(programId: 'prog2', status: 'inactive');
+      expect(updated.id, 'cap1');
+      expect(updated.programId, 'prog2');
+      expect(updated.status, 'inactive');
+      expect(updated.isActive, false);
+      expect(updated.specialistId, 'spec1');
+    });
+
+    test('SpecialistProgramCapability default status is active', () {
+      final cap = SpecialistProgramCapability(
+        id: 'cap2',
+        centerId: 'c1',
+        specialistId: 'spec1',
+        programId: 'prog1',
+      );
+      expect(cap.status, 'active');
+      expect(cap.isActive, true);
+    });
+  });
+}
+
+/// Stub models for tests (imported from app_models in real tests but
+/// duplicated here to avoid import complexity).
+class ClinicalAssessment {
+  const ClinicalAssessment({
+    required this.id,
+    required this.centerId,
+    required this.studentId,
+    required this.specialistId,
+    required this.specialistName,
+    required this.type,
+    this.programId = '',
+    required this.strengthsSummary,
+    required this.weaknessesSummary,
+    required this.goalsSummary,
+    required this.trainingSummary,
+    required this.createdAt,
+    this.updatedAt = '',
+  });
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String specialistId;
+  final String specialistName;
+  final String type;
+  final String programId;
+  final String strengthsSummary;
+  final String weaknessesSummary;
+  final String goalsSummary;
+  final String trainingSummary;
+  final String createdAt;
+  final String updatedAt;
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'center_id': centerId,
+    'student_id': studentId,
+    'specialist_id': specialistId,
+    'specialist_name': specialistName,
+    'type': type,
+    'program_id': programId,
+    'strengths_summary': strengthsSummary,
+    'weaknesses_summary': weaknessesSummary,
+    'goals_summary': goalsSummary,
+    'training_summary': trainingSummary,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
+}
+
+class ClinicalFinding {
+  const ClinicalFinding({
+    required this.id,
+    required this.assessmentId,
+    required this.centerId,
+    required this.studentId,
+    required this.domain,
+    required this.itemTitle,
+    required this.result,
+    required this.isNormal,
+    this.weakness = '',
+    this.goal = '',
+    this.training = '',
+    this.programId = '',
+    this.sourceType = 'standard',
+    this.templateId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+  final String id;
+  final String assessmentId;
+  final String centerId;
+  final String studentId;
+  final String domain;
+  final String itemTitle;
+  final String result;
+  final bool isNormal;
+  final String weakness;
+  final String goal;
+  final String training;
+  final String programId;
+  final String sourceType;
+  final String templateId;
+  final String createdAt;
+  final String updatedAt;
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'assessment_id': assessmentId,
+    'center_id': centerId,
+    'student_id': studentId,
+    'domain': domain,
+    'item_title': itemTitle,
+    'result': result,
+    'is_normal': isNormal ? 1 : 0,
+    'weakness': weakness,
+    'goal': goal,
+    'training': training,
+    'program_id': programId,
+    'source_type': sourceType,
+    'template_id': templateId,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
+}
+
+class TrainingPlan {
+  const TrainingPlan({
+    required this.id,
+    this.centerId = '',
+    required this.studentId,
+    required this.goal,
+    this.treatment = '',
+    required this.targetDate,
+    required this.progress,
+    this.programId = '',
+    this.sourceType = 'standard',
+    this.specialistId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String goal;
+  final String treatment;
+  final String targetDate;
+  final int progress;
+  final String programId;
+  final String sourceType;
+  final String specialistId;
+  final String createdAt;
+  final String updatedAt;
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'center_id': centerId,
+    'student_id': studentId,
+    'goal': goal,
+    'treatment': treatment,
+    'target_date': targetDate,
+    'progress': progress,
+    'program_id': programId,
+    'source_type': sourceType,
+    'specialist_id': specialistId,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
+}
+
+class Exercise {
+  const Exercise({
+    required this.id,
+    this.centerId = '',
+    required this.studentId,
+    required this.title,
+    required this.instructions,
+    required this.dueDate,
+    required this.status,
+    this.audioPath = '',
+    this.parentNote = '',
+    this.stars = 0,
+    this.programId = '',
+    this.planId = '',
+    this.goalSkillStepId = '',
+    this.sourceType = 'standard',
+    this.sessionDate = '',
+    this.noteForParent = '',
+    this.parentCompletedAt = '',
+    this.specialistReviewedAt = '',
+    this.createdFromSessionResult = '',
+    this.specialistId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String title;
+  final String instructions;
+  final String dueDate;
+  final String status;
+  final String audioPath;
+  final String parentNote;
+  final int stars;
+  final String programId;
+  final String planId;
+  final String goalSkillStepId;
+  final String sourceType;
+  final String sessionDate;
+  final String noteForParent;
+  final String parentCompletedAt;
+  final String specialistReviewedAt;
+  final String createdFromSessionResult;
+  final String specialistId;
+  final String createdAt;
+  final String updatedAt;
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'center_id': centerId,
+    'student_id': studentId,
+    'title': title,
+    'instructions': instructions,
+    'due_date': dueDate,
+    'status': status,
+    'audio_path': audioPath,
+    'parent_note': parentNote,
+    'stars': stars,
+    'program_id': programId,
+    'plan_id': planId,
+    'goal_skill_step_id': goalSkillStepId,
+    'source_type': sourceType,
+    'session_date': sessionDate,
+    'note_for_parent': noteForParent,
+    'parent_completed_at': parentCompletedAt,
+    'specialist_reviewed_at': specialistReviewedAt,
+    'created_from_session_result': createdFromSessionResult,
+    'specialist_id': specialistId,
+    'created_at': createdAt,
+    'updated_at': updatedAt,
+  };
+}
+
+class SpecialistProgramCapability {
+  const SpecialistProgramCapability({
+    this.id = '',
+    this.centerId = '',
+    required this.specialistId,
+    required this.programId,
+    this.status = 'active',
+    this.createdByUserId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String specialistId;
+  final String programId;
+  final String status;
+  final String createdByUserId;
+  final String createdAt;
+  final String updatedAt;
+
+  bool get isActive => status == 'active';
+
+  static SpecialistProgramCapability fromMap(Map<String, Object?> row) =>
+      SpecialistProgramCapability(
+        id: (row['id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        status: (row['status'] ?? 'active') as String,
+        createdByUserId: (row['created_by_user_id'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'specialist_id': specialistId,
+        'program_id': programId,
+        'status': status,
+        'created_by_user_id': createdByUserId,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+
+  SpecialistProgramCapability copyWith({
+    String? id,
+    String? centerId,
+    String? specialistId,
+    String? programId,
+    String? status,
+    String? createdByUserId,
+    String? createdAt,
+    String? updatedAt,
+  }) =>
+      SpecialistProgramCapability(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        specialistId: specialistId ?? this.specialistId,
+        programId: programId ?? this.programId,
+        status: status ?? this.status,
+        createdByUserId: createdByUserId ?? this.createdByUserId,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }

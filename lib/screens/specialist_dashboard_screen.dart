@@ -33,76 +33,78 @@ class _SpecialistDashboardScreenState extends State<SpecialistDashboardScreen> {
     final masteredGoals = _masteredGoals(app);
     final alerts = _alerts(app, todaySessions);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _DashboardHero(
-          app: app,
-          improvement: improvement,
-          todaySessions: todaySessions.length,
-          alerts: alerts.length,
-          studentCount: app.students.length,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        ResponsiveGrid(children: [
-          _SpecialistStatCard(
-            label: 'الطلاب',
-            value: '${app.students.length}',
-            icon: Icons.groups_2_outlined,
-            progress: (app.students.length / 20).clamp(0, 1),
-            trend: 'ملفات متاحة',
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DashboardHero(
+            app: app,
+            improvement: improvement,
+            todaySessions: todaySessions.length,
+            alerts: alerts.length,
+            studentCount: app.students.length,
           ),
-          _SpecialistStatCard(
-            label: 'جلسات اليوم',
-            value: '${todaySessions.length}',
-            icon: Icons.timer_outlined,
-            progress: (todaySessions.length / 8).clamp(0, 1),
-            trend: 'جدول اليوم',
-          ),
-          _SpecialistStatCard(
-            label: 'الأهداف النشطة',
-            value: '$activeGoals',
-            icon: Icons.track_changes_outlined,
-            progress: _safeDiv(activeGoals, activeGoals + masteredGoals),
-            trend: 'قيد التدريب',
-          ),
-          _SpecialistStatCard(
-            label: 'الأهداف المتقنة',
-            value: '$masteredGoals',
-            icon: Icons.emoji_events_outlined,
-            progress: masteredGoals == 0
-                ? 0
-                : _safeDiv(masteredGoals, activeGoals + masteredGoals),
-            trend: 'مكتملة',
-          ),
-        ]),
-        const SizedBox(height: AppSpacing.md),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 980;
-            final timeline = _RecentActivity(app: app);
-            final attention = _AttentionCard(alerts: alerts);
-            if (!wide) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          const SizedBox(height: AppSpacing.md),
+          ResponsiveGrid(children: [
+            _SpecialistStatCard(
+              label: 'الطلاب',
+              value: '${app.students.length}',
+              icon: Icons.groups_2_outlined,
+              progress: (app.students.length / 20).clamp(0, 1),
+              trend: 'ملفات متاحة',
+            ),
+            _SpecialistStatCard(
+              label: 'جلسات اليوم',
+              value: '${todaySessions.length}',
+              icon: Icons.timer_outlined,
+              progress: (todaySessions.length / 8).clamp(0, 1),
+              trend: 'جدول اليوم',
+            ),
+            _SpecialistStatCard(
+              label: 'الأهداف النشطة',
+              value: '$activeGoals',
+              icon: Icons.track_changes_outlined,
+              progress: _safeDiv(activeGoals, activeGoals + masteredGoals),
+              trend: 'قيد التدريب',
+            ),
+            _SpecialistStatCard(
+              label: 'الأهداف المتقنة',
+              value: '$masteredGoals',
+              icon: Icons.emoji_events_outlined,
+              progress: masteredGoals == 0
+                  ? 0
+                  : _safeDiv(masteredGoals, activeGoals + masteredGoals),
+              trend: 'مكتملة',
+            ),
+          ]),
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 980;
+              final timeline = _RecentActivity(app: app);
+              final attention = _AttentionCard(alerts: alerts);
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    timeline,
+                    const SizedBox(height: AppSpacing.md),
+                    attention,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  timeline,
-                  const SizedBox(height: AppSpacing.md),
-                  attention,
+                  Expanded(flex: 3, child: timeline),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(flex: 2, child: attention),
                 ],
               );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: timeline),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(flex: 2, child: attention),
-              ],
-            );
-          },
-        ),
-      ],
+            },
+          ),
+        ],
+      ),
     );
   }
 

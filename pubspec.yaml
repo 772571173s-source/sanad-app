@@ -17,6 +17,8 @@ dependencies:
   printing: ^5.13.4
   provider: ^6.1.2
   crypto: ^3.0.6
+  share_plus: ^10.1.4
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
@@ -25,3 +27,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/fonts/NotoNaskhArabic-Regular.ttf

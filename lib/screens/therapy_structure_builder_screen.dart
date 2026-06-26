@@ -58,12 +58,15 @@ class _TherapyStructureBuilderScreenState
               children: [
                 SizedBox(
                   width: 320,
-                  child: _ProgramListPanel(
-                    app: app,
-                    selectedProgramId: selectedProgramId,
-                    onSelect: (id) => setState(() {
-                      selectedProgramId = id;
-                    }),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _ProgramListPanel(
+                      app: app,
+                      selectedProgramId: selectedProgramId,
+                      onSelect: (id) => setState(() {
+                        selectedProgramId = id;
+                      }),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 24),

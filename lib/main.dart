@@ -1,3 +1,5 @@
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -66,6 +68,52 @@ TextTheme _sanadTextTheme(TextTheme base, Color text, Color muted) {
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Log all Flutter errors to console
+  FlutterError.onError = (details) {
+    debugPrint('[Sanad Fatal Error] ${details.exception}');
+    debugPrint('[Sanad Fatal Error] Stack: ${details.stack}');
+  };
+
+  // Catch platform-level errors
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[Sanad Platform Error] $error\n$stack');
+    return true;
+  };
+
+  // Replace default ErrorWidget (red screen) with a useful message
+  ErrorWidget.builder = (details) {
+    debugPrint('[Sanad ErrorWidget] ${details.exception}');
+    return Container(
+      color: const Color(0xFFFEF2F2),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'حدث خطأ في عرض هذه الشاشة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '${details.exception}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp(const SanadApp());
 }
 

@@ -19,6 +19,7 @@ class _StudentDistributionScreenState
   String query = '';
   String? selectedStudentId;
   String? selectedStudentName;
+  String? selectedProgramId;
   bool _loading = true;
 
   @override
@@ -29,13 +30,28 @@ class _StudentDistributionScreenState
     });
   }
 
-  List<Student> _unassigned(AppProvider app) {
-    final assignedIds = app.studentSpecialists
-        .where((s) => s.isActive)
-        .map((s) => s.studentId)
+  bool _studentReadyForDistribution(AppProvider app, String studentId) {
+    // Student is ready if they have active therapy programs
+    return app.studentTherapyPrograms
+        .any((p) => p.studentId == studentId && p.isActive);
+  }
+
+  bool _studentFullyAssigned(AppProvider app, String studentId) {
+    final studentPrograms = app.studentTherapyPrograms
+        .where((p) => p.studentId == studentId && p.isActive)
+        .map((p) => p.programId)
         .toSet();
+    if (studentPrograms.isEmpty) return false;
+    final assignedPrograms = app.studentProgramAssignments
+        .where((a) => a.studentId == studentId && a.isActive && a.role == 'primary')
+        .map((a) => a.programId)
+        .toSet();
+    return assignedPrograms.containsAll(studentPrograms);
+  }
+
+  List<Student> _unassigned(AppProvider app) {
     return app.students
-        .where((s) => !assignedIds.contains(s.id))
+        .where((s) => !_studentFullyAssigned(app, s.id))
         .where((s) => s.name.contains(query) || s.diagnosis.contains(query))
         .toList();
   }
@@ -44,58 +60,60 @@ class _StudentDistributionScreenState
     return app.staff.where((u) => u.role == UserRole.specialist).toList();
   }
 
+  int _assignedProgramCount(AppProvider app, String studentId) {
+    return app.studentProgramAssignments
+        .where((a) => a.studentId == studentId && a.isActive && a.role == 'primary')
+        .length;
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
     final unassigned = _unassigned(app);
     final specialists = _specialists(app);
-    final isPhase2 = selectedStudentId != null;
+    final phase = selectedProgramId != null
+        ? 3
+        : selectedStudentId != null
+            ? 2
+            : 1;
 
-    debugPrint(
-      '[StudentDistribution] students=${app.students.length}, '
-      'specialists=${specialists.length}, '
-      'studentSpecialists=${app.studentSpecialists.length}, '
-      'unassigned=${unassigned.length}, '
-      'phase2=$isPhase2',
-    );
-
-    if (_loading && app.students.isEmpty && app.studentSpecialists.isEmpty) {
+    if (_loading && app.students.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
     final viewportH = MediaQuery.of(context).size.height;
     final contentHeight = (viewportH - 260).clamp(200.0, viewportH);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(context, app, unassigned.length, isPhase2),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: contentHeight,
-          child: isPhase2
-              ? _buildPhase2Content(context, app, specialists)
-              : _buildPhase1Content(context, app, unassigned),
-        ),
-      ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(context, app, unassigned.length, phase),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: contentHeight,
+            child: phase == 3
+                ? _buildPhase3Content(context, app, specialists)
+                : phase == 2
+                    ? _buildPhase2Content(context, app)
+                    : _buildPhase1Content(context, app, unassigned),
+          ),
+          const SizedBox(height: 80),
+        ],
+      ),
     );
   }
 
   // ─── Headers ────────────────────────────────────────────
 
-  Widget _buildHeader(
-    BuildContext context,
-    AppProvider app,
-    int count,
-    bool isPhase2,
-  ) {
-    if (isPhase2) {
+  Widget _buildHeader(BuildContext context, AppProvider app, int count, int phase) {
+    if (phase == 3) {
       return Row(
         children: [
           TextButton.icon(
             onPressed: () => setState(() {
-              selectedStudentId = null;
-              selectedStudentName = null;
+              selectedProgramId = null;
             }),
             icon: const Icon(Icons.arrow_forward),
             label: const Text('رجوع'),
@@ -115,7 +133,24 @@ class _StudentDistributionScreenState
         ],
       );
     }
-
+    if (phase == 2) {
+      return Row(
+        children: [
+          TextButton.icon(
+            onPressed: () => setState(() {
+              selectedStudentId = null;
+              selectedStudentName = null;
+            }),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('رجوع'),
+          ),
+          const Expanded(
+            child: Text('اختيار البرنامج العلاجي',
+                textAlign: TextAlign.center),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -150,20 +185,16 @@ class _StudentDistributionScreenState
       return const EmptyState(
         icon: Icons.child_care_outlined,
         title: 'لا يوجد طلاب في المركز',
-        message:
-            'يتم إضافة الطلاب من شاشة إدخال البيانات (السكرتارية). بعد التسجيل، سيظهرون هنا لربطهم بأخصائي.',
+        message: 'يتم إضافة الطلاب من شاشة إدخال البيانات.',
       );
     }
-
     if (unassigned.isEmpty && query.trim().isEmpty) {
       return const EmptyState(
         icon: Icons.check_circle_outline,
         title: 'جميع الطلاب مرتبطون',
-        message:
-            'لا يوجد طلاب بانتظار التوزيع حاليًا. أي طالب جديد يتم تسجيله سيظهر هنا ليتم ربطه بأخصائي.',
+        message: 'لا يوجد طلاب بانتظار التوزيع حاليًا.',
       );
     }
-
     if (unassigned.isEmpty && query.trim().isNotEmpty) {
       return EmptyState(
         icon: Icons.search_off_outlined,
@@ -171,13 +202,14 @@ class _StudentDistributionScreenState
         message: 'لا يوجد طالب اسمه "${query.trim()}" في قائمة الانتظار.',
       );
     }
-
     return ListView.builder(
       itemCount: unassigned.length,
       itemBuilder: (context, index) {
         final student = unassigned[index];
+        final assignedCount = _assignedProgramCount(app, student.id);
         return _StudentCard(
           student: student,
+          assignedPrograms: assignedCount,
           onTap: () => setState(() {
             selectedStudentId = student.id;
             selectedStudentName = student.name;
@@ -188,22 +220,87 @@ class _StudentDistributionScreenState
     );
   }
 
-  // ─── Phase 2: Selected student + Specialists ──────────
+  // ─── Phase 2: Select program for the chosen student ────
 
-  Widget _buildPhase2Content(
-    BuildContext context,
-    AppProvider app,
-    List<AppUser> specialists,
-  ) {
+  Widget _buildPhase2Content(BuildContext context, AppProvider app) {
     final student = app.students.firstWhere(
       (s) => s.id == selectedStudentId,
     );
+
+    final studentProgramIds = app.studentTherapyPrograms
+        .where((stp) =>
+            stp.studentId == student.id &&
+            stp.isActive)
+        .map((stp) => stp.programId)
+        .toSet();
+
+    final studentPrograms = app.therapyPrograms
+        .where((p) => studentProgramIds.contains(p.id))
+        .toList();
+
+    final existingAssignments = app.studentProgramAssignments
+        .where((a) => a.studentId == student.id && a.isActive && a.role == 'primary')
+        .toList();
+    final assignedProgramIds = existingAssignments.map((a) => a.programId).toSet();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SelectedStudentCard(student: student),
         const SizedBox(height: AppSpacing.md),
+        Text(
+          'اختر البرنامج العلاجي',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Expanded(
+          child: studentPrograms.isEmpty
+              ? const SingleChildScrollView(
+                  child: EmptyState(
+                    icon: Icons.menu_book_outlined,
+                    title: 'لا توجد برامج علاجية محددة',
+                    message:
+                        'هذا الطالب لا توجد له برامج علاجية محددة. يرجى تحديد البرامج من شاشة بيانات الطالب/السكرتارية.',
+                  ),
+                )
+              : ListView.builder(
+                  itemCount: studentPrograms.length,
+                  itemBuilder: (context, index) {
+                    final program = studentPrograms[index];
+                    final hasAssignment = assignedProgramIds.contains(program.id);
+                    return _ProgramCard(
+                      program: program,
+                      hasAssignment: hasAssignment,
+                      onTap: hasAssignment
+                          ? null
+                          : () => setState(() {
+                                selectedProgramId = program.id;
+                              }),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Phase 3: Assign specialist ────────────────────────
+
+  Widget _buildPhase3Content(
+    BuildContext context,
+    AppProvider app,
+    List<AppUser> specialists,
+  ) {
+    final eligibleSpecialists = specialists.where((s) {
+      final caps = app.specialistCapabilityProgramsByUser[s.id] ?? [];
+      return caps.contains(selectedProgramId);
+    }).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         Text(
           'اختر الأخصائي المناسب',
           style: Theme.of(context)
@@ -213,28 +310,28 @@ class _StudentDistributionScreenState
         ),
         const SizedBox(height: AppSpacing.sm),
         Expanded(
-          child: specialists.isEmpty
+          child: eligibleSpecialists.isEmpty
               ? const SingleChildScrollView(
                   child: EmptyState(
                     icon: Icons.person_off_outlined,
-                    title: 'لا يوجد أخصائيون متاحون في المركز',
+                    title: 'لا يوجد أخصائيون مفعّلون لهذا البرنامج',
                     message:
-                        'يجب إضافة أخصائيين أولًا من إدارة الموظفين ليتم ربط الطلاب بهم.',
+                        'لا يوجد أخصائيون مفعّلون لهذا البرنامج في المركز. يرجى ربط أخصائي بهذا البرنامج من شاشة الموظفين.',
                   ),
                 )
               : ListView.builder(
-                  itemCount: specialists.length,
+                  itemCount: eligibleSpecialists.length,
                   itemBuilder: (context, index) {
-                    final specialist = specialists[index];
-                    final myCount = app.studentSpecialists
-                        .where((s) =>
-                            s.specialistId == specialist.id && s.isActive)
+                    final specialist = eligibleSpecialists[index];
+                    final myCount = app.studentProgramAssignments
+                        .where((a) =>
+                            a.specialistId == specialist.id && a.isActive)
                         .length;
                     return _SpecialistCard(
                       specialist: specialist,
                       assignedCount: myCount,
-                      onTap: () => _assign(
-                          context, app, selectedStudentId!, specialist.id),
+                      onTap: () => _assign(context, app, selectedStudentId!,
+                          selectedProgramId!, specialist.id),
                     );
                   },
                 ),
@@ -244,23 +341,34 @@ class _StudentDistributionScreenState
   }
 
   Future<void> _assign(BuildContext context, AppProvider app,
-      String studentId, String specialistId) async {
+      String studentId, String programId, String specialistId) async {
     await runWithFeedback(context, () async {
-      await app.assignStudentToSpecialist(studentId, specialistId);
+      await app.assignProgramToSpecialist(
+        studentId: studentId,
+        programId: programId,
+        specialistId: specialistId,
+        centerId: app.activeCenterId,
+      );
       setState(() {
         selectedStudentId = null;
         selectedStudentName = null;
+        selectedProgramId = null;
       });
-    }, success: 'تم ربط الطالب بالأخصائي بنجاح.');
+    }, success: 'تم ربط البرنامج بالأخصائي بنجاح.');
   }
 }
 
-// ─── Phase 1: Student card (full info) ───────────────────
+// ─── Phase 1: Student card ───────────────────────────────
 
 class _StudentCard extends StatelessWidget {
-  const _StudentCard({required this.student, required this.onTap});
+  const _StudentCard({
+    required this.student,
+    required this.assignedPrograms,
+    required this.onTap,
+  });
 
   final Student student;
+  final int assignedPrograms;
   final VoidCallback onTap;
 
   @override
@@ -321,6 +429,19 @@ class _StudentCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (assignedPrograms > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$assignedPrograms مبرمج',
+                  style: TextStyle(fontSize: 11, color: colorScheme.onTertiaryContainer),
+                ),
+              ),
+            const SizedBox(width: 4),
             Icon(
               Icons.arrow_back_ios_new_outlined,
               color: colorScheme.onSurfaceVariant,
@@ -421,6 +542,14 @@ class _StudentCard extends StatelessWidget {
                     colorScheme.onTertiaryContainer,
                   ),
                 ],
+                if (assignedPrograms > 0) ...[
+                  const SizedBox(height: 4),
+                  _miniChip(
+                    '$assignedPrograms برنامج مرتبط',
+                    colorScheme.tertiaryContainer,
+                    colorScheme.onTertiaryContainer,
+                  ),
+                ],
                 if (student.parentName.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
@@ -494,6 +623,87 @@ class _StudentCard extends StatelessWidget {
   }
 }
 
+// ─── Phase 2: Program card ───────────────────────────────
+
+class _ProgramCard extends StatelessWidget {
+  const _ProgramCard({
+    required this.program,
+    required this.hasAssignment,
+    this.onTap,
+  });
+
+  final TherapyProgramTemplate program;
+  final bool hasAssignment;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Material(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          onTap: onTap,
+          child: AppCard(
+            child: Row(
+              children: [
+                Icon(Icons.menu_book_outlined, color: colorScheme.primary),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        program.name,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (program.description.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          program.description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (hasAssignment)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: colorScheme.tertiaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'مرتبط',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onTertiaryContainer,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(Icons.arrow_back_ios_new_outlined,
+                      color: colorScheme.onSurfaceVariant, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Phase 2: Selected student summary card ─────────────
 
 class _SelectedStudentCard extends StatelessWidget {
@@ -541,7 +751,7 @@ class _SelectedStudentCard extends StatelessWidget {
   }
 }
 
-// ─── Phase 2: Specialist card with assign button ────────
+// ─── Phase 3: Specialist card with assign button ────────
 
 class _SpecialistCard extends StatelessWidget {
   const _SpecialistCard({

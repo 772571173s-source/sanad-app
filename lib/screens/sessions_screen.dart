@@ -101,21 +101,27 @@ class _SessionsScreenState extends State<SessionsScreen> {
 
   List<TrainingPlan> _filteredPlans(AppProvider app) {
     final pid = _selectedProgram?.id ?? '';
-    final st = _selectedSourceType ?? '';
-    if (pid.isEmpty || st.isEmpty) return [];
-    return app.plans
-        .where((p) => p.programId == pid && p.sourceType == st)
-        .toList()
+    if (pid.isEmpty) return [];
+    var filtered = app.plans.where((p) => p.programId == pid);
+    if (app.isSpecialist && app.user != null) {
+      filtered = filtered.where((p) => p.specialistId == app.user!.id);
+    }
+    final st = _selectedSourceType ?? 'all';
+    if (st != 'all') {
+      filtered = filtered.where((p) => p.sourceType == st);
+    }
+    return filtered.toList()
       ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
   }
 
-  List<GoalSkillStep> _filteredSteps(AppProvider app, String goalId) =>
-      app.stepsForGoal(goalId)
-          .where((s) =>
-              s.programId == (_selectedProgram?.id ?? '') &&
-              s.sourceType == (_selectedSourceType ?? ''))
-          .toList()
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  List<GoalSkillStep> _filteredSteps(AppProvider app, String goalId) {
+    final st = _selectedSourceType ?? 'all';
+    return app.stepsForGoal(goalId)
+        .where((s) => s.programId == (_selectedProgram?.id ?? ''))
+        .where((s) => st == 'all' || s.sourceType == st)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
 
   List<TrainingPlan> _activeGoals(AppProvider app) =>
       _filteredPlans(app).where((p) => app.goalProgress(p.id) < 100).toList();
@@ -281,24 +287,34 @@ class _SessionsScreenState extends State<SessionsScreen> {
     final app = context.watch<AppProvider>();
 
     Widget content;
-    if (app.selectedStudent == null) {
-      content = _buildStudentPicker(app);
-    } else if (app.plans.isEmpty && _selectedProgram == null) {
-      content = _buildNoPlans();
-    } else if (_selectedProgram == null) {
-      content = _buildProgramPicker(app);
-    } else if (_selectedProgram!.usesSpeechSounds && _selectedSourceType == null) {
-      content = _buildSourceTypePicker();
-    } else if (_selectedGoal == null) {
-      content = _buildGoalList(app);
+    if (app.isSpecialist) {
+      if (_selectedProgram == null) {
+        content = _buildAssignmentPicker(app);
+      } else if (_selectedGoal == null) {
+        content = _buildGoalList(app);
+      } else {
+        content = _buildGoalSession(app);
+      }
     } else {
-      content = _buildGoalSession(app);
+      if (app.selectedStudent == null) {
+        content = _buildStudentPicker(app);
+      } else if (app.plans.isEmpty && _selectedProgram == null) {
+        content = _buildNoPlans();
+      } else if (_selectedProgram == null) {
+        content = _buildProgramPicker(app);
+      } else if (_selectedGoal == null) {
+        content = _buildGoalList(app);
+      } else {
+        content = _buildGoalSession(app);
+      }
     }
 
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 820),
-        child: content,
+        child: SingleChildScrollView(
+          child: content,
+        ),
       ),
     );
   }
@@ -351,6 +367,151 @@ class _SessionsScreenState extends State<SessionsScreen> {
                       _applyPreselect();
                     },
                   )),
+      ],
+    );
+  }
+
+  // ─── Phase 1b: Assignment picker (specialists) ─────────
+
+  Widget _buildAssignmentPicker(AppProvider app) {
+    final user = app.user;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final assignments = user == null
+        ? <StudentProgramAssignment>[]
+        : app.studentProgramAssignments
+            .where((a) =>
+                a.specialistId == user.id &&
+                a.isActive &&
+                a.centerId == app.activeCenterId)
+            .toList();
+
+    final studentMap = {for (final s in app.students) s.id: s};
+    final programMap = {for (final p in app.therapyPrograms) p.id: p};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 8),
+        Text('الجلسات العلاجية', style: SanadText.title(context)),
+        const SizedBox(height: 4),
+        Text('اختر طالبًا وبرنامجًا لبدء الجلسة',
+            style: SanadText.secondary(context)),
+        const SizedBox(height: AppSpacing.md),
+        TextField(
+          decoration: InputDecoration(
+            prefixIcon:
+                Icon(Icons.search, color: colorScheme.onSurfaceVariant),
+            hintText: 'ابحث عن طالب...',
+            filled: true,
+            fillColor:
+                colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppRadii.control),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          ),
+          onChanged: (value) => setState(() => query = value),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (assignments.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: EmptyState(
+              icon: Icons.fact_check_outlined,
+              title: 'لا توجد ارتباطات نشطة',
+              message:
+                  'لم يتم إسناد أي طالب أو برنامج إليك بعد. تواصل مع المنسق.',
+            ),
+          )
+        else
+          ...assignments
+              .where((a) {
+                if (query.isEmpty) return true;
+                final student = studentMap[a.studentId];
+                return student?.name.contains(query) ?? false;
+              })
+              .map((assignment) {
+                final student = studentMap[assignment.studentId];
+                final program = programMap[assignment.programId];
+                if (student == null || program == null) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Material(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppRadii.card),
+                      onTap: () async {
+                        await app.selectStudent(student);
+                        if (!mounted) return;
+                        setState(() {
+                          _selectedProgram = program;
+                          _selectedSourceType = 'all';
+                          _selectedGoal = null;
+                          _currentSessionId = null;
+                          _isRetrainMode = false;
+                          _showCompletedGoals = false;
+                        });
+                      },
+                      child: AppCard(
+                        highlight: true,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                program.usesSpeechSounds
+                                    ? Icons.record_voice_over_outlined
+                                    : Icons.psychology_alt_outlined,
+                                color: colorScheme.primary,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    student.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    program.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: colorScheme.onSurfaceVariant),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(Icons.arrow_back_ios_new_outlined,
+                                color: colorScheme.onSurfaceVariant, size: 18),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
       ],
     );
   }
@@ -408,7 +569,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     onTap: () {
                       setState(() {
                         _selectedProgram = program;
-                        _selectedSourceType = program.usesSpeechSounds ? null : 'standard';
+                        _selectedSourceType = 'all';
                         _selectedGoal = null;
                         _currentSessionId = null;
                       });
@@ -491,148 +652,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
-  // ─── Phase 3: Source type picker ────────────────────────
-
-  Widget _buildSourceTypePicker() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildPhase3Header(),
-        const SizedBox(height: AppSpacing.md),
-        Text('اختر نوع الجلسة', style: SanadText.subtitle(context)),
-        const SizedBox(height: 4),
-        Text('حدد نوع التمارين للجلسة', style: SanadText.secondary(context)),
-        const SizedBox(height: AppSpacing.md),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final narrow = constraints.maxWidth < 460;
-            if (narrow) {
-              return Column(
-                children: [
-                  _sourceTypeCard(
-                    colorScheme, Icons.assessment_outlined,
-                    'أقسام التقييم', 'تماثل الوجه - أعضاء النطق - العمليات الوظيفية',
-                    () => setState(() {
-                      _selectedSourceType = 'standard';
-                      _selectedGoal = null;
-                      _currentSessionId = null;
-                    }),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  _sourceTypeCard(
-                    colorScheme, Icons.record_voice_over_outlined,
-                    'حروف النطق', 'حذف - إبدال - إضافة - تشويه',
-                    () => setState(() {
-                      _selectedSourceType = 'speechSound';
-                      _selectedGoal = null;
-                      _currentSessionId = null;
-                    }),
-                  ),
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(
-                  child: _sourceTypeCard(
-                    colorScheme, Icons.assessment_outlined,
-                    'أقسام التقييم', 'تماثل الوجه - أعضاء النطق - العمليات الوظيفية',
-                    () => setState(() {
-                      _selectedSourceType = 'standard';
-                      _selectedGoal = null;
-                      _currentSessionId = null;
-                    }),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _sourceTypeCard(
-                    colorScheme, Icons.record_voice_over_outlined,
-                    'حروف النطق', 'حذف - إبدال - إضافة - تشويه',
-                    () => setState(() {
-                      _selectedSourceType = 'speechSound';
-                      _selectedGoal = null;
-                      _currentSessionId = null;
-                    }),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _sourceTypeCard(ColorScheme colorScheme, IconData icon, String title,
-      String subtitle, VoidCallback onTap) {
-    return AppCard(
-      highlight: true,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
-          child: Column(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(icon, size: 28, color: colorScheme.primary),
-              ),
-              const SizedBox(height: 12),
-              Text(title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 6),
-              Text(subtitle,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPhase3Header() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outlineVariant),
-            borderRadius: BorderRadius.circular(AppRadii.control),
-          ),
-          child: TextButton.icon(
-            onPressed: () => setState(() {
-              _selectedProgram = null;
-              _selectedSourceType = null;
-              _selectedGoal = null;
-              _currentSessionId = null;
-            }),
-            icon: const Icon(Icons.arrow_forward, size: 18),
-            label: const Text('رجوع', style: TextStyle(fontSize: 14)),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Text(_selectedProgram?.name ?? '', style: SanadText.title(context)),
-        ),
-      ],
-    );
-  }
-
-  // ─── Phase 4: Goal Dashboard ────────────────────────────
+  // ─── Phase 3: Goal Dashboard ────────────────────────────
 
   Widget _buildGoalList(AppProvider app) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -727,6 +747,22 @@ class _SessionsScreenState extends State<SessionsScreen> {
         const SizedBox(height: 4),
         Text(activeGoals.isEmpty ? 'جميع الأهداف مكتملة' : 'اختر هدفًا لبدء الجلسة', style: SanadText.secondary(context)),
         const SizedBox(height: AppSpacing.md),
+        // Source type filter
+        if (_selectedProgram?.usesSpeechSounds == true) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _sourceTypeFilterChip('all', 'كل الأهداف', colorScheme),
+                const SizedBox(width: 8),
+                _sourceTypeFilterChip('standard', 'أقسام التقييم', colorScheme),
+                const SizedBox(width: 8),
+                _sourceTypeFilterChip('speechSound', 'حروف النطق', colorScheme),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (!hasGoals)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -944,6 +980,25 @@ class _SessionsScreenState extends State<SessionsScreen> {
     );
   }
 
+  Widget _sourceTypeFilterChip(String value, String label, ColorScheme colorScheme) {
+    final current = _selectedSourceType ?? 'all';
+    final selected = current == value;
+    return FilterChip(
+      selected: selected,
+      label: Text(label,
+          style: TextStyle(
+              fontSize: 13,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500)),
+      onSelected: (_) {
+        setState(() {
+          _selectedSourceType = value;
+          _selectedGoal = null;
+        });
+      },
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   Widget _buildGoalListHeader() {
     final colorScheme = Theme.of(context).colorScheme;
     return Row(
@@ -954,11 +1009,13 @@ class _SessionsScreenState extends State<SessionsScreen> {
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: TextButton.icon(
-            onPressed: () => setState(() {
-              _selectedSourceType = null;
-              _selectedGoal = null;
-              _currentSessionId = null;
-            }),
+              onPressed: () => setState(() {
+                _selectedProgram = null;
+                _selectedSourceType = null;
+                _selectedGoal = null;
+                _currentSessionId = null;
+                _showCompletedGoals = false;
+              }),
             icon: const Icon(Icons.arrow_forward, size: 18),
             label: const Text('رجوع', style: TextStyle(fontSize: 14)),
           ),
@@ -1313,8 +1370,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
     if (_isRetrainMode) {
       widget.onReturnToProfile?.call();
     } else {
-      context.read<AppProvider>().selectStudent(null).then((_) {
-        if (context.mounted) _reset();
+      setState(() {
+        _selectedGoal = null;
+        _currentSessionId = null;
       });
     }
   }

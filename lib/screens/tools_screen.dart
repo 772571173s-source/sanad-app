@@ -20,7 +20,8 @@ class _ToolsScreenState extends State<ToolsScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ResponsiveGrid(
@@ -53,6 +54,7 @@ class _ToolsScreenState extends State<ToolsScreen> {
         if (selected == 'reports') const ReportsScreen(),
         if (selected == 'staff') const StaffScreen(),
       ],
+      ),
     );
   }
 }

@@ -28,14 +28,18 @@ class _AssignmentManagementScreenState
     });
   }
 
+  Set<String> _activeSpecialistIds(AppProvider app) {
+    return app.studentProgramAssignments
+        .where((a) => a.isActive)
+        .map((a) => a.specialistId)
+        .toSet();
+  }
+
   List<AppUser> _filteredSpecialists(AppProvider app) {
-    final activeAssignments =
-        app.studentSpecialists.where((s) => s.isActive).toList();
-    final specialistIds =
-        activeAssignments.map((s) => s.specialistId).toSet();
+    final ids = _activeSpecialistIds(app);
     return app.staff
         .where((u) =>
-            u.role == UserRole.specialist && specialistIds.contains(u.id))
+            u.role == UserRole.specialist && ids.contains(u.id))
         .where((u) => u.name.contains(query))
         .toList();
   }
@@ -48,14 +52,7 @@ class _AssignmentManagementScreenState
         app.staff.where((u) => u.role == UserRole.specialist).toList();
     final isPhase2 = selectedSpecialistId != null;
 
-    debugPrint(
-      '[AssignmentManagement] students=${app.students.length}, '
-      'allSpecialists=${allSpecialists.length}, '
-      'specialists=$specialists, '
-      'phase2=$isPhase2',
-    );
-
-    if (_loading && app.studentSpecialists.isEmpty && allSpecialists.isEmpty) {
+    if (_loading && app.studentProgramAssignments.isEmpty && allSpecialists.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -63,22 +60,24 @@ class _AssignmentManagementScreenState
     final overhead = isPhase2 ? 300.0 : 260.0;
     final contentHeight = (viewportH - overhead).clamp(200.0, viewportH);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHeader(isPhase2),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: contentHeight,
-          child: isPhase2
-              ? _buildPhase2Content(context, app)
-              : _buildPhase1Content(context, app, specialists, allSpecialists),
-        ),
-      ],
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildHeader(isPhase2),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            height: contentHeight,
+            child: isPhase2
+                ? _buildPhase2Content(context, app)
+                : _buildPhase1Content(context, app, specialists, allSpecialists),
+          ),
+          const SizedBox(height: 80),
+        ],
+      ),
     );
   }
-
-  // ─── Headers ────────────────────────────────────────────
 
   Widget _buildHeader(bool isPhase2) {
     if (isPhase2) {
@@ -107,7 +106,6 @@ class _AssignmentManagementScreenState
         ],
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -131,8 +129,6 @@ class _AssignmentManagementScreenState
     );
   }
 
-  // ─── Phase 1: Specialist list ───────────────────────────
-
   Widget _buildPhase1Content(
     BuildContext context,
     AppProvider app,
@@ -143,38 +139,30 @@ class _AssignmentManagementScreenState
       return const EmptyState(
         icon: Icons.person_off_outlined,
         title: 'لا يوجد أخصائيون في المركز',
-        message:
-            'يجب إضافة أخصائيين أولًا من إدارة الموظفين قبل إمكانية ربط الطلاب.',
+        message: 'يجب إضافة أخصائيين أولًا من إدارة الموظفين.',
       );
     }
-
     if (specialists.isEmpty && query.trim().isEmpty) {
       return const EmptyState(
         icon: Icons.people_outline,
         title: 'لا توجد ارتباطات حالية',
-        message:
-            'لم يتم ربط أي طالب بأخصائي بعد. استخدم شاشة توزيع الطلاب لربط الطلاب.',
+        message: 'لم يتم ربط أي طالب بأخصائي بعد.',
       );
     }
-
     if (specialists.isEmpty && query.trim().isNotEmpty) {
       return EmptyState(
         icon: Icons.search_off_outlined,
         title: 'لم يتم العثور على أخصائي بهذا الاسم',
-        message:
-            'لا يوجد أخصائي اسمه "${query.trim()}" في الارتباطات الحالية.',
+        message: 'لا يوجد أخصائي اسمه "${query.trim()}" في الارتباطات الحالية.',
       );
     }
-
-    final activeAssignments =
-        app.studentSpecialists.where((s) => s.isActive).toList();
 
     return ListView.builder(
       itemCount: specialists.length,
       itemBuilder: (context, index) {
         final specialist = specialists[index];
-        final myCount = activeAssignments
-            .where((s) => s.specialistId == specialist.id)
+        final myCount = app.studentProgramAssignments
+            .where((a) => a.specialistId == specialist.id && a.isActive)
             .length;
         return _SpecialistCard(
           specialist: specialist,
@@ -189,28 +177,27 @@ class _AssignmentManagementScreenState
     );
   }
 
-  // ─── Phase 2: Selected specialist's students ───────────
-
   Widget _buildPhase2Content(BuildContext context, AppProvider app) {
-    final activeAssignments =
-        app.studentSpecialists.where((s) => s.isActive).toList();
+    final myAssignments = app.studentProgramAssignments
+        .where((a) => a.specialistId == selectedSpecialistId && a.isActive)
+        .toList();
+
     final specialist = app.staff.firstWhere(
       (u) => u.id == selectedSpecialistId,
     );
-    final myAssignments = activeAssignments
-        .where((s) => s.specialistId == selectedSpecialistId)
-        .toList();
+
+    final totalCount = myAssignments.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _SelectedSpecialistCard(
           specialist: specialist,
-          assignedCount: myAssignments.length,
+          assignedCount: totalCount,
         ),
         const SizedBox(height: AppSpacing.md),
         Text(
-          'الطلاب المرتبطون (${myAssignments.length})',
+          'الطلاب والبرامج المرتبطة ($totalCount)',
           style: Theme.of(context)
               .textTheme
               .titleMedium
@@ -223,8 +210,7 @@ class _AssignmentManagementScreenState
                   child: EmptyState(
                     icon: Icons.child_care_outlined,
                     title: 'لا يوجد طلاب مرتبطون بهذا الأخصائي',
-                    message:
-                        'لم يتم ربط أي طالب بهذا الأخصائي بعد. استخدم شاشة توزيع الطلاب لربط طالب.',
+                    message: 'لم يتم ربط أي طالب بهذا الأخصائي بعد.',
                   ),
                 )
               : ListView.builder(
@@ -237,11 +223,14 @@ class _AssignmentManagementScreenState
                     if (student == null) {
                       return const SizedBox.shrink();
                     }
+                    final program = app.therapyPrograms
+                        .where((p) => p.id == assignment.programId)
+                        .firstOrNull;
                     return _AssignedStudentCard(
                       student: student,
-                      assignment: assignment,
-                      onUnassign: () => _unassign(
-                          context, app, student.id, specialist.id),
+                      subtitle: program?.name ?? 'برنامج علاجي',
+                      id: assignment.id,
+                      onUnassign: () => _unassign(context, app, assignment.id),
                     );
                   },
                 ),
@@ -250,14 +239,13 @@ class _AssignmentManagementScreenState
     );
   }
 
-  Future<void> _unassign(BuildContext context, AppProvider app,
-      String studentId, String specialistId) async {
+  Future<void> _unassign(BuildContext context, AppProvider app, String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأكيد فك الارتباط'),
         content: const Text(
-            'سيتم فك ربط هذا الطالب من الأخصائي. سيعود الطالب إلى قائمة انتظار الربط.'),
+            'سيتم إلغاء إسناد هذا البرنامج عن الأخصائي.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -271,7 +259,7 @@ class _AssignmentManagementScreenState
       ),
     );
     if (confirmed != true) return;
-    await app.unassignStudentFromSpecialist(studentId, specialistId);
+    await app.deactivateAssignment(id);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('تم فك ارتباط الطالب.')),
@@ -307,65 +295,55 @@ class _SpecialistCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(AppRadii.card),
           onTap: onTap,
           child: AppCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    RoleAvatar(
-                        role: specialist.role,
-                        name: specialist.name,
-                        radius: 28),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            specialist.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            specialist.role.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondaryContainer,
-                        borderRadius:
-                            BorderRadius.circular(AppRadii.control),
-                      ),
-                      child: Text(
-                        '$assignedCount طالب',
+                RoleAvatar(
+                    role: specialist.role,
+                    name: specialist.name,
+                    radius: 26),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        specialist.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
-                          color: colorScheme.onSecondaryContainer,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        specialist.role.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(AppRadii.control),
+                  ),
+                  child: Text(
+                    '$assignedCount طالب',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      color: colorScheme.onSecondaryContainer,
                     ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                FilledButton.tonalIcon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.visibility_outlined, size: 18),
-                  label: const Text('عرض الطلاب'),
-                ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_left, color: colorScheme.onSurfaceVariant),
               ],
             ),
           ),
@@ -375,7 +353,7 @@ class _SpecialistCard extends StatelessWidget {
   }
 }
 
-// ─── Phase 2: Selected specialist summary card ───────────
+// ─── Phase 2: Selected specialist card ────────────────────
 
 class _SelectedSpecialistCard extends StatelessWidget {
   const _SelectedSpecialistCard({
@@ -414,7 +392,7 @@ class _SelectedSpecialistCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  specialist.role.label,
+                  '${specialist.role.label} — $assignedCount طالب مرتبط',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: textTheme.bodySmall,
@@ -422,48 +400,27 @@ class _SelectedSpecialistCard extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(AppRadii.control),
-            ),
-            child: Text(
-              '$assignedCount طالب',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: colorScheme.onSecondaryContainer,
-              ),
-            ),
-          ),
+          Icon(Icons.check_circle, color: colorScheme.primary, size: 22),
         ],
       ),
     );
   }
 }
 
-// ─── Phase 2: Assigned student card with unassign ────────
+// ─── Phase 2: Assigned student card with unassign button ──
 
 class _AssignedStudentCard extends StatelessWidget {
   const _AssignedStudentCard({
     required this.student,
-    required this.assignment,
-    required this.onUnassign,
+    required this.subtitle,
+    required this.id,
+    this.onUnassign,
   });
 
   final Student student;
-  final StudentSpecialist assignment;
-  final VoidCallback onUnassign;
-
-  String _formatDate(String value) {
-    final date = DateTime.tryParse(value);
-    if (date == null) return value;
-    return '${date.year}/${date.month}/${date.day}';
-  }
+  final String subtitle;
+  final String id;
+  final VoidCallback? onUnassign;
 
   @override
   Widget build(BuildContext context) {
@@ -473,90 +430,44 @@ class _AssignedStudentCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            Row(
-              children: [
-                StudentAvatar(student: student, radius: 28),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        student.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${student.age} سنة - ${student.diagnosis}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (student.programType.isNotEmpty ||
-                assignment.assignedAt.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
+            StudentAvatar(student: student, radius: 24),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (student.programType.isNotEmpty)
-                    _miniChip(
-                      student.programType,
-                      colorScheme.tertiaryContainer,
-                      colorScheme.onTertiaryContainer,
+                  Text(
+                    student.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
                     ),
-                  if (assignment.assignedAt.isNotEmpty)
-                    _miniChip(
-                      'الربط: ${_formatDate(assignment.assignedAt)}',
-                      colorScheme.secondaryContainer,
-                      colorScheme.onSecondaryContainer,
+                  ),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
+                  ),
                 ],
               ),
-            ],
-            const SizedBox(height: AppSpacing.sm),
-            OutlinedButton.icon(
-              onPressed: onUnassign,
-              icon: const Icon(Icons.link_off, size: 18),
-              label: const Text('فك الارتباط'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: colorScheme.error,
-                side: BorderSide(color: colorScheme.error.withValues(alpha: 0.5)),
-              ),
             ),
+            if (onUnassign != null)
+              TextButton.icon(
+                onPressed: onUnassign,
+                icon: const Icon(Icons.link_off, size: 16),
+                label: const Text('فك'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.error,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _miniChip(String label, Color bg, Color fg) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: fg,
         ),
       ),
     );

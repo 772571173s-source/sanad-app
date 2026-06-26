@@ -20,6 +20,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
   Student? _selectedStudent;
   bool _isLinked = false;
 
+  String? _selectedProgramId;
   TrainingPlan? _selectedPlan;
   GoalSkillStep? _selectedStep;
 
@@ -40,12 +41,12 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
 
   List<Student> _myStudents(AppProvider app) {
     final uid = app.user?.id ?? '';
-    final assignedIds = app.studentSpecialists
-        .where((s) => s.isActive && s.specialistId == uid)
-        .map((s) => s.studentId)
+    final myIds = app.studentProgramAssignments
+        .where((a) => a.isActive && a.specialistId == uid)
+        .map((a) => a.studentId)
         .toSet();
     return app.students.where((s) {
-      if (!assignedIds.contains(s.id)) return false;
+      if (!myIds.contains(s.id)) return false;
       if (query.trim().isEmpty) return true;
       return s.name.contains(query) || s.diagnosis.contains(query);
     }).toList();
@@ -56,7 +57,8 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
     final app = context.watch<AppProvider>();
     final students = _myStudents(app);
 
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _buildHeader(app),
@@ -72,6 +74,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
         else if (_phase == 4)
           _buildForm(app),
       ],
+      ),
     );
   }
 
@@ -146,6 +149,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
                   onTap: () {
                     setState(() {
                       _selectedStudent = s;
+                      _selectedProgramId = null;
                       _phase = 1;
                       query = '';
                     });
@@ -202,14 +206,62 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
     _dateCtl.text = '';
   }
 
+  List<TherapyProgramTemplate> _availablePrograms(AppProvider app) {
+    if (_selectedStudent == null) return [];
+    final uid = app.user?.id ?? '';
+    final programIds = app.studentProgramAssignments
+        .where((a) =>
+            a.studentId == _selectedStudent!.id &&
+            a.specialistId == uid &&
+            a.isActive)
+        .map((a) => a.programId)
+        .toSet();
+    if (programIds.isEmpty) return [];
+    return app.therapyPrograms
+        .where((p) => programIds.contains(p.id))
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
+
   // ─── Phase 2: Goal picker ─────────────────────────────────
 
   Widget _buildGoalPicker(AppProvider app) {
-    final plans = app.plans;
+    final programs = _availablePrograms(app);
+    final plans = app.plans.where((p) =>
+        _selectedProgramId == null || p.programId == _selectedProgramId
+    ).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SizedBox(height: AppSpacing.md),
+        if (programs.length > 1) ...[
+          SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: programs.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return FilterChip(
+                    label: const Text('الكل'),
+                    selected: _selectedProgramId == null,
+                    onSelected: (_) =>
+                        setState(() => _selectedProgramId = null),
+                  );
+                }
+                final p = programs[index - 1];
+                return FilterChip(
+                  label: Text(p.name),
+                  selected: _selectedProgramId == p.id,
+                  onSelected: (_) =>
+                      setState(() => _selectedProgramId = p.id),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
         if (plans.isEmpty)
           const EmptyState(
             icon: Icons.track_changes_outlined,
@@ -425,6 +477,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
       sourceType: _selectedPlan?.sourceType ?? 'standard',
       sessionDate: now.toIso8601String().split('T').first,
       createdFromSessionResult: 'homework',
+      specialistId: app.user?.id ?? '',
     );
 
     await runWithFeedback(context, () async {
@@ -444,6 +497,7 @@ class _HomeworkScreenState extends State<HomeworkScreen> {
     setState(() {
       _phase = 0;
       _selectedStudent = null;
+      _selectedProgramId = null;
       _selectedPlan = null;
       _selectedStep = null;
       _isLinked = false;

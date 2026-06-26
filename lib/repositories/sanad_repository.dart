@@ -191,7 +191,8 @@ class SanadRepository {
     final initialPassword = student.portalPassword.trim().isNotEmpty
         ? student.portalPassword.trim()
         : parentUsername;
-    if (existingParentAccount == null || student.portalPassword.isNotEmpty) {
+    final isNewParent = existingParentAccount == null;
+    if (isNewParent || student.portalPassword.isNotEmpty) {
       await _db.upsert(
         'users',
         AppUser(
@@ -199,14 +200,16 @@ class SanadRepository {
               'parent_${parentUsername.hashCode.abs()}',
           centerId: student.centerId,
           email: parentUsername,
-          passwordHash: AuthService.hashPassword(initialPassword),
+          passwordHash: existingParentAccount?.passwordHash ??
+              AuthService.hashPassword(initialPassword),
           name: student.parentName.isEmpty
               ? '??? ??? ${student.name}'
               : student.parentName,
           role: UserRole.parent,
-          studentId: null,
-          forcePasswordChange: true,
-          isDemo: false,
+          studentId: existingParentAccount?.studentId,
+          forcePasswordChange:
+              existingParentAccount?.forcePasswordChange ?? true,
+          isDemo: existingParentAccount?.isDemo ?? false,
         ).toMap(),
       );
     } else {
@@ -218,7 +221,7 @@ class SanadRepository {
           'name': student.parentName.isEmpty
               ? '??? ??? ${student.name}'
               : student.parentName,
-          'student_id': null,
+          if (existingParentAccount.studentId == null) 'student_id': null,
         },
         'id = ?',
         [existingParentAccount.id],
@@ -403,7 +406,18 @@ class SanadRepository {
       whereArgs: centerId.isEmpty ? [''] : ['', centerId],
       orderBy: 'center_id, sort_order, created_at',
     );
-    return rows.map(TherapyProgramTemplate.fromMap).toList();
+    // Deduplicate by name: when multiple programs have the same name,
+    // keep the global one (center_id = '') over a center-specific one.
+    final seen = <String, TherapyProgramTemplate>{};
+    for (final row in rows) {
+      final program = TherapyProgramTemplate.fromMap(row);
+      final existing = seen[program.name];
+      if (existing == null || program.centerId.isEmpty) {
+        seen[program.name] = program;
+      }
+    }
+    return seen.values.toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
   }
 
   Future<void> saveTherapyProgramTemplate(TherapyProgramTemplate program) =>
@@ -594,11 +608,25 @@ class SanadRepository {
     return rows.map((row) => row['program_id'] as String).toList();
   }
 
-  Future<List<StudentTherapyProgram>> studentTherapyPrograms(
-      String studentId) async {
-    final rows = await _db.where('student_therapy_programs',
-        where: 'student_id = ?',
-        whereArgs: [studentId],
+  Future<List<StudentTherapyProgram>> studentTherapyPrograms({
+    String? studentId,
+    String? programId,
+  }) async {
+    if (studentId != null && programId != null) {
+      final rows = await _db.where('student_therapy_programs',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId],
+          orderBy: 'sort_order');
+      return rows.map(StudentTherapyProgram.fromMap).toList();
+    }
+    if (studentId != null) {
+      final rows = await _db.where('student_therapy_programs',
+          where: 'student_id = ?',
+          whereArgs: [studentId],
+          orderBy: 'sort_order');
+      return rows.map(StudentTherapyProgram.fromMap).toList();
+    }
+    final rows = await _db.all('student_therapy_programs',
         orderBy: 'sort_order');
     return rows.map(StudentTherapyProgram.fromMap).toList();
   }
@@ -626,52 +654,211 @@ class SanadRepository {
         'student_id = ? AND program_id = ?', [studentId, programId]);
   }
 
-  Future<List<StudentSpecialist>> studentSpecialists() async {
-    final rows =
-        await _db.all('student_specialists', orderBy: 'assigned_at DESC');
-    return rows.map(StudentSpecialist.fromMap).toList();
+  // ── Student Program Assignments ──────────────────────────────────
+
+  Future<List<StudentProgramAssignment>> studentProgramAssignments() async {
+    final rows = await _db.all('student_program_assignments',
+        orderBy: 'assigned_at DESC');
+    return rows.map(StudentProgramAssignment.fromMap).toList();
   }
 
-  Future<List<StudentSpecialist>> specialistsForStudent(
+  Future<List<StudentProgramAssignment>> activeAssignmentsForStudent(
       String studentId) async {
-    final rows = await _db.where('student_specialists',
-        where: 'student_id = ? AND is_active = 1',
-        whereArgs: [studentId]);
-    return rows.map(StudentSpecialist.fromMap).toList();
+    final rows = await _db.where('student_program_assignments',
+        where: 'student_id = ? AND status = ?',
+        whereArgs: [studentId, 'active']);
+    return rows.map(StudentProgramAssignment.fromMap).toList();
   }
 
-  Future<List<StudentSpecialist>> studentsForSpecialist(
+  Future<List<StudentProgramAssignment>> activeAssignmentsForStudentByProgram(
+      String studentId, String programId) async {
+    final rows = await _db.where('student_program_assignments',
+        where: 'student_id = ? AND program_id = ? AND status = ?',
+        whereArgs: [studentId, programId, 'active']);
+    return rows.map(StudentProgramAssignment.fromMap).toList();
+  }
+
+  Future<List<StudentProgramAssignment>> activeAssignmentsForSpecialist(
       String specialistId) async {
-    final rows = await _db.where('student_specialists',
-        where: 'specialist_id = ? AND is_active = 1',
-        whereArgs: [specialistId]);
-    return rows.map(StudentSpecialist.fromMap).toList();
+    final rows = await _db.where('student_program_assignments',
+        where: 'specialist_id = ? AND status = ?',
+        whereArgs: [specialistId, 'active']);
+    return rows.map(StudentProgramAssignment.fromMap).toList();
   }
 
-  Future<void> saveStudentSpecialist(StudentSpecialist assignment) async {
-    final existing = await _db.first('student_specialists',
-        where: 'student_id = ? AND specialist_id = ?',
-        whereArgs: [assignment.studentId, assignment.specialistId]);
-    if (existing != null) {
-      await _db.updateWhere(
-        'student_specialists',
-        assignment.toMap(),
-        'id = ?',
-        [existing['id']],
-      );
-    } else {
-      await _db.upsert('student_specialists', assignment.toMap());
+  Future<List<StudentProgramAssignment>>
+      activeAssignmentsForSpecialistByProgram(
+          String specialistId, String programId) async {
+    final rows = await _db.where('student_program_assignments',
+        where: 'specialist_id = ? AND program_id = ? AND status = ?',
+        whereArgs: [specialistId, programId, 'active']);
+    return rows.map(StudentProgramAssignment.fromMap).toList();
+  }
+
+  Future<List<StudentProgramAssignment>> activeAssignmentsByCenter(
+      String centerId) async {
+    final rows = await _db.where('student_program_assignments',
+        where: 'center_id = ? AND status = ?',
+        whereArgs: [centerId, 'active']);
+    return rows.map(StudentProgramAssignment.fromMap).toList();
+  }
+
+  Future<StudentProgramAssignment?> getActivePrimaryAssignment(
+      String studentId, String programId) async {
+    final row = await _db.first('student_program_assignments',
+        where: 'student_id = ? AND program_id = ? AND status = ? AND role = ?',
+        whereArgs: [studentId, programId, 'active', 'primary']);
+    return row != null ? StudentProgramAssignment.fromMap(row) : null;
+  }
+
+  Future<bool> hasActivePrimaryAssignment(
+      String studentId, String programId) async {
+    final count = await _db.countWhere('student_program_assignments',
+        'student_id = ? AND program_id = ? AND status = ? AND role = ?',
+        [studentId, programId, 'active', 'primary']);
+    return count > 0;
+  }
+
+  Future<StudentProgramAssignment?> getAssignmentById(String id) async {
+    final row = await _db.first('student_program_assignments',
+        where: 'id = ?', whereArgs: [id]);
+    return row != null ? StudentProgramAssignment.fromMap(row) : null;
+  }
+
+  Future<List<StudentProgramAssignment>> assignmentsForStudent(
+      String studentId) async {
+    final rows = await _db.where('student_program_assignments',
+        where: 'student_id = ?', whereArgs: [studentId],
+        orderBy: 'assigned_at DESC');
+    return rows.map(StudentProgramAssignment.fromMap).toList();
+  }
+
+  /// Creates a new active assignment.
+  /// Throws if:
+  /// - The specialist has no active capability for (center_id, program_id).
+  /// - An active primary assignment already exists for the same
+  ///   (student_id + program_id).
+  Future<void> assignProgramToSpecialist(
+      StudentProgramAssignment assignment) async {
+    final cap = await capabilityBySpecialistAndProgram(
+        assignment.specialistId, assignment.programId);
+    if (cap == null || !cap.isActive) {
+      throw StateError(
+          'الأخصائي غير مؤهل لهذا البرنامج. يرجى ربط الأخصائي بالبرنامج أولاً من شاشة الموظفين.');
     }
+    if (assignment.role == 'primary') {
+      final conflict = await hasActivePrimaryAssignment(
+          assignment.studentId, assignment.programId);
+      if (conflict) {
+        throw StateError(
+            'يوجد إسناد نشط بالفعل لهذا الطالب والبرنامج. استخدم replaceSpecialistForProgram لاستبدال الأخصائي.');
+      }
+    }
+    await _db.upsert('student_program_assignments', assignment.toMap());
   }
 
-  Future<void> deactivateStudentSpecialist(
-      String studentId, String specialistId) async {
-    await _db.updateWhere(
-      'student_specialists',
-      {'is_active': 0},
-      'student_id = ? AND specialist_id = ?',
-      [studentId, specialistId],
+  /// Deactivates the current active primary assignment for
+  /// (studentId, programId) and creates a new active assignment for the new
+  /// specialist. Logs both actions in audit_logs.
+  Future<void> replaceSpecialistForProgram({
+    required String studentId,
+    required String programId,
+    required String newSpecialistId,
+    required String centerId,
+    required String userId,
+    required String userName,
+    required String newAssignmentId,
+    String notes = '',
+  }) async {
+    final old = await getActivePrimaryAssignment(studentId, programId);
+    if (old != null) {
+      await _db.updateWhere(
+        'student_program_assignments',
+        {'status': 'inactive'},
+        'id = ?',
+        [old.id],
+      );
+      await _db.upsert('audit_logs', {
+        'id': 'audit_${DateTime.now().millisecondsSinceEpoch}_deact',
+        'center_id': centerId,
+        'user_id': userId,
+        'user_name': userName,
+        'action': 'deactivate_assignment',
+        'entity_type': 'student_program_assignment',
+        'entity_id': old.id,
+        'details': 'إلغاء إسناد الطالب $studentId من الأخصائي '
+            '${old.specialistId} للبرنامج $programId',
+        'created_at': DateTime.now().toIso8601String(),
+      });
+    }
+    final newAssignment = StudentProgramAssignment(
+      id: newAssignmentId,
+      centerId: centerId,
+      studentId: studentId,
+      programId: programId,
+      specialistId: newSpecialistId,
+      role: 'primary',
+      status: 'active',
+      notes: notes,
+      assignedByUserId: userId,
+      assignedAt: DateTime.now().toIso8601String(),
     );
+    await _db.upsert('student_program_assignments', newAssignment.toMap());
+    await _db.upsert('audit_logs', {
+      'id': 'audit_${DateTime.now().millisecondsSinceEpoch}_assign',
+      'center_id': centerId,
+      'user_id': userId,
+      'user_name': userName,
+      'action': 'assign_program_to_specialist',
+      'entity_type': 'student_program_assignment',
+      'entity_id': newAssignment.id,
+      'details': 'إسناد الطالب $studentId إلى الأخصائي $newSpecialistId '
+          'للبرنامج $programId',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  /// Sets an assignment status to 'inactive'.
+  Future<void> deactivateAssignment(String id) async {
+    await _db.updateWhere(
+      'student_program_assignments',
+      {'status': 'inactive'},
+      'id = ?',
+      [id],
+    );
+  }
+
+  /// Reactivates an inactive assignment.
+  /// Throws if there is already an active primary assignment for the same
+  /// (student_id + program_id).
+  Future<void> reactivateAssignment(String id) async {
+    final assignment = await getAssignmentById(id);
+    if (assignment == null) {
+      throw StateError('الإسناد غير موجود.');
+    }
+    if (assignment.status == 'active') {
+      return; // already active, no-op
+    }
+    if (assignment.role == 'primary') {
+      final conflict = await hasActivePrimaryAssignment(
+          assignment.studentId, assignment.programId);
+      if (conflict) {
+        throw StateError(
+            'لا يمكن إعادة التفعيل، يوجد إسناد نشط آخر لنفس الطالب والبرنامج.');
+      }
+    }
+    await _db.updateWhere(
+      'student_program_assignments',
+      {'status': 'active'},
+      'id = ?',
+      [id],
+    );
+  }
+
+  /// Returns student IDs assigned to a specialist via the new table.
+  Future<List<String>> studentIdsForSpecialist(String specialistId) async {
+    final rows = await activeAssignmentsForSpecialist(specialistId);
+    return rows.map((a) => a.studentId).toSet().toList();
   }
 
   Future<List<StudentFollowup>> studentFollowups(String studentId) async {
@@ -736,7 +923,117 @@ class SanadRepository {
     return row != null ? StudentFollowup.fromMap(row) : null;
   }
 
+  // ---- Specialist Program Capabilities ----
+
+  Future<List<SpecialistProgramCapability>> capabilitiesForSpecialist(
+      String specialistId) async {
+    final rows = await _db.where('specialist_program_capabilities',
+        where: 'specialist_id = ?', whereArgs: [specialistId]);
+    return rows.map(SpecialistProgramCapability.fromMap).toList();
+  }
+
+  Future<List<SpecialistProgramCapability>> activeCapabilitiesForSpecialist(
+      String specialistId) async {
+    final rows = await _db.where('specialist_program_capabilities',
+        where: 'specialist_id = ? AND status = ?',
+        whereArgs: [specialistId, 'active']);
+    return rows.map(SpecialistProgramCapability.fromMap).toList();
+  }
+
+  Future<List<SpecialistProgramCapability>> capabilitiesForProgram(
+      String programId) async {
+    final rows = await _db.where('specialist_program_capabilities',
+        where: 'program_id = ? AND status = ?',
+        whereArgs: [programId, 'active']);
+    return rows.map(SpecialistProgramCapability.fromMap).toList();
+  }
+
+  Future<List<SpecialistProgramCapability>>
+      activeCapabilitiesByCenter(String centerId) async {
+    final rows = await _db.where('specialist_program_capabilities',
+        where: 'center_id = ? AND status = ?',
+        whereArgs: [centerId, 'active']);
+    return rows.map(SpecialistProgramCapability.fromMap).toList();
+  }
+
+  Future<SpecialistProgramCapability?> capabilityBySpecialistAndProgram(
+      String specialistId, String programId) async {
+    final row = await _db.first('specialist_program_capabilities',
+        where: 'specialist_id = ? AND program_id = ?',
+        whereArgs: [specialistId, programId]);
+    return row != null ? SpecialistProgramCapability.fromMap(row) : null;
+  }
+
+  Future<bool> hasCapability(
+      String specialistId, String programId) async {
+    final cap = await capabilityBySpecialistAndProgram(
+        specialistId, programId);
+    return cap != null && cap.isActive;
+  }
+
+  Future<void> saveCapability(
+      SpecialistProgramCapability capability) async {
+    await _db.upsert(
+        'specialist_program_capabilities', capability.toMap());
+  }
+
+  Future<void> removeCapability(String id) async {
+    await _db.delete('specialist_program_capabilities', id);
+  }
+
+  Future<void> setCapabilitiesForSpecialist(
+    String specialistId,
+    String centerId,
+    String userId,
+    List<String> programIds,
+  ) async {
+    final existing =
+        await capabilitiesForSpecialist(specialistId);
+    final existingMap = {
+      for (final c in existing) c.programId: c
+    };
+    final now = DateTime.now().toIso8601String();
+
+    // Remove capabilities for programs no longer selected
+    for (final cap in existing) {
+      if (!programIds.contains(cap.programId)) {
+        await removeCapability(cap.id);
+      }
+    }
+
+    // Add capabilities for newly selected programs
+    for (final programId in programIds) {
+      if (!existingMap.containsKey(programId)) {
+        await saveCapability(SpecialistProgramCapability(
+          id: 'cap_${DateTime.now().millisecondsSinceEpoch}_$programId',
+          centerId: centerId,
+          specialistId: specialistId,
+          programId: programId,
+          status: 'active',
+          createdByUserId: userId,
+          createdAt: now,
+          updatedAt: now,
+        ));
+      }
+    }
+  }
+
+  // ---- End Specialist Program Capabilities ----
+
   Future<void> exportBackup(String targetPath) => _db.exportBackup(targetPath);
+
+  Future<Map<String, dynamic>> exportCenterBackup(String centerId) =>
+      _db.exportCenterBackup(centerId);
+
+  Future<void> saveCenterBackupToFile(
+          Map<String, dynamic> backup, String targetPath) =>
+      _db.saveCenterBackupToFile(backup, targetPath);
+
+  Future<Map<String, dynamic>> loadCenterBackupFromFile(String sourcePath) =>
+      _db.loadCenterBackupFromFile(sourcePath);
+
+  Future<void> importCenterBackup(Map<String, dynamic> backup) =>
+      _db.importCenterBackup(backup);
 
   Future<void> importBackup(String sourcePath) => _db.importBackup(sourcePath);
 

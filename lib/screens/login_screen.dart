@@ -29,10 +29,14 @@ class _LoginScreenState extends State<LoginScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: ConstrainedBox(
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 920),
               child: Card(
                 clipBehavior: Clip.antiAlias,
@@ -151,7 +155,8 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Future<void> _login() async {

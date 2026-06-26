@@ -1,10 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
 import '../models/assessment_improvement_summary.dart';
 import '../repositories/sanad_repository.dart';
+import '../services/demo_data_service.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
+import '../services/report_comparison_service.dart';
+import '../services/report_data_builder.dart';
 
 class AppProvider extends ChangeNotifier {
   AppProvider(this._repository, this._pdfService);
@@ -16,6 +21,9 @@ class AppProvider extends ChangeNotifier {
   AppUser? user;
   SanadCenter? currentCenter;
   SanadCenter? supportModeCenter;
+  AppUser? _realUserBeforeDemo;
+  bool isDemoModeActive = false;
+  String? demoModeUserId;
   List<SanadCenter> centers = [];
   List<AppUser> staff = [];
   List<Student> students = [];
@@ -42,7 +50,11 @@ class AppProvider extends ChangeNotifier {
   List<Evaluation> centerEvaluations = [];
   List<Exercise> centerExercises = [];
   List<SanadNotification> notifications = [];
-  List<StudentSpecialist> studentSpecialists = [];
+  String? currentProgramId;
+  List<StudentProgramAssignment> studentProgramAssignments = [];
+  List<StudentTherapyProgram> studentTherapyPrograms = [];
+  List<SpecialistProgramCapability> specialistProgramCapabilities = [];
+  Map<String, List<String>> specialistCapabilityProgramsByUser = {};
   Reward? reward;
   List<String> studentProgramIds = [];
   Map<String, String>? sessionPreselect;
@@ -65,7 +77,8 @@ class AppProvider extends ChangeNotifier {
 
   bool get isSanadOwnerAccount => user?.role == UserRole.sanadOwner;
   bool get isSupportMode => isSanadOwnerAccount && supportModeCenter != null;
-  bool get isOwner => isSanadOwnerAccount && !isSupportMode;
+  bool get isOwner =>
+      isSanadOwnerAccount && !isSupportMode && !isDemoModeActive;
   bool get isCenterManager =>
       user?.role == UserRole.centerManager || isSupportMode;
   bool get isClinicalSupervisor => user?.role == UserRole.clinicalSupervisor;
@@ -97,6 +110,11 @@ class AppProvider extends ChangeNotifier {
       isParent || hasPermission(AppPermission.createHomework);
   bool get canViewReports => hasPermission(AppPermission.viewReports);
   String get activeCenterId => currentCenter?.id ?? user?.centerId ?? '';
+
+  List<String> get specialistCapabilityProgramIds =>
+      isSpecialist
+          ? specialistProgramCapabilities.map((c) => c.programId).toList()
+          : [];
 
   int get completedHomeworkCount =>
       centerExercises.where((item) => item.status == 'مكتمل').length;
@@ -132,6 +150,34 @@ class AppProvider extends ChangeNotifier {
 
   bool studentHasAssessment(String studentId) =>
       clinicalAssessments.any((a) => a.studentId == studentId);
+
+  /// Check if student has ANY therapy data across all data sources.
+  /// For supervisor/manager roles, having any data (assessment, plan, session,
+  /// finding, followup, exercise) is sufficient to create a report.
+  bool studentHasTherapyData(String studentId, {String? programId}) {
+    if (programId != null) {
+      if (clinicalAssessments.any((a) => a.studentId == studentId && a.programId == programId)) return true;
+      if (plans.any((p) => p.studentId == studentId && p.programId == programId)) return true;
+      if (sessions.any((s) => s.studentId == studentId && s.programId == programId)) return true;
+      if (goalSkillSteps.any((s) => s.studentId == studentId && s.programId == programId)) return true;
+      if (studentFollowups.any((f) => f.studentId == studentId && f.programId == programId)) return true;
+      if (exercises.any((e) => e.studentId == studentId && e.programId == programId)) return true;
+      for (final entry in clinicalFindingsByAssessment.entries) {
+        if (entry.value.any((f) => f.studentId == studentId && f.programId == programId)) return true;
+      }
+    } else {
+      if (clinicalAssessments.any((a) => a.studentId == studentId)) return true;
+      if (plans.any((p) => p.studentId == studentId)) return true;
+      if (sessions.any((s) => s.studentId == studentId)) return true;
+      if (goalSkillSteps.any((s) => s.studentId == studentId)) return true;
+      if (studentFollowups.any((f) => f.studentId == studentId)) return true;
+      if (exercises.any((e) => e.studentId == studentId)) return true;
+      for (final entry in clinicalFindingsByAssessment.entries) {
+        if (entry.value.any((f) => f.studentId == studentId)) return true;
+      }
+    }
+    return false;
+  }
 
   String get studentAssessmentStatus {
     final student = selectedStudent;
@@ -355,6 +401,9 @@ class AppProvider extends ChangeNotifier {
     user = null;
     currentCenter = null;
     supportModeCenter = null;
+    _realUserBeforeDemo = null;
+    isDemoModeActive = false;
+    demoModeUserId = null;
     centers = [];
     centerStudentCounts = {};
     centerSpecialistCounts = {};
@@ -367,7 +416,10 @@ class AppProvider extends ChangeNotifier {
     evaluations = [];
     plans = [];
     exercises = [];
-    studentSpecialists = [];
+    studentProgramAssignments = [];
+    studentTherapyPrograms = [];
+    specialistProgramCapabilities = [];
+    specialistCapabilityProgramsByUser = {};
     reports = [];
     studentFollowups = [];
     centerStudentFollowups = [];
@@ -447,14 +499,28 @@ class AppProvider extends ChangeNotifier {
               : await _repository.students(activeCenterId);
 
       if (isSpecialist || isCoordinator || isCenterManager || isClinicalSupervisor) {
-        studentSpecialists = await _repository.studentSpecialists();
+        studentProgramAssignments =
+            await _repository.studentProgramAssignments();
+        studentTherapyPrograms =
+            await _repository.studentTherapyPrograms();
       }
       if (isSpecialist) {
-        final myStudentIds = studentSpecialists
-            .where((s) => s.specialistId == current.id && s.isActive)
-            .map((s) => s.studentId)
-            .toSet();
+        final myStudentIds = await _repository.studentIdsForSpecialist(current.id);
         students = students.where((s) => myStudentIds.contains(s.id)).toList();
+        specialistProgramCapabilities =
+            await _repository.activeCapabilitiesForSpecialist(current.id);
+      }
+      if (canManageStaff || isCoordinator) {
+        final specialistUsers = staff
+            .where((u) => u.role == UserRole.specialist)
+            .toList();
+        specialistCapabilityProgramsByUser = {};
+        for (final spec in specialistUsers) {
+          final caps =
+              await _repository.activeCapabilitiesForSpecialist(spec.id);
+          specialistCapabilityProgramsByUser[spec.id] =
+              caps.map((c) => c.programId).toList();
+        }
       }
 
       await _loadCenterMetrics();
@@ -533,6 +599,39 @@ class AppProvider extends ChangeNotifier {
     await loadHome();
   }
 
+  Future<void> enterDemoMode(String demoUserId) async {
+    _ensure(isSanadOwnerAccount || isDemoModeActive,
+        'الوضع التجريبي خاص بمالك سند فقط.');
+    if (!isDemoModeActive) {
+      _realUserBeforeDemo = user;
+    }
+    final rows = await _repository.users(centerId: DemoDataService.demoCenterId);
+    final demoUser = rows.cast<AppUser?>().firstWhere(
+        (u) => u?.id == demoUserId,
+        orElse: () => null);
+    if (demoUser == null) {
+      throw StateError('المستخدم التجريبي غير موجود. أنشئ البيانات التجريبية أولاً.');
+    }
+    user = demoUser;
+    isDemoModeActive = true;
+    demoModeUserId = demoUserId;
+    selectedStudent = null;
+    await loadHome();
+    notifyListeners();
+  }
+
+  Future<void> exitDemoMode() async {
+    if (!isDemoModeActive || _realUserBeforeDemo == null) return;
+    user = _realUserBeforeDemo;
+    _realUserBeforeDemo = null;
+    isDemoModeActive = false;
+    demoModeUserId = null;
+    selectedStudent = null;
+    supportModeCenter = null;
+    currentCenter = null;
+    await loadHome();
+  }
+
   Future<void> switchCenter(SanadCenter center) async {
     _ensure(canManageCenters, 'إدارة المراكز خاصة بمالك النظام فقط.');
     currentCenter = center;
@@ -588,6 +687,66 @@ class AppProvider extends ChangeNotifier {
       selectedStudent = null;
     }
     notifyListeners();
+  }
+
+  Future<void> selectStudentProgramContext({
+    required String studentId,
+    required String programId,
+    String? specialistId,
+  }) async {
+    final student = _requireStudent(studentId);
+    try {
+      _ensureStudentAccess(student);
+      selectedStudent = student;
+      currentProgramId = programId;
+      sessions = (await _repository.sessions(student.id))
+          .where((s) => s.programId == programId)
+          .toList();
+      if (specialistId != null) {
+        sessions = sessions.where((s) => s.specialistId == specialistId).toList();
+      }
+      studentFollowups = await _repository.studentFollowups(student.id);
+      evaluations = await _repository.evaluations(student.id);
+      plans = (await _repository.plansForProgram(student.id, programId)).toList();
+      if (specialistId != null) {
+        plans = plans.where((p) => p.specialistId == specialistId).toList();
+      }
+      goalSkillSteps = (await _repository.goalSkillSteps(student.id))
+          .where((s) => s.programId == programId)
+          .toList();
+      exercises = (await _repository.exercises(student.id))
+          .where((e) => e.programId == programId)
+          .toList();
+      reports = await _repository.reports(student.id);
+      clinicalAssessments = (await _repository.clinicalAssessments(student.id))
+          .where((a) => a.programId == programId)
+          .toList();
+      clinicalFindingsByAssessment = {};
+      for (final assessment in clinicalAssessments) {
+        clinicalFindingsByAssessment[assessment.id] =
+            (await _repository.clinicalFindings(assessment.id))
+                .where((f) => f.programId == programId)
+                .toList();
+      }
+      auditLogs = isOwner || isCenterManager
+          ? await _repository.auditLogs(
+              centerId: isOwner ? null : activeCenterId, studentId: student.id)
+          : [];
+      reward = await _repository.reward(student.id);
+      studentProgramIds = await _repository.studentProgramIds(student.id);
+    } catch (error) {
+      _debugLog('فشل تحميل سياق الطالب ${student.id} برنامج $programId: $error');
+      selectedStudent = null;
+      currentProgramId = null;
+    }
+    notifyListeners();
+  }
+
+  Student _requireStudent(String studentId) {
+    for (final s in students) {
+      if (s.id == studentId) return s;
+    }
+    throw StateError('الطالب غير موجود.');
   }
 
   void _debugLog(String message) {
@@ -740,6 +899,26 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setSpecialistCapabilities(
+    String specialistId,
+    List<String> programIds,
+  ) async {
+    _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
+    final current = _requireUser();
+    await _repository.setCapabilitiesForSpecialist(
+      specialistId,
+      activeCenterId,
+      current.id,
+      programIds,
+    );
+    if (specialistId == current.id) {
+      specialistProgramCapabilities =
+          await _repository.activeCapabilitiesForSpecialist(specialistId);
+    }
+    specialistCapabilityProgramsByUser[specialistId] = programIds;
+    notifyListeners();
+  }
+
   Future<void> setStaffUserActive(AppUser account, bool isActive) async {
     _ensure(canManageStaff, 'إدارة الموظفين غير متاحة لهذا الحساب.');
     if (!isOwner && account.centerId != activeCenterId) {
@@ -870,25 +1049,64 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> assignStudentToSpecialist(
-      String studentId, String specialistId) async {
-    await _repository.saveStudentSpecialist(StudentSpecialist(
-      id: 'ss_${studentId}_$specialistId',
-      studentId: studentId,
-      specialistId: specialistId,
-      assignedByUserId: user?.id ?? '',
-      assignedAt: DateTime.now().toIso8601String(),
-      isActive: true,
-    ));
-    studentSpecialists = await _repository.studentSpecialists();
+  // ── Student Program Assignments ────────────────────────────────────
+
+  Future<void> loadStudentProgramAssignments() async {
+    studentProgramAssignments =
+        await _repository.studentProgramAssignments();
     notifyListeners();
   }
 
-  Future<void> unassignStudentFromSpecialist(
-      String studentId, String specialistId) async {
-    await _repository.deactivateStudentSpecialist(studentId, specialistId);
-    studentSpecialists = await _repository.studentSpecialists();
-    notifyListeners();
+  Future<void> assignProgramToSpecialist({
+    required String studentId,
+    required String programId,
+    required String specialistId,
+    required String centerId,
+  }) async {
+    final id = 'spa_${DateTime.now().millisecondsSinceEpoch}';
+    await _repository.assignProgramToSpecialist(StudentProgramAssignment(
+      id: id,
+      centerId: centerId,
+      studentId: studentId,
+      programId: programId,
+      specialistId: specialistId,
+      role: 'primary',
+      status: 'active',
+      assignedByUserId: user?.id ?? '',
+      assignedAt: DateTime.now().toIso8601String(),
+    ));
+    await loadStudentProgramAssignments();
+  }
+
+  Future<void> replaceSpecialistForProgram({
+    required String studentId,
+    required String programId,
+    required String newSpecialistId,
+    required String centerId,
+    String notes = '',
+  }) async {
+    final newId = 'spa_${DateTime.now().millisecondsSinceEpoch}';
+    await _repository.replaceSpecialistForProgram(
+      studentId: studentId,
+      programId: programId,
+      newSpecialistId: newSpecialistId,
+      centerId: centerId,
+      userId: user?.id ?? '',
+      userName: user?.name ?? '',
+      newAssignmentId: newId,
+      notes: notes,
+    );
+    await loadStudentProgramAssignments();
+  }
+
+  Future<void> deactivateAssignment(String id) async {
+    await _repository.deactivateAssignment(id);
+    await loadStudentProgramAssignments();
+  }
+
+  Future<void> reactivateAssignment(String id) async {
+    await _repository.reactivateAssignment(id);
+    await loadStudentProgramAssignments();
   }
 
   List<TherapyProgramTemplate> programsForStudent() {
@@ -1150,6 +1368,7 @@ class AppProvider extends ChangeNotifier {
       progress: progress,
       programId: plan.programId,
       sourceType: plan.sourceType,
+      specialistId: plan.specialistId,
       createdAt: plan.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     );
@@ -1178,6 +1397,7 @@ class AppProvider extends ChangeNotifier {
       progress: progress,
       programId: plan.programId,
       sourceType: plan.sourceType,
+      specialistId: plan.specialistId,
       createdAt: plan.createdAt,
       updatedAt: DateTime.now().toIso8601String(),
     );
@@ -1290,6 +1510,7 @@ class AppProvider extends ChangeNotifier {
             progress: 0,
             programId: finding.programId,
             sourceType: finding.sourceType,
+            specialistId: assessment.specialistId,
             createdAt: now,
             updatedAt: now,
           ),
@@ -1310,6 +1531,7 @@ class AppProvider extends ChangeNotifier {
               sortOrder: index,
               programId: finding.programId,
               sourceType: finding.sourceType,
+              specialistId: assessment.specialistId,
               createdAt: now,
               updatedAt: now,
             ));
@@ -1928,6 +2150,350 @@ class AppProvider extends ChangeNotifier {
         .length;
     final partial = evaluations.where((item) => item.score == 'جزئي').length;
     return (((good + partial * .5) / evaluations.length) * 100).round();
+  }
+
+  /// Returns current quarter (Q1-Q4) for a given date.
+  static String quarterForDate(DateTime date) {
+    final m = date.month;
+    if (m <= 3) return 'Q1';
+    if (m <= 6) return 'Q2';
+    if (m <= 9) return 'Q3';
+    return 'Q4';
+  }
+
+  /// Quarter start date for a given quarter and year.
+  static DateTime quarterStart(String quarter, int year) {
+    switch (quarter) {
+      case 'Q1': return DateTime(year, 1, 1);
+      case 'Q2': return DateTime(year, 4, 1);
+      case 'Q3': return DateTime(year, 7, 1);
+      case 'Q4': return DateTime(year, 10, 1);
+      default: return DateTime(year, 1, 1);
+    }
+  }
+
+  /// Quarter end date for a given quarter and year.
+  static DateTime quarterEnd(String quarter, int year) {
+    switch (quarter) {
+      case 'Q1': return DateTime(year, 3, 31);
+      case 'Q2': return DateTime(year, 6, 30);
+      case 'Q3': return DateTime(year, 9, 30);
+      case 'Q4': return DateTime(year, 12, 31);
+      default: return DateTime(year, 12, 31);
+    }
+  }
+
+  /// Find the most recent previous specialist report for the same
+  /// (studentId, programId?, specialistId) combination.
+  ReportRecord? findPreviousSpecialistReport({
+    required String studentId,
+    String? programId,
+    String? specialistId,
+    String? scope,
+  }) {
+    final matching = reports.where((r) {
+      if (r.studentId != studentId) return false;
+      if (r.reportCategory != 'specialistInitial' &&
+          r.reportCategory != 'specialistFollowup') return false;
+      if (programId != null && r.programId != programId) return false;
+      if (specialistId != null && r.specialistId != specialistId) return false;
+      return true;
+    }).toList();
+    matching.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return matching.isNotEmpty ? matching.first : null;
+  }
+
+  /// Find the logically previous quarterly report for the same
+  /// (studentId, scope, programId).
+  /// Q1 → looks for Q4 of previous year.
+  /// Q2 → looks for Q1 of same year.
+  /// Q3 → looks for Q2 of same year.
+  /// Q4 → looks for Q3 of same year.
+  ReportRecord? findPreviousQuarterlyReport({
+    required String studentId,
+    required String scope,
+    String? programId,
+    String? quarter,
+    String? year,
+  }) {
+    if (quarter == null || year == null) return null;
+
+    String prevQuarter;
+    int prevYear;
+    switch (quarter) {
+      case 'Q1':
+        prevQuarter = 'Q4';
+        prevYear = int.tryParse(year) ?? DateTime.now().year;
+        prevYear--;
+        break;
+      case 'Q2':
+        prevQuarter = 'Q1';
+        prevYear = int.tryParse(year) ?? DateTime.now().year;
+        break;
+      case 'Q3':
+        prevQuarter = 'Q2';
+        prevYear = int.tryParse(year) ?? DateTime.now().year;
+        break;
+      case 'Q4':
+        prevQuarter = 'Q3';
+        prevYear = int.tryParse(year) ?? DateTime.now().year;
+        break;
+      default:
+        return null;
+    }
+
+    final matching = reports.where((r) {
+      if (r.studentId != studentId) return false;
+      if (r.reportCategory != 'supervisorQuarterly') return false;
+      if (r.scope != scope) return false;
+      if (programId != null && r.programId != programId) return false;
+      if (r.quarter == prevQuarter && r.year == prevYear.toString()) return true;
+      return false;
+    }).toList();
+    matching.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return matching.isNotEmpty ? matching.first : null;
+  }
+
+  /// Build full snapshot JSON from ReportData for later comparison.
+  String buildSnapshotJson(ReportData data, {String reportCategory = 'general'}) {
+    return jsonEncode({
+      'studentId': data.student.id,
+      'studentName': data.student.name,
+      'generatedAt': DateTime.now().toIso8601String(),
+      'reportCategory': reportCategory,
+      'dateFrom': data.dateFrom,
+      'dateTo': data.dateTo,
+      'totalSessions': data.totalSessions,
+      'totalPlans': data.totalPlans,
+      'totalMasteredGoals': data.totalMasteredGoals,
+      'totalActiveGoals': data.totalActiveGoals,
+      'overallImprovementRate': data.overallImprovementRate,
+      'sections': data.sections.map((s) => {
+        'programId': s.programId,
+        'programName': s.programName,
+        'specialistId': s.specialistId,
+        'specialistName': s.specialistName,
+        'overallProgress': s.overallProgress,
+        'masteredGoals': s.masteredGoals,
+        'activeGoals': s.activeGoals,
+        'plans': s.plans.map((p) => {
+          'id': p.id,
+          'goal': p.goal,
+          'sourceType': p.sourceType,
+          'progress': _goalProgressFromSectionData(s, p.id),
+        }).toList(),
+        'sessions': s.sessions.map((sess) => {
+          'id': sess.id,
+          'startedAt': sess.startedAt,
+          'quickResult': sess.quickResult,
+          'planId': sess.planId,
+          'successRate': sess.successRate,
+        }).toList(),
+        'assessments': s.assessments.map((a) => {
+          'id': a.id,
+          'specialistName': a.specialistName,
+          'createdAt': a.createdAt,
+        }).toList(),
+        'findings': s.findings.map((f) => {
+          'itemTitle': f.itemTitle,
+          'result': f.result,
+          'isNormal': f.isNormal,
+        }).toList(),
+        'goalSkillSteps': s.goalSkillSteps.map((g) => {
+          'id': g.id,
+          'goalId': g.goalId,
+          'title': g.title,
+          'status': g.status,
+        }).toList(),
+      }).toList(),
+    });
+  }
+
+  int _goalProgressFromSectionData(ProgramReportSection section, String planId) {
+    final steps = section.goalSkillSteps.where((s) => s.goalId == planId).toList();
+    if (steps.isEmpty) {
+      final matches = section.sessions
+          .where((s) => s.planId == planId)
+          .toList()
+        ..sort((a, b) => b.startedAt.compareTo(a.startedAt));
+      if (matches.isEmpty) return 0;
+      switch (matches.first.quickResult) {
+        case 'متقن': return 100;
+        case 'بمساعدة': return 50;
+        default: return 0;
+      }
+    }
+    final completed = steps.where((s) => s.status == 'متقن').length;
+    return ((completed / steps.length) * 100).round();
+  }
+
+  /// Check if the student has enough therapy data to generate a report.
+  /// For all roles: looks for ANY therapy data (assessments, findings, plans,
+  /// sessions, followups, exercises) within the relevant program scope.
+  /// Returns an error message string if no data found, or null if OK.
+  String? validateStudentHasAssessment({
+    required String studentId,
+    required String scope,
+    String? programId,
+    String? specialistId,
+  }) {
+    bool hasData = false;
+
+    if (scope == 'singleProgram' && programId != null) {
+      hasData = studentHasTherapyData(studentId, programId: programId);
+    } else if (scope == 'specialistPrograms' && specialistId != null) {
+      final assignedIds = studentProgramAssignments
+          .where((a) =>
+              a.specialistId == specialistId &&
+              a.studentId == studentId &&
+              a.isActive &&
+              a.centerId == activeCenterId)
+          .map((a) => a.programId)
+          .toSet();
+      for (final pid in assignedIds) {
+        if (studentHasTherapyData(studentId, programId: pid)) {
+          hasData = true;
+          break;
+        }
+      }
+    } else {
+      hasData = studentHasTherapyData(studentId);
+    }
+
+    if (!hasData) {
+      return 'لا توجد بيانات علاجية كافية لهذا الطالب بعد. يرجى إجراء تقييم أولي أو تسجيل بيانات علاجية أولًا.';
+    }
+    return null;
+  }
+
+  Future<({
+    ReportData data,
+    ReportRecord record,
+    ReportComparisonResult? comparison,
+  })> buildSmartReportData({
+    required String studentId,
+    required String type,
+    required String scope,
+    String? programId,
+    String? specialistId,
+    String? dateFrom,
+    String? dateTo,
+    String specialistSignature = '',
+    String managerSignature = '',
+    String reportCategory = 'general',
+    String? previousReportId,
+    String? quarter,
+    String? year,
+  }) async {
+    _ensure(canViewReports, 'التقارير الرسمية يصدرها المركز فقط.');
+
+    // Validate assessment exists
+    final assessmentError = validateStudentHasAssessment(
+      studentId: studentId,
+      scope: scope,
+      programId: programId,
+      specialistId: specialistId,
+    );
+    if (assessmentError != null) {
+      throw StateError(assessmentError);
+    }
+
+    final student = students.where((s) => s.id == studentId).firstOrNull;
+    if (student == null) {
+      throw StateError('الطالب غير موجود.');
+    }
+
+    final builder = ReportDataBuilder(app: this);
+    final data = builder.build(
+      studentId: studentId,
+      type: type,
+      scope: scope,
+      programId: programId,
+      specialistId: specialistId,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+      createdByUserId: user?.id ?? '',
+      createdByName: user?.name ?? '',
+    );
+
+    final now = DateTime.now();
+    final reportId = 'report_${now.millisecondsSinceEpoch}';
+
+    // Build full snapshot
+    final snapshotJson = buildSnapshotJson(data, reportCategory: reportCategory);
+
+    // Build data summary (kept for backward compat)
+    final dataSummary = jsonEncode({
+      'programCount': data.sections.length,
+      'sessionsCount': data.totalSessions,
+      'plansCount': data.totalPlans,
+      'masteredGoals': data.totalMasteredGoals,
+      'activeGoals': data.totalActiveGoals,
+      'sections': data.sections.map((s) => {
+        'programId': s.programId,
+        'programName': s.programName,
+        'specialistId': s.specialistId,
+        'specialistName': s.specialistName,
+        'plansCount': s.plans.length,
+        'sessionsCount': s.sessions.length,
+        'progress': s.overallProgress,
+        'masteredGoals': s.masteredGoals,
+        'activeGoals': s.activeGoals,
+      }).toList(),
+    });
+
+    // Compute comparison if previous report exists
+    ReportComparisonResult? comparison;
+    if (previousReportId != null) {
+      final prevReport = reports.where((r) => r.id == previousReportId).firstOrNull;
+      if (prevReport != null && prevReport.snapshotJson.isNotEmpty) {
+        final prevSnapshot = ReportComparisonService.parseSnapshot(prevReport.snapshotJson);
+        comparison = ReportComparisonService.compare(
+          previousSnapshot: prevSnapshot,
+          currentData: data,
+        );
+      }
+    }
+
+    final report = ReportRecord(
+      id: reportId,
+      centerId: student.centerId,
+      studentId: student.id,
+      programId: programId,
+      specialistId: specialistId,
+      createdByUserId: user?.id ?? '',
+      type: type,
+      reportTitle: data.type,
+      createdAt: now.toIso8601String(),
+      improvementRate: data.overallImprovementRate,
+      specialistSignature: specialistSignature,
+      managerSignature: managerSignature,
+      scope: scope,
+      dateFrom: dateFrom ?? '',
+      dateTo: dateTo ?? '',
+      reportStatus: 'exported',
+      dataJson: dataSummary,
+      reportCategory: reportCategory,
+      previousReportId: previousReportId,
+      quarter: quarter,
+      year: year,
+      snapshotJson: snapshotJson,
+    );
+
+    return (data: data, record: report, comparison: comparison);
+  }
+
+  Future<void> saveReportRecord(ReportRecord report) async {
+    await _repository.saveReport(report);
+    await _log(
+      action: 'إنشاء تقرير ذكي',
+      entityType: 'report',
+      entityId: report.id,
+      centerId: report.centerId,
+      details: '${report.studentId} - ${report.type} - ${report.scope}',
+    );
+    reports.add(report);
+    notifyListeners();
   }
 
   AppUser _requireUser() {

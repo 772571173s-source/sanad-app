@@ -15,44 +15,46 @@ class DashboardScreen extends StatelessWidget {
     final todaySessions = _todaySessions(app);
     final alerts = _alerts(app, todaySessions);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _DashboardHero(
-          app: app,
-          improvement: improvement,
-          todaySessions: todaySessions.length,
-          alerts: alerts.length,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        ResponsiveGrid(children: _quickStats(app, improvement, todaySessions)),
-        const SizedBox(height: AppSpacing.md),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 980;
-            final timeline = _RecentActivityTimeline(app: app);
-            final attention = _AttentionCard(alerts: alerts);
-            if (!wide) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _DashboardHero(
+            app: app,
+            improvement: improvement,
+            todaySessions: todaySessions.length,
+            alerts: alerts.length,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          ResponsiveGrid(children: _quickStats(app, improvement, todaySessions)),
+          const SizedBox(height: AppSpacing.md),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 980;
+              final timeline = _RecentActivityTimeline(app: app);
+              final attention = _AttentionCard(alerts: alerts);
+              if (!wide) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    timeline,
+                    const SizedBox(height: AppSpacing.md),
+                    attention,
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  timeline,
-                  const SizedBox(height: AppSpacing.md),
-                  attention,
+                  Expanded(flex: 3, child: timeline),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(flex: 2, child: attention),
                 ],
               );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 3, child: timeline),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(flex: 2, child: attention),
-              ],
-            );
-          },
-        ),
-      ],
+            },
+          ),
+        ],
+      ),
     );
   }
 

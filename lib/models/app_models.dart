@@ -29,6 +29,7 @@ enum AppPermission {
   updateGoalProgress,
   createHomework,
   parentFollowUp,
+  manageStudentAssignments,
 }
 
 extension UserRoleX on UserRole {
@@ -73,6 +74,7 @@ extension UserRoleX on UserRole {
           AppPermission.runSessions,
           AppPermission.updateGoalProgress,
           AppPermission.createHomework,
+          AppPermission.manageStudentAssignments,
         };
       case UserRole.centerManager:
         return {
@@ -83,6 +85,7 @@ extension UserRoleX on UserRole {
           AppPermission.viewReports,
           AppPermission.viewClinicalAssessments,
           AppPermission.manageTherapyStructure,
+          AppPermission.manageStudentAssignments,
         };
       case UserRole.clinicalSupervisor:
         return {
@@ -99,6 +102,7 @@ extension UserRoleX on UserRole {
         return {
           AppPermission.viewStudents,
           AppPermission.assignStudents,
+          AppPermission.manageStudentAssignments,
         };
       case UserRole.dataEntry:
         return {
@@ -475,6 +479,8 @@ class Evaluation {
     this.notes = '',
     this.severity = 1,
     this.recommendation = '',
+    this.programId = '',
+    this.specialistId = '',
     this.updatedAt = '',
   });
 
@@ -489,6 +495,8 @@ class Evaluation {
   final String notes;
   final int severity;
   final String recommendation;
+  final String programId;
+  final String specialistId;
   final String updatedAt;
 
   static Evaluation fromMap(Map<String, Object?> row) => Evaluation(
@@ -503,6 +511,8 @@ class Evaluation {
         notes: (row['notes'] ?? '') as String,
         severity: (row['severity'] ?? 1) as int,
         recommendation: (row['recommendation'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
 
@@ -518,6 +528,8 @@ class Evaluation {
         'notes': notes,
         'severity': severity,
         'recommendation': recommendation,
+        'program_id': programId,
+        'specialist_id': specialistId,
         'updated_at': updatedAt,
       };
 }
@@ -533,6 +545,7 @@ class TrainingPlan {
     required this.progress,
     this.programId = '',
     this.sourceType = 'standard',
+    this.specialistId = '',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -546,6 +559,7 @@ class TrainingPlan {
   final int progress;
   final String programId;
   final String sourceType;
+  final String specialistId;
   final String createdAt;
   final String updatedAt;
 
@@ -559,6 +573,7 @@ class TrainingPlan {
         progress: (row['progress'] ?? 0) as int,
         programId: (row['program_id'] ?? '') as String,
         sourceType: (row['source_type'] ?? 'standard') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -573,6 +588,7 @@ class TrainingPlan {
         'progress': progress,
         'program_id': programId,
         'source_type': sourceType,
+        'specialist_id': specialistId,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -583,6 +599,7 @@ class TrainingPlan {
     String? programId,
     String? sourceType,
     String? targetDate,
+    String? specialistId,
     String? updatedAt,
   }) =>
       TrainingPlan(
@@ -594,6 +611,7 @@ class TrainingPlan {
         progress: progress ?? this.progress,
         programId: programId ?? this.programId,
         sourceType: sourceType ?? this.sourceType,
+        specialistId: specialistId ?? this.specialistId,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
       );
@@ -612,6 +630,7 @@ class GoalSkillStep {
     this.lastSessionId = '',
     this.programId = '',
     this.sourceType = 'standard',
+    this.specialistId = '',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -627,6 +646,7 @@ class GoalSkillStep {
   final String lastSessionId;
   final String programId;
   final String sourceType;
+  final String specialistId;
   final String createdAt;
   final String updatedAt;
 
@@ -642,6 +662,7 @@ class GoalSkillStep {
         lastSessionId: (row['last_session_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
         sourceType: (row['source_type'] ?? 'standard') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -658,6 +679,7 @@ class GoalSkillStep {
         'last_session_id': lastSessionId,
         'program_id': programId,
         'source_type': sourceType,
+        'specialist_id': specialistId,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -668,6 +690,7 @@ class GoalSkillStep {
     String? lastSessionId,
     String? programId,
     String? sourceType,
+    String? specialistId,
     String? updatedAt,
   }) =>
       GoalSkillStep(
@@ -753,6 +776,7 @@ class Exercise {
     this.parentCompletedAt = '',
     this.specialistReviewedAt = '',
     this.createdFromSessionResult = '',
+    this.specialistId = '',
     this.createdAt = '',
     this.updatedAt = '',
   });
@@ -776,6 +800,7 @@ class Exercise {
   final String parentCompletedAt;
   final String specialistReviewedAt;
   final String createdFromSessionResult;
+  final String specialistId;
   final String createdAt;
   final String updatedAt;
 
@@ -800,6 +825,7 @@ class Exercise {
         specialistReviewedAt: (row['specialist_reviewed_at'] ?? '') as String,
         createdFromSessionResult:
             (row['created_from_session_result'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
       );
@@ -824,6 +850,7 @@ class Exercise {
         'parent_completed_at': parentCompletedAt,
         'specialist_reviewed_at': specialistReviewedAt,
         'created_from_session_result': createdFromSessionResult,
+        'specialist_id': specialistId,
         'created_at': createdAt,
         'updated_at': updatedAt,
       };
@@ -911,51 +938,166 @@ class ReportRecord {
     required this.id,
     this.centerId = '',
     required this.studentId,
+    this.programId,
+    this.specialistId,
+    this.createdByUserId = '',
     required this.type,
+    this.reportTitle = '',
     required this.createdAt,
-    required this.improvementRate,
-    required this.specialistSignature,
+    this.improvementRate = 0,
+    this.specialistSignature = '',
     this.managerSignature = '',
+    this.scope = '',
+    this.dateFrom = '',
+    this.dateTo = '',
+    this.reportStatus = 'exported',
+    this.dataJson = '',
     this.filePath = '',
     this.updatedAt = '',
+    this.reportCategory = 'general',
+    this.previousReportId,
+    this.quarter,
+    this.year,
+    this.snapshotJson = '',
+    this.sequenceNumber = 0,
   });
 
   final String id;
   final String centerId;
   final String studentId;
+  final String? programId;
+  final String? specialistId;
+  final String createdByUserId;
   final String type;
+  final String reportTitle;
   final String createdAt;
   final int improvementRate;
   final String specialistSignature;
   final String managerSignature;
+  final String scope;
+  final String dateFrom;
+  final String dateTo;
+  final String reportStatus;
+  final String dataJson;
   final String filePath;
   final String updatedAt;
+  final String reportCategory;
+  final String? previousReportId;
+  final String? quarter;
+  final String? year;
+  final String snapshotJson;
+  final int sequenceNumber;
 
   static ReportRecord fromMap(Map<String, Object?> row) => ReportRecord(
         id: (row['id'] ?? '') as String,
         centerId: (row['center_id'] ?? '') as String,
         studentId: (row['student_id'] ?? '') as String,
+        programId: row['program_id'] as String?,
+        specialistId: row['specialist_id'] as String?,
+        createdByUserId: (row['created_by_user_id'] ?? '') as String,
         type: (row['type'] ?? '') as String,
+        reportTitle: (row['report_title'] ?? '') as String,
         createdAt: (row['created_at'] ?? '') as String,
         improvementRate: (row['improvement_rate'] ?? 0) as int,
         specialistSignature: (row['specialist_signature'] ?? '') as String,
         managerSignature: (row['manager_signature'] ?? '') as String,
+        scope: (row['scope'] ?? '') as String,
+        dateFrom: (row['date_from'] ?? '') as String,
+        dateTo: (row['date_to'] ?? '') as String,
+        reportStatus: (row['report_status'] ?? 'exported') as String,
+        dataJson: (row['data_json'] ?? '') as String,
         filePath: (row['file_path'] ?? '') as String,
         updatedAt: (row['updated_at'] ?? '') as String,
+        reportCategory: (row['report_category'] ?? 'general') as String,
+        previousReportId: row['previous_report_id'] as String?,
+        quarter: row['quarter'] as String?,
+        year: row['year'] as String?,
+        snapshotJson: (row['snapshot_json'] ?? '') as String,
+        sequenceNumber: (row['sequence_number'] ?? 0) as int,
       );
 
   Map<String, Object?> toMap() => {
         'id': id,
         'center_id': centerId,
         'student_id': studentId,
+        'program_id': programId,
+        'specialist_id': specialistId,
+        'created_by_user_id': createdByUserId,
         'type': type,
+        'report_title': reportTitle,
         'created_at': createdAt,
         'improvement_rate': improvementRate,
         'specialist_signature': specialistSignature,
         'manager_signature': managerSignature,
+        'scope': scope,
+        'date_from': dateFrom,
+        'date_to': dateTo,
+        'report_status': reportStatus,
+        'data_json': dataJson,
         'file_path': filePath,
         'updated_at': updatedAt,
+        'report_category': reportCategory,
+        'previous_report_id': previousReportId,
+        'quarter': quarter,
+        'year': year,
+        'snapshot_json': snapshotJson,
+        'sequence_number': sequenceNumber,
       };
+
+  ReportRecord copyWith({
+    String? id,
+    String? centerId,
+    String? studentId,
+    String? programId,
+    String? specialistId,
+    String? createdByUserId,
+    String? type,
+    String? reportTitle,
+    String? createdAt,
+    int? improvementRate,
+    String? specialistSignature,
+    String? managerSignature,
+    String? scope,
+    String? dateFrom,
+    String? dateTo,
+    String? reportStatus,
+    String? dataJson,
+    String? filePath,
+    String? updatedAt,
+    String? reportCategory,
+    String? previousReportId,
+    String? quarter,
+    String? year,
+    String? snapshotJson,
+    int? sequenceNumber,
+  }) =>
+      ReportRecord(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        studentId: studentId ?? this.studentId,
+        programId: programId ?? this.programId,
+        specialistId: specialistId ?? this.specialistId,
+        createdByUserId: createdByUserId ?? this.createdByUserId,
+        type: type ?? this.type,
+        reportTitle: reportTitle ?? this.reportTitle,
+        createdAt: createdAt ?? this.createdAt,
+        improvementRate: improvementRate ?? this.improvementRate,
+        specialistSignature: specialistSignature ?? this.specialistSignature,
+        managerSignature: managerSignature ?? this.managerSignature,
+        scope: scope ?? this.scope,
+        dateFrom: dateFrom ?? this.dateFrom,
+        dateTo: dateTo ?? this.dateTo,
+        reportStatus: reportStatus ?? this.reportStatus,
+        dataJson: dataJson ?? this.dataJson,
+        filePath: filePath ?? this.filePath,
+        updatedAt: updatedAt ?? this.updatedAt,
+        reportCategory: reportCategory ?? this.reportCategory,
+        previousReportId: previousReportId ?? this.previousReportId,
+        quarter: quarter ?? this.quarter,
+        year: year ?? this.year,
+        snapshotJson: snapshotJson ?? this.snapshotJson,
+        sequenceNumber: sequenceNumber ?? this.sequenceNumber,
+      );
 }
 
 class ClinicalAssessment {
@@ -966,6 +1108,7 @@ class ClinicalAssessment {
     required this.specialistId,
     required this.specialistName,
     required this.type,
+    this.programId = '',
     required this.strengthsSummary,
     required this.weaknessesSummary,
     required this.goalsSummary,
@@ -980,6 +1123,7 @@ class ClinicalAssessment {
   final String specialistId;
   final String specialistName;
   final String type;
+  final String programId;
   final String strengthsSummary;
   final String weaknessesSummary;
   final String goalsSummary;
@@ -995,6 +1139,7 @@ class ClinicalAssessment {
         specialistId: (row['specialist_id'] ?? '') as String,
         specialistName: (row['specialist_name'] ?? '') as String,
         type: (row['type'] ?? 'speech') as String,
+        programId: (row['program_id'] ?? '') as String,
         strengthsSummary: (row['strengths_summary'] ?? '') as String,
         weaknessesSummary: (row['weaknesses_summary'] ?? '') as String,
         goalsSummary: (row['goals_summary'] ?? '') as String,
@@ -1010,6 +1155,7 @@ class ClinicalAssessment {
         'specialist_id': specialistId,
         'specialist_name': specialistName,
         'type': type,
+        'program_id': programId,
         'strengths_summary': strengthsSummary,
         'weaknesses_summary': weaknessesSummary,
         'goals_summary': goalsSummary,
@@ -1601,6 +1747,7 @@ class AssessmentDraft {
   const AssessmentDraft({
     required this.studentId,
     required this.programId,
+    this.centerId = '',
     this.phase = 'sections',
     this.stepIndex = 0,
     this.currentLetter = '',
@@ -1613,6 +1760,7 @@ class AssessmentDraft {
 
   final String studentId;
   final String programId;
+  final String centerId;
   final String phase;
   final int stepIndex;
   final String currentLetter;
@@ -1626,6 +1774,7 @@ class AssessmentDraft {
       AssessmentDraft(
         studentId: (row['student_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
         phase: (row['phase'] ?? 'sections') as String,
         stepIndex: (row['step_index'] ?? 0) as int,
         currentLetter: (row['current_letter'] ?? '') as String,
@@ -1642,6 +1791,7 @@ class AssessmentDraft {
   Map<String, Object?> toMap() => {
         'student_id': studentId,
         'program_id': programId,
+        'center_id': centerId,
         'phase': phase,
         'step_index': stepIndex,
         'current_letter': currentLetter,
@@ -1659,12 +1809,14 @@ class StudentTherapyProgram {
     required this.studentId,
     required this.programId,
     required this.assignedAt,
+    this.centerId = '',
     this.assignedByUserId = '',
     this.isActive = true,
     this.sortOrder = 0,
   });
 
   final String id;
+  final String centerId;
   final String studentId;
   final String programId;
   final String assignedAt;
@@ -1675,6 +1827,7 @@ class StudentTherapyProgram {
   static StudentTherapyProgram fromMap(Map<String, Object?> row) =>
       StudentTherapyProgram(
         id: (row['id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: (row['student_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
         assignedAt: (row['assigned_at'] ?? '') as String,
@@ -1685,6 +1838,7 @@ class StudentTherapyProgram {
 
   Map<String, Object?> toMap() => {
         'id': id,
+        'center_id': centerId,
         'student_id': studentId,
         'program_id': programId,
         'assigned_at': assignedAt,
@@ -1698,6 +1852,7 @@ class StudentFollowup {
   const StudentFollowup({
     required this.id,
     required this.studentId,
+    this.centerId = '',
     required this.specialistId,
     required this.programId,
     required this.sourceType,
@@ -1712,6 +1867,7 @@ class StudentFollowup {
   });
 
   final String id;
+  final String centerId;
   final String studentId;
   final String specialistId;
   final String programId;
@@ -1727,6 +1883,7 @@ class StudentFollowup {
 
   static StudentFollowup fromMap(Map<String, Object?> row) => StudentFollowup(
         id: (row['id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
         studentId: (row['student_id'] ?? '') as String,
         specialistId: (row['specialist_id'] ?? '') as String,
         programId: (row['program_id'] ?? '') as String,
@@ -1743,6 +1900,7 @@ class StudentFollowup {
 
   Map<String, Object?> toMap() => {
         'id': id,
+        'center_id': centerId,
         'student_id': studentId,
         'specialist_id': specialistId,
         'program_id': programId,
@@ -1778,6 +1936,8 @@ class StudentFollowup {
       );
 }
 
+@Deprecated('Use student_program_assignments instead. '
+    'This table is no longer written to and will be removed in a future version.')
 class StudentSpecialist {
   const StudentSpecialist({
     required this.id,
@@ -1813,4 +1973,164 @@ class StudentSpecialist {
         'assigned_at': assignedAt,
         'is_active': isActive ? 1 : 0,
       };
+}
+
+class StudentProgramAssignment {
+  const StudentProgramAssignment({
+    required this.id,
+    required this.centerId,
+    required this.studentId,
+    required this.programId,
+    required this.specialistId,
+    this.role = 'primary',
+    this.status = 'active',
+    this.notes = '',
+    this.assignedByUserId = '',
+    this.assignedAt = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  final String id;
+  final String centerId;
+  final String studentId;
+  final String programId;
+  final String specialistId;
+  final String role;
+  final String status;
+  final String notes;
+  final String assignedByUserId;
+  final String assignedAt;
+  final String createdAt;
+  final String updatedAt;
+
+  bool get isActive => status == 'active';
+
+  static StudentProgramAssignment fromMap(Map<String, Object?> row) =>
+      StudentProgramAssignment(
+        id: (row['id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
+        studentId: (row['student_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
+        role: (row['role'] ?? 'primary') as String,
+        status: (row['status'] ?? 'active') as String,
+        notes: (row['notes'] ?? '') as String,
+        assignedByUserId: (row['assigned_by_user_id'] ?? '') as String,
+        assignedAt: (row['assigned_at'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'student_id': studentId,
+        'program_id': programId,
+        'specialist_id': specialistId,
+        'role': role,
+        'status': status,
+        'notes': notes,
+        'assigned_by_user_id': assignedByUserId,
+        'assigned_at': assignedAt,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+
+  StudentProgramAssignment copyWith({
+    String? id,
+    String? centerId,
+    String? studentId,
+    String? programId,
+    String? specialistId,
+    String? role,
+    String? status,
+    String? notes,
+    String? assignedByUserId,
+    String? assignedAt,
+    String? createdAt,
+    String? updatedAt,
+  }) =>
+      StudentProgramAssignment(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        studentId: studentId ?? this.studentId,
+        programId: programId ?? this.programId,
+        specialistId: specialistId ?? this.specialistId,
+        role: role ?? this.role,
+        status: status ?? this.status,
+        notes: notes ?? this.notes,
+        assignedByUserId: assignedByUserId ?? this.assignedByUserId,
+        assignedAt: assignedAt ?? this.assignedAt,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+}
+
+class SpecialistProgramCapability {
+  final String id;
+  final String centerId;
+  final String specialistId;
+  final String programId;
+  final String status;
+  final String createdByUserId;
+  final String createdAt;
+  final String updatedAt;
+
+  const SpecialistProgramCapability({
+    this.id = '',
+    this.centerId = '',
+    required this.specialistId,
+    required this.programId,
+    this.status = 'active',
+    this.createdByUserId = '',
+    this.createdAt = '',
+    this.updatedAt = '',
+  });
+
+  bool get isActive => status == 'active';
+
+  static SpecialistProgramCapability fromMap(Map<String, Object?> row) =>
+      SpecialistProgramCapability(
+        id: (row['id'] ?? '') as String,
+        centerId: (row['center_id'] ?? '') as String,
+        specialistId: (row['specialist_id'] ?? '') as String,
+        programId: (row['program_id'] ?? '') as String,
+        status: (row['status'] ?? 'active') as String,
+        createdByUserId: (row['created_by_user_id'] ?? '') as String,
+        createdAt: (row['created_at'] ?? '') as String,
+        updatedAt: (row['updated_at'] ?? '') as String,
+      );
+
+  Map<String, Object?> toMap() => {
+        'id': id,
+        'center_id': centerId,
+        'specialist_id': specialistId,
+        'program_id': programId,
+        'status': status,
+        'created_by_user_id': createdByUserId,
+        'created_at': createdAt,
+        'updated_at': updatedAt,
+      };
+
+  SpecialistProgramCapability copyWith({
+    String? id,
+    String? centerId,
+    String? specialistId,
+    String? programId,
+    String? status,
+    String? createdByUserId,
+    String? createdAt,
+    String? updatedAt,
+  }) =>
+      SpecialistProgramCapability(
+        id: id ?? this.id,
+        centerId: centerId ?? this.centerId,
+        specialistId: specialistId ?? this.specialistId,
+        programId: programId ?? this.programId,
+        status: status ?? this.status,
+        createdByUserId: createdByUserId ?? this.createdByUserId,
+        createdAt: createdAt ?? this.createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
 }

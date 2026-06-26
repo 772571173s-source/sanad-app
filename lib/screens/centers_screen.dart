@@ -12,7 +12,8 @@ class CentersScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TherapyCard(
@@ -56,6 +57,7 @@ class CentersScreen extends StatelessWidget {
                 .toList(),
           ),
       ],
+      ),
     );
   }
 

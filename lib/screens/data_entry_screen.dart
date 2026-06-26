@@ -52,7 +52,8 @@ class _DataEntryScreenState extends State<DataEntryScreen> {
             .where((student) => student.parentPhone == phone)
             .toList();
 
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AppCard(
@@ -218,6 +219,7 @@ class _DataEntryScreenState extends State<DataEntryScreen> {
                 .toList(),
           ),
       ],
+      ),
     );
   }
 

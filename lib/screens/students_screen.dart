@@ -27,7 +27,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
       final matchesStatus = status == 'الكل' || student.status == status;
       return matchesSearch && matchesStatus;
     }).toList();
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Wrap(
@@ -134,7 +135,8 @@ class _StudentsScreenState extends State<StudentsScreen> {
             }).toList(),
           ),
       ],
+      ),
     );
   }
-
 }
+

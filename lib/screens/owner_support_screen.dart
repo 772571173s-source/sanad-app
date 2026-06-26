@@ -19,7 +19,8 @@ class OwnerSupportScreen extends StatelessWidget {
         message: 'أضف مركزًا أولًا حتى يظهر في لوحة المساعدة.',
       );
     }
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const TherapyCard(
@@ -44,6 +45,7 @@ class OwnerSupportScreen extends StatelessWidget {
               .toList(),
         ),
       ],
+      ),
     );
   }
 

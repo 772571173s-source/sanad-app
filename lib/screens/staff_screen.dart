@@ -27,7 +27,8 @@ class StaffScreen extends StatelessWidget {
             .toList();
     final title = app.isOwner ? 'مدراء المراكز' : 'الموظفون';
     final addLabel = app.isOwner ? 'إنشاء مدير' : 'إضافة موظف';
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return SingleChildScrollView(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TherapyCard(
         title: title,
         icon: Icons.manage_accounts_outlined,
@@ -60,14 +61,28 @@ class StaffScreen extends StatelessWidget {
               .map((account) => _ManagerProfileCard(
                     account: account,
                     centerName: _centerName(app.centers, account.centerId),
+                    capabilityProgramIds:
+                        app.specialistCapabilityProgramsByUser[account.id] ?? [],
+                    therapyProgramNames: app.therapyPrograms
+                        .where((p) => (app.specialistCapabilityProgramsByUser[
+                                    account.id]
+                                ?.contains(p.id) ??
+                            false))
+                        .map((p) => p.name)
+                        .toList(),
                     onEdit: () => _showForm(context, account: account),
                     onPassword: () => _changePassword(context, account),
                     onToggle: () => _toggleAccount(context, account),
                     onDelete: () => _deleteManager(context, account),
+                    onManagePrograms: account.role == UserRole.specialist
+                        ? () => _manageCapabilities(context, account)
+                        : null,
                   ))
               .toList(),
         ),
-    ]);
+      ],
+      ),
+    );
   }
 
   Future<void> _showForm(BuildContext context, {AppUser? account}) async {
@@ -81,6 +96,12 @@ class StaffScreen extends StatelessWidget {
     String? selectedCenterId = account?.centerId ??
         app.currentCenter?.id ??
         (centers.isEmpty ? null : centers.first.id);
+    final selectedPrograms = <String>{};
+    if (account != null && account.role == UserRole.specialist) {
+      final existing =
+          app.specialistCapabilityProgramsByUser[account.id] ?? [];
+      selectedPrograms.addAll(existing);
+    }
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -128,9 +149,42 @@ class StaffScreen extends StatelessWidget {
                       .map((item) => DropdownMenuItem(
                           value: item, child: Text(item.label)))
                       .toList(),
-                  onChanged: (value) =>
-                      setDialogState(() => role = value ?? role),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      role = value ?? role;
+                      if (role != UserRole.specialist) {
+                        selectedPrograms.clear();
+                      }
+                    });
+                  },
                 ),
+                if (role == UserRole.specialist && !app.isOwner) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  const Text('البرامج العلاجية',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  const SizedBox(height: AppSpacing.xs),
+                  if (app.therapyPrograms.isEmpty)
+                    const Text('لا توجد برامج علاجية في المركز.',
+                        style: TextStyle(color: Colors.grey))
+                  else
+                    ...app.therapyPrograms.map((program) {
+                      return CheckboxListTile(
+                        dense: true,
+                        title: Text(program.name, style: const TextStyle(fontSize: 14)),
+                        value: selectedPrograms.contains(program.id),
+                        onChanged: (checked) {
+                          setDialogState(() {
+                            if (checked == true) {
+                              selectedPrograms.add(program.id);
+                            } else {
+                              selectedPrograms.remove(program.id);
+                            }
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                      );
+                    }),
+                ],
                 if (app.isOwner) ...[
                   const SizedBox(height: AppSpacing.sm),
                   if (centers.isEmpty)
@@ -178,9 +232,14 @@ class StaffScreen extends StatelessWidget {
                   throw StateError(
                       'أكمل بيانات الحساب واختر المركز، وكلمة المرور لا تقل عن 8 أحرف.');
                 }
+                if (role == UserRole.specialist && selectedPrograms.isEmpty) {
+                  throw StateError(
+                      'يجب اختيار برنامج علاجي واحد على الأقل للأخصائي.');
+                }
+                final userId = account?.id ??
+                    'user_${DateTime.now().millisecondsSinceEpoch}';
                 await app.saveStaffUser(AppUser(
-                  id: account?.id ??
-                      'user_${DateTime.now().millisecondsSinceEpoch}',
+                  id: userId,
                   centerId: centerId,
                   email: email.text.trim(),
                   passwordHash: account?.passwordHash ??
@@ -194,6 +253,10 @@ class StaffScreen extends StatelessWidget {
                   createdAt: account?.createdAt ?? '',
                   updatedAt: DateTime.now().toIso8601String(),
                 ));
+                if (role == UserRole.specialist && selectedPrograms.isNotEmpty) {
+                  await app.setSpecialistCapabilities(
+                      userId, selectedPrograms.toList());
+                }
                 if (dialogContext.mounted) Navigator.pop(dialogContext);
               }),
               child: const Text('حفظ'),
@@ -311,24 +374,94 @@ class StaffScreen extends StatelessWidget {
     }
     return byId.values.toList();
   }
+
+  Future<void> _manageCapabilities(BuildContext context, AppUser account) async {
+    final app = context.read<AppProvider>();
+    final existing = app.specialistCapabilityProgramsByUser[account.id] ?? [];
+    final programs = app.therapyPrograms;
+
+    final selected = Set<String>.from(existing);
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('البرامج المتاحة - ${account.name}'),
+          content: SizedBox(
+            width: MediaQuery.sizeOf(context).width.clamp(320, 480).toDouble(),
+            child: programs.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(AppSpacing.lg),
+                    child: Text('لا توجد برامج علاجية متاحة. أضف برامج أولاً.'),
+                  )
+                : SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: programs.map((program) {
+                        return CheckboxListTile(
+                          title: Text(program.name),
+                          subtitle: program.description.isNotEmpty
+                              ? Text(program.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis)
+                              : null,
+                          value: selected.contains(program.id),
+                          onChanged: (checked) {
+                            setDialogState(() {
+                              if (checked == true) {
+                                selected.add(program.id);
+                              } else {
+                                selected.remove(program.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () => runWithFeedback(context, () async {
+                await app.setSpecialistCapabilities(
+                    account.id, selected.toList());
+                if (dialogContext.mounted) Navigator.pop(dialogContext);
+              }, success: 'تم حفظ البرامج.'),
+              child: const Text('حفظ'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ManagerProfileCard extends StatefulWidget {
   const _ManagerProfileCard({
     required this.account,
     required this.centerName,
+    required this.capabilityProgramIds,
+    required this.therapyProgramNames,
     required this.onEdit,
     required this.onPassword,
     required this.onToggle,
     required this.onDelete,
+    this.onManagePrograms,
   });
 
   final AppUser account;
   final String centerName;
+  final List<String> capabilityProgramIds;
+  final List<String> therapyProgramNames;
   final VoidCallback onEdit;
   final VoidCallback onPassword;
   final VoidCallback onToggle;
   final VoidCallback onDelete;
+  final VoidCallback? onManagePrograms;
 
   @override
   State<_ManagerProfileCard> createState() => _ManagerProfileCardState();
@@ -399,7 +532,9 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
                 children: [
                   AppPill(label: account.role.label, icon: Icons.verified_user),
                   AppPill(
-                    label: 'ID: ${_shortId(account.id)}',
+                    label: account.email.isNotEmpty
+                        ? account.email
+                        : account.role.label,
                     icon: Icons.badge_outlined,
                   ),
                   AppPill(
@@ -408,6 +543,19 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
                   ),
                 ],
               ),
+              if (account.role == UserRole.specialist && widget.therapyProgramNames.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.xs,
+                  runSpacing: AppSpacing.xs,
+                  children: widget.therapyProgramNames.map((name) {
+                    return AppPill(
+                      label: name,
+                      icon: Icons.folder_outlined,
+                    );
+                  }).toList(),
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
               Wrap(
                 spacing: AppSpacing.sm,
@@ -430,6 +578,12 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
                         : Icons.play_circle_outline),
                     label: Text(account.isActive ? 'إيقاف' : 'تفعيل'),
                   ),
+                  if (widget.onManagePrograms != null)
+                    FilledButton.tonalIcon(
+                      onPressed: widget.onManagePrograms,
+                      icon: const Icon(Icons.folder_outlined),
+                      label: const Text('البرامج'),
+                    ),
                   FilledButton.tonalIcon(
                     onPressed: widget.onDelete,
                     icon: const Icon(Icons.delete_outline),
@@ -447,6 +601,4 @@ class _ManagerProfileCardState extends State<_ManagerProfileCard> {
     );
   }
 
-  String _shortId(String id) =>
-      id.length <= 12 ? id : '${id.substring(0, 12)}...';
 }

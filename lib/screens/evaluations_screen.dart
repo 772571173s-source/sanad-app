@@ -6,6 +6,11 @@ import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
 import '../widgets/feedback.dart';
 
+// TODO: Legacy screen — kept for existing multi-program evaluations.
+// New assessments should use ClinicalAssessmentWizardScreen for single-program
+// flow. This screen creates ClinicalAssessment with programId='' because it
+// spans multiple programs; findings still carry individual programId values.
+
 class EvaluationsScreen extends StatefulWidget {
   const EvaluationsScreen({super.key});
 
@@ -17,6 +22,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
   int stepIndex = 0;
   bool summaryMode = false;
   bool saved = false;
+  final bool _showLegacyWarning = true;
   final selections = <String, _AssessmentChoice>{};
 
   @override
@@ -44,7 +50,8 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
     if (stepIndex >= steps.length) stepIndex = 0;
     final complete = selections.length == steps.length;
 
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         TherapyCard(
@@ -64,8 +71,11 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                   steps: steps,
                   selections: selections,
                   saved: saved,
+                  showLegacyWarning: _showLegacyWarning,
                   onBack: () => setState(() => summaryMode = false),
-                  onSave: saved ? null : () => _save(app, student, steps),
+                  onSave: saved || _showLegacyWarning
+                      ? null
+                      : () => _save(app, student, steps),
                 )
               else
                 _AssessmentStepCard(
@@ -95,6 +105,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
         const SizedBox(height: AppSpacing.md),
         _PreviousClinicalAssessments(app: app),
       ],
+      ),
     );
   }
 
@@ -128,6 +139,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                 ? 'اختر نتيجة البند حسب ملاحظة الأخصائي.'
                 : item.prompt,
             options: options,
+            programId: program.id,
           ));
         }
       }
@@ -153,6 +165,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
                   training: trigger.therapyTemplate,
                 ))
             .toList(),
+        programId: program.id,
       ));
     }
     return steps;
@@ -216,6 +229,7 @@ class _EvaluationsScreenState extends State<EvaluationsScreen> {
               weakness: choice.weakness,
               goal: choice.goal,
               training: choice.training,
+              programId: step.programId,
               createdAt: now,
             );
           }).toList(),
@@ -364,6 +378,7 @@ class _AssessmentSummary extends StatelessWidget {
     required this.saved,
     required this.onBack,
     required this.onSave,
+    this.showLegacyWarning = false,
   });
 
   final List<_AssessmentStep> steps;
@@ -371,6 +386,7 @@ class _AssessmentSummary extends StatelessWidget {
   final bool saved;
   final VoidCallback onBack;
   final VoidCallback? onSave;
+  final bool showLegacyWarning;
 
   @override
   Widget build(BuildContext context) {
@@ -418,6 +434,16 @@ class _AssessmentSummary extends StatelessWidget {
                   '${entry.value.goal}\nالتدريب: ${entry.value.training}')
               .toList(),
         ),
+        if (showLegacyWarning) ...[
+          const SizedBox(height: AppSpacing.md),
+          const SemanticAlertCard(
+            kind: SemanticAlertKind.warning,
+            icon: Icons.info_outline,
+            title: 'شاشة تقييم قديمة',
+            message:
+                'هذه الشاشة قديمة ولا تدعم البرامج العلاجية بشكل كامل. استخدم معالج التقييم العلاجي المرتبط بالبرنامج للتقييمات الجديدة.',
+          ),
+        ],
         const SizedBox(height: AppSpacing.lg),
         Row(
           children: [
@@ -526,12 +552,14 @@ class _AssessmentStep {
     required this.title,
     required this.question,
     required this.options,
+    this.programId = '',
   });
 
   final String id;
   final String domain;
   final String title;
   final String question;
+  final String programId;
   final List<_AssessmentChoice> options;
 }
 

@@ -9,11 +9,12 @@ import '../widgets/app_widgets.dart';
 import '../widgets/feedback.dart';
 import 'therapy_structure_builder_screen.dart';
 
+
 double _rv(BuildContext context, {required double small, required double large}) {
   return MediaQuery.of(context).size.width > 720 ? large : small;
 }
 
-enum _WizardPhase { studentSelect, programSelect, sections, soundMatrix, summary }
+enum _WizardPhase { initialLoading, studentSelect, programSelect, sections, soundMatrix, summary }
 
 class _AssessmentStep {
   const _AssessmentStep({
@@ -30,7 +31,18 @@ class _AssessmentStep {
 }
 
 class ClinicalAssessmentWizardScreen extends StatefulWidget {
-  const ClinicalAssessmentWizardScreen({super.key});
+  const ClinicalAssessmentWizardScreen({
+    super.key,
+    this.initialStudentId,
+    this.initialProgramId,
+    this.embedded = true,
+    this.onBack,
+  });
+
+  final String? initialStudentId;
+  final String? initialProgramId;
+  final bool embedded;
+  final VoidCallback? onBack;
 
   @override
   State<ClinicalAssessmentWizardScreen> createState() =>
@@ -67,17 +79,25 @@ class _ClinicalAssessmentWizardScreenState
   /// Needed because [context.read] may not work reliably in [dispose].
   AppProvider? _app;
 
+  String? _initializationError;
+
   @override
   void initState() {
     super.initState();
-    debugPrint(
-        '[Wizard] initState — phase=programSelect stepIndex=0');
     WidgetsBinding.instance.addObserver(this);
+    final hasInitialIds =
+        widget.initialStudentId != null && widget.initialProgramId != null;
+    if (hasInitialIds) {
+      phase = _WizardPhase.initialLoading;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _jumpToProgram(context);
+      });
+    }
   }
 
   @override
   void dispose() {
-    debugPrint('[Wizard] dispose — flushing draft save');
     WidgetsBinding.instance.removeObserver(this);
     _autoSaveDraftSync();
     super.dispose();
@@ -113,21 +133,95 @@ class _ClinicalAssessmentWizardScreenState
       updatedAt: DateTime.now().toIso8601String(),
     );
 
-    debugPrint('[Wizard] _autoSaveDraftSync —'
-        ' phase=${phase.name} stepIndex=$stepIndex _steps.length=${_steps.length}');
-
-    // Fire-and-forget: start the DB write synchronously.
+// Fire-and-forget: start the DB write synchronously.
     // This is the last save for this widget's lifetime; it runs to completion
     // on the event loop even after super.dispose().
     app.saveAssessmentDraft(draft);
+  }
+
+  Future<void> _jumpToProgram(BuildContext ctx) async {
+final app = ctx.read<AppProvider>();
+    final studentId = widget.initialStudentId;
+    final programId = widget.initialProgramId;
+if (studentId == null || programId == null) {
+return;
+    }
+
+    final student = app.students.cast<Student?>().firstWhere(
+      (s) => s!.id == studentId,
+      orElse: () => null,
+    );
+    final program = app.therapyPrograms.cast<TherapyProgramTemplate?>().firstWhere(
+      (p) => p!.id == programId,
+      orElse: () => null,
+    );
+
+if (student == null || program == null) {
+      final msg = student == null && program == null
+          ? 'لا يمكن فتح التقييم لأن بيانات الطالب والبرنامج غير موجودة.'
+          : student == null
+              ? 'لا يمكن فتح التقييم لأن بيانات الطالب غير موجودة أو لا تنتمي لهذا المركز.'
+              : 'لا يمكن فتح التقييم لأن البرنامج العلاجي غير موجود في مكتبة سند.';
+if (mounted) {
+        setState(() => _initializationError = msg);
+      }
+      return;
+    }
+
+    try {
+      await app.selectStudentProgramContext(
+        studentId: student.id,
+        programId: program.id,
+        specialistId: app.isSpecialist ? app.user?.id : null,
+      );
+      if (!mounted) return;
+
+      if (app.selectedStudent == null) {
+        setState(() {
+          _initializationError = 'فشل تحميل بيانات الطالب. قد لا تملك صلاحية الوصول أو حدث خطأ في قاعدة البيانات.';
+        });
+        return;
+      }
+
+      setState(() {
+        selectedProgram = program;
+        selections.clear();
+        multiSelections.clear();
+        letterResults.clear();
+        saved = false;
+        stepIndex = 0;
+        soundLetterIndex = 0;
+        _showPositionPicker = false;
+        _selectedErrorType = null;
+        lettersList = [];
+        phase = _WizardPhase.programSelect;
+        _buildSteps(app);
+      });
+await _checkForDraft(app);
+if (!mounted) return;
+      if (phase == _WizardPhase.programSelect) {
+        final nextPhase = _steps.isNotEmpty
+            ? _WizardPhase.sections
+            : program.usesSpeechSounds
+                ? _WizardPhase.soundMatrix
+                : _WizardPhase.summary;
+setState(() => phase = nextPhase);
+        _autoSaveDraft();
+      }
+    } catch (e) {
+if (mounted) {
+        setState(() {
+          _initializationError = 'حدث خطأ أثناء فتح التقييم: $e';
+        });
+      }
+    }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      debugPrint('[Wizard] lifecycle=$state → draft save');
-      _autoSaveDraft();
+_autoSaveDraft();
     }
   }
 
@@ -198,8 +292,7 @@ class _ClinicalAssessmentWizardScreenState
       }
     }
     _steps = all;
-    debugPrint('[Wizard] _buildSteps → ${_steps.length} steps');
-  }
+}
 
   int get _totalSteps => _steps.length;
 
@@ -238,10 +331,7 @@ class _ClinicalAssessmentWizardScreenState
       }
     });
 
-    debugPrint('[Wizard] _goNext —'
-        ' isLast=$isLast nextStepIndex=$nextStepIndex nextPhase=${nextPhase?.name}');
-
-    // 3. Save with EXPLICIT values (not relying on instance fields after setState).
+// 3. Save with EXPLICIT values (not relying on instance fields after setState).
     _autoSaveDraft(
       explicitStepIndex: isLast ? null : nextStepIndex,
       explicitPhase: isLast ? nextPhase!.name : null,
@@ -306,15 +396,7 @@ class _ClinicalAssessmentWizardScreenState
       updatedAt: DateTime.now().toIso8601String(),
     );
 
-    debugPrint('[Wizard] _autoSaveDraft —'
-        ' explicitStepIndex=$explicitStepIndex'
-        ' fallbackStepIndex=$stepIndex'
-        ' using=$saveStepIndex'
-        ' explicitPhase=$explicitPhase'
-        ' selections=${selections.length}'
-        ' multi=${multiSelections.length}');
-
-    await app.saveAssessmentDraft(draft);
+await app.saveAssessmentDraft(draft);
   }
 
   bool _hasAnyAnswer() {
@@ -421,8 +503,7 @@ class _ClinicalAssessmentWizardScreenState
     final app = context.read<AppProvider>();
     final student = app.selectedStudent;
     if (student == null || selectedProgram == null) return;
-    debugPrint('[Wizard] _clearDraft');
-    await app.deleteAssessmentDraft(student.id, selectedProgram!.id);
+await app.deleteAssessmentDraft(student.id, selectedProgram!.id);
   }
 
   Future<void> _checkForDraft(AppProvider app) async {
@@ -430,20 +511,11 @@ class _ClinicalAssessmentWizardScreenState
     if (student == null || selectedProgram == null) return;
 
     final draft = await app.assessmentDraft(student.id, selectedProgram!.id);
-    debugPrint('[Wizard] _checkForDraft —'
-        ' studentId=${student.id} programId=${selectedProgram!.id}'
-        ' draft=${draft != null}');
-    if (draft == null || !mounted) {
-      debugPrint('[Wizard] _checkForDraft — no draft or unmounted');
-      return;
+if (draft == null || !mounted) {
+return;
     }
 
-    debugPrint('[Wizard] draft found —'
-        ' phase=${draft.phase} stepIndex=${draft.stepIndex}'
-        ' selections=${draft.selectionsJson}'
-        ' multiSelections=${draft.multiSelectionsJson}');
-
-    final resume = await showDialog<bool>(
+final resume = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -578,14 +650,7 @@ class _ClinicalAssessmentWizardScreenState
           : _WizardPhase.summary;
     }
 
-    debugPrint('[Wizard] _restoreFromDraft —'
-        ' resolvedPhase=${resolvedPhase.name}'
-        ' draftStepIndex=${draft.stepIndex}'
-        ' restoredStepIndex=$restoredStepIndex'
-        ' _steps.length=${_steps.length}'
-        ' restoredSoundIndex=$restoredSoundIndex');
-
-    setState(() {
+setState(() {
       phase = resolvedPhase;
       stepIndex = _steps.isEmpty
           ? 0
@@ -600,26 +665,43 @@ class _ClinicalAssessmentWizardScreenState
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final app = context.watch<AppProvider>();
-    _app = app; // cache for dispose where context.read may not work
+    _app = app;
     final student = app.selectedStudent;
 
     if (app.loading) {
-      return const Center(child: CircularProgressIndicator());
+      return _wrap(child: const Center(child: CircularProgressIndicator()));
+    }
+
+    if (_initializationError != null) {
+      return _wrap(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: EmptyState(
+              icon: Icons.error_outline,
+              title: 'تعذر فتح التقييم',
+              message: _initializationError!,
+            ),
+          ),
+        ),
+      );
     }
 
     if (app.therapyPrograms.isEmpty) {
-      return EmptyState(
-        icon: Icons.schema_outlined,
-        title: 'لا توجد برامج علاجية',
-        message:
-            'يجب إنشاء برنامج علاجي في شاشة بناء الهيكل العلاجي أولاً قبل استخدام المعالج.',
-        action: _buildAction(
-          context,
-          label: 'فتح بناء الهيكل العلاجي',
+      return _wrap(
+        child: EmptyState(
           icon: Icons.schema_outlined,
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const TherapyStructureBuilderScreen(),
+          title: 'لا توجد برامج علاجية',
+          message:
+              'يجب إنشاء برنامج علاجي في شاشة بناء الهيكل العلاجي أولاً قبل استخدام المعالج.',
+          action: _buildAction(
+            context,
+            label: 'فتح بناء الهيكل العلاجي',
+            icon: Icons.schema_outlined,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const TherapyStructureBuilderScreen(),
+              ),
             ),
           ),
         ),
@@ -642,8 +724,9 @@ class _ClinicalAssessmentWizardScreenState
     const double maxWidth = 640;
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth > 720;
+    final isMobile = screenWidth < 600;
 
-    return Container(
+    final mainContent = Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -655,38 +738,83 @@ class _ClinicalAssessmentWizardScreenState
           ],
         ),
       ),
-      child: Center(
-        child: Container(
-          constraints: BoxConstraints(
-            maxWidth: isDesktop ? maxWidth : double.infinity,
-          ),
-              child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _CompactHeader(
-                phase: phase,
-                programName: selectedProgram?.name ?? '',
-                studentName: student?.name ?? '',
-                sectionTitle:
-                    phase == _WizardPhase.sections ? _currentSectionTitle : '',
-                totalSteps: displayTotal,
-                currentStep: displayStep,
-                onBackToStudentSelect: phase == _WizardPhase.programSelect
-                    ? _confirmBackToStudentSelect
-                    : null,
-                onBackToProgramSelect: (phase == _WizardPhase.sections ||
-                        phase == _WizardPhase.soundMatrix ||
-                        phase == _WizardPhase.summary)
-                    ? _confirmBackToProgramSelect
-                    : null,
-              ),
-              _buildPhaseContent(app, student, sections, lettersList),
-              if (showNavBar) _buildNavBar(context),
-            ],
+      child: SafeArea(
+        child: Center(
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? maxWidth : double.infinity,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.onBack != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4, top: 4),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_forward),
+                          onPressed: widget.onBack,
+                          tooltip: 'العودة إلى قائمة الإسنادات',
+                        ),
+                      ],
+                    ),
+                  ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    isMobile ? 12 : 16,
+                    AppSpacing.lg,
+                    0,
+                  ),
+                  child: Text(
+                    selectedProgram != null ? 'تقييم ${selectedProgram!.name}' : 'التقييم العلاجي',
+                    style: TextStyle(
+                      fontSize: isMobile ? 22 : 28,
+                      fontWeight: FontWeight.w900,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                _CompactHeader(
+                  phase: phase,
+                  programName: selectedProgram?.name ?? '',
+                  studentName: student?.name ?? '',
+                  sectionTitle:
+                      phase == _WizardPhase.sections ? _currentSectionTitle : '',
+                  totalSteps: displayTotal,
+                  currentStep: displayStep,
+                  onBackToStudentSelect: phase == _WizardPhase.programSelect
+                      ? _confirmBackToStudentSelect
+                      : null,
+                  onBackToProgramSelect: (phase == _WizardPhase.sections ||
+                          phase == _WizardPhase.soundMatrix ||
+                          phase == _WizardPhase.summary)
+                      ? _confirmBackToProgramSelect
+                      : null,
+                ),
+                Expanded(
+                  child: _buildPhaseContent(app, student, sections, lettersList),
+                ),
+                if (showNavBar) _buildNavBar(context),
+              ],
+            ),
           ),
         ),
       ),
     );
+
+    if (widget.embedded) {
+      return Material(color: Colors.transparent, child: mainContent);
+    }
+    return Scaffold(body: mainContent);
+  }
+
+  Widget _wrap({required Widget child}) {
+    if (widget.embedded) {
+      return Material(color: Colors.transparent, child: child);
+    }
+    return Scaffold(body: SafeArea(child: child));
   }
 
   Widget? _buildAction(BuildContext context,
@@ -703,7 +831,27 @@ class _ClinicalAssessmentWizardScreenState
 
   Widget _buildPhaseContent(AppProvider app, Student? student,
       List<AssessmentSectionTemplate> sections, List<String> letters) {
+    try {
+      return _buildPhaseContentUnsafe(app, student, sections, letters);
+    } catch (e) {
+return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: EmptyState(
+            icon: Icons.error_outline,
+            title: 'حدث خطأ في عرض التقييم',
+            message: 'تفاصيل: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildPhaseContentUnsafe(AppProvider app, Student? student,
+      List<AssessmentSectionTemplate> sections, List<String> letters) {
     switch (phase) {
+      case _WizardPhase.initialLoading:
+        return const Center(child: CircularProgressIndicator());
       case _WizardPhase.studentSelect:
         return _StudentSelectPhase(
           app: app,
@@ -746,7 +894,18 @@ class _ClinicalAssessmentWizardScreenState
               _buildSteps(app);
             });
 
-            // 2. Check for a saved draft; user may click resume or start fresh.
+            // 2. Switch to program-filtered context.
+            final student = app.selectedStudent;
+            if (student != null) {
+              await app.selectStudentProgramContext(
+                studentId: student.id,
+                programId: program.id,
+                specialistId: app.isSpecialist ? app.user?.id : null,
+              );
+            }
+            if (!mounted) return;
+
+            // 3. Check for a saved draft; user may click resume or start fresh.
             await _checkForDraft(app);
             if (!mounted) return;
 
@@ -764,8 +923,7 @@ class _ClinicalAssessmentWizardScreenState
               _autoSaveDraft();
             } else {
               // Draft was restored — save again with restored state as a checkpoint.
-              debugPrint('[Wizard] onSelect — draft restored, saving checkpoint');
-              _autoSaveDraft();
+_autoSaveDraft();
             }
           },
         );
@@ -778,7 +936,13 @@ class _ClinicalAssessmentWizardScreenState
           );
         }
         final step = _currentStep;
-        if (step == null) return const SizedBox.shrink();
+        if (step == null) {
+          return const EmptyState(
+            icon: Icons.error_outline,
+            title: 'خطأ في البند',
+            message: 'لم يتم العثور على بند التقييم الحالي.',
+          );
+        }
         return _StepView(
           step: step,
           stepIndex: stepIndex + 1,
@@ -842,7 +1006,18 @@ class _ClinicalAssessmentWizardScreenState
           },
         );
       case _WizardPhase.summary:
-        if (student == null) return const SizedBox.shrink();
+        if (student == null) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: EmptyState(
+                icon: Icons.error_outline,
+                title: 'لم يتم اختيار طالب',
+                message: 'الرجاء العودة واختيار طالب.',
+              ),
+            ),
+          );
+        }
         return _SummaryPhase(
           app: app,
           student: student,
@@ -858,6 +1033,9 @@ class _ClinicalAssessmentWizardScreenState
 
   Future<void> _saveAssessment(AppProvider app, Student student) async {
     if (isSaving) return;
+    if (selectedProgram == null) {
+      throw StateError('لا يمكن حفظ التقييم بدون تحديد البرنامج العلاجي.');
+    }
     isSaving = true;
     setState(() {});
 
@@ -915,7 +1093,11 @@ class _ClinicalAssessmentWizardScreenState
           result: option.label,
           isNormal: !option.generatesTherapy,
           weakness: option.weaknessTemplate,
-          goal: option.goalTemplate,
+          goal: option.goalTemplate.isNotEmpty
+              ? option.goalTemplate
+              : (option.weaknessTemplate.isNotEmpty
+                  ? option.weaknessTemplate
+                  : option.label),
           training: option.therapyTemplate,
           programId: selectedProgram?.id ?? '',
           sourceType: 'standard',
@@ -981,7 +1163,7 @@ class _ClinicalAssessmentWizardScreenState
           result: '${option.label}: ${isNormal ? 'نعم' : 'لا'}',
           isNormal: isNormal,
           weakness: isNormal ? '' : option.weaknessTemplate,
-          goal: isNormal ? '' : option.goalTemplate,
+          goal: isNormal ? '' : (option.goalTemplate.isNotEmpty ? option.goalTemplate : (option.weaknessTemplate.isNotEmpty ? option.weaknessTemplate : option.label)),
           training: isNormal ? '' : option.therapyTemplate,
           programId: selectedProgram?.id ?? '',
           sourceType: 'standard',
@@ -1065,6 +1247,7 @@ class _ClinicalAssessmentWizardScreenState
               specialistId: app.user?.id ?? '',
               specialistName: app.user?.name ?? '',
               type: 'speech',
+              programId: selectedProgram?.id ?? '',
               strengthsSummary: strengths.join('\n'),
               weaknessesSummary: weaknessText,
               goalsSummary: goals,
@@ -1075,14 +1258,22 @@ class _ClinicalAssessmentWizardScreenState
           );
           await _clearDraft();
           if (!mounted) return;
+          if (widget.onBack != null) {
+            widget.onBack!();
+            return;
+          }
           _goToStudentSelect();
         },
         loading: 'جار حفظ التقييم العلاجي وتوليد الأهداف...',
-        success: 'تم حفظ التقييم وتوليد الأهداف والخطوات المهارية.',
+        success: () {
+          final pc = weakFindings.where((f) => f.goal.trim().isNotEmpty).length;
+          return pc > 0
+              ? 'تم حفظ التقييم وتوليد $pc أهداف علاجية.'
+              : 'تم حفظ التقييم، لكن لم يتم توليد أهداف علاجية لأن القوالب العلاجية غير مكتملة.';
+        }(),
       );
     } catch (e) {
-      debugPrint('ClinicalAssessmentWizard: save failed: $e');
-    } finally {
+} finally {
       isSaving = false;
       if (mounted) setState(() {});
     }
@@ -1469,6 +1660,16 @@ class _ProgramSelectPhase extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    if (app.isSpecialist) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          icon: Icons.error_outline,
+          title: 'لا يمكن اختيار البرنامج',
+          message: 'لا يوجد برنامج علاجي مسند لك لهذا الطالب.',
+        ),
+      );
+    }
     final programs = app.programsForStudent();
     return SingleChildScrollView(
       child: Column(
@@ -1903,7 +2104,6 @@ class _StepView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
     final item = step.item;
     final isMulti = item.responseMode == 'multiResponse';
     final bool isAnswered = isMulti
@@ -2038,7 +2238,8 @@ class _StepView extends StatelessWidget {
                     textAlign: TextAlign.center,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: (narrow ? textTheme.titleMedium : textTheme.titleLarge)?.copyWith(
+                    style: TextStyle(
+                      fontSize: narrow ? 18 : 22,
                       fontWeight: FontWeight.w900,
                       height: 1.3,
                       color: colorScheme.onSurface,
@@ -2197,7 +2398,7 @@ class _SingleChoiceOptions extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: textColor,
                             height: 1.3,
@@ -2285,7 +2486,7 @@ class _MultiResponseOption extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontWeight: FontWeight.w800,
-              fontSize: 15,
+              fontSize: 16,
               color: colorScheme.onSurface,
             ),
           ),
@@ -3384,3 +3585,5 @@ class _SummarySectionCard extends StatelessWidget {
     );
   }
 }
+
+

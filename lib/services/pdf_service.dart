@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -12,8 +13,13 @@ class PdfService {
   static const _accentGreen = PdfColor.fromInt(0xFFDCFCE7);
   static const _border = PdfColor.fromInt(0xFFE2E8F0);
 
+  Future<pw.Font> _loadFont() async {
+    final data = await rootBundle.load('assets/fonts/NotoNaskhArabic-Regular.ttf');
+    return pw.Font.ttf(data);
+  }
+
   Future<void> printStudentCredentials(Student student) async {
-    final font = await PdfGoogleFonts.notoNaskhArabicRegular();
+    final font = await _loadFont();
     final pdf = pw.Document();
     pdf.addPage(
       pw.Page(
@@ -67,7 +73,7 @@ class PdfService {
     required String specialistSignature,
     required String managerSignature,
   }) async {
-    final font = await PdfGoogleFonts.notoNaskhArabicRegular();
+    final font = await _loadFont();
     final improvement = evaluations.isEmpty
         ? _sessionAverage(sessions)
         : _improvementRate(evaluations);
@@ -103,18 +109,27 @@ class PdfService {
           _sectionTitle(font, 'الخطة التدريبية'),
           if (plans.isEmpty)
             pw.Text('لا توجد أهداف مسجلة.', style: pw.TextStyle(font: font)),
-          ...plans.map((plan) => pw.Bullet(
-                text: '${plan.goal} - تقدم ${plan.progress}%',
-                style: pw.TextStyle(font: font),
+          ...plans.map((plan) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 2),
+                child: pw.Text(
+                  '- ${plan.goal} - تقدم ${plan.progress}%',
+                  textDirection: pw.TextDirection.rtl,
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(font: font),
+                ),
               )),
           pw.SizedBox(height: 14),
           _sectionTitle(font, 'تقييم نطق الحروف'),
           if (evaluations.isEmpty)
             pw.Text('لا توجد تقييمات مسجلة.', style: pw.TextStyle(font: font)),
-          ...evaluations.take(18).map((evaluation) => pw.Bullet(
-                text:
-                    '${evaluation.letter} - ${evaluation.position} - ${evaluation.errorType} - ${evaluation.score}',
-                style: pw.TextStyle(font: font),
+          ...evaluations.take(18).map((evaluation) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 2),
+                child: pw.Text(
+                  '- ${evaluation.letter} - ${evaluation.position} - ${evaluation.errorType} - ${evaluation.score}',
+                  textDirection: pw.TextDirection.rtl,
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(font: font),
+                ),
               )),
           pw.SizedBox(height: 14),
           _sectionTitle(font, 'التوصيات والخطة القادمة'),
@@ -182,29 +197,27 @@ class PdfService {
                     fontWeight: pw.FontWeight.bold)),
           ),
           pw.SizedBox(width: 12),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(center?.name ?? 'مركز سند',
-                    style: pw.TextStyle(
-                        font: font,
-                        fontSize: 21,
-                        color: _text,
-                        fontWeight: pw.FontWeight.bold)),
-                pw.SizedBox(height: 4),
-                pw.Text(center?.address ?? 'العنوان غير محدد',
-                    style: pw.TextStyle(font: font, color: _text)),
-                pw.Directionality(
-                  textDirection: pw.TextDirection.ltr,
-                  child: pw.Text(center?.phone ?? '',
-                      style: pw.TextStyle(font: font),
-                      textAlign: pw.TextAlign.left),
-                ),
-                pw.Text('تاريخ التقرير: $date',
-                    style: pw.TextStyle(font: font)),
-              ],
-            ),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(center?.name ?? 'مركز سند',
+                  style: pw.TextStyle(
+                      font: font,
+                      fontSize: 21,
+                      color: _text,
+                      fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 4),
+              pw.Text(center?.address ?? 'العنوان غير محدد',
+                  style: pw.TextStyle(font: font, color: _text)),
+              pw.Directionality(
+                textDirection: pw.TextDirection.ltr,
+                child: pw.Text(center?.phone ?? '',
+                    style: pw.TextStyle(font: font),
+                    textAlign: pw.TextAlign.left),
+              ),
+              pw.Text('تاريخ التقرير: $date',
+                  style: pw.TextStyle(font: font)),
+            ],
           ),
         ],
       ),
@@ -251,36 +264,37 @@ class PdfService {
         sessions.where((session) => session.successRate >= 80).length;
     final needsSupport =
         sessions.where((session) => session.successRate < 60).length;
+    const pmw4 = (539.28 - 24) / 4;
     return pw.Row(
       children: [
-        _metricBox(font, 'عدد الجلسات', '$count'),
+        _metricBox(font, 'عدد الجلسات', '$count', width: pmw4),
         pw.SizedBox(width: 8),
-        _metricBox(font, 'نسبة الأداء', '$improvement%'),
+        _metricBox(font, 'نسبة الأداء', '$improvement%', width: pmw4),
         pw.SizedBox(width: 8),
-        _metricBox(font, 'أداء قوي', '$strong'),
+        _metricBox(font, 'أداء قوي', '$strong', width: pmw4),
         pw.SizedBox(width: 8),
-        _metricBox(font, 'يحتاج دعم', '$needsSupport'),
+        _metricBox(font, 'يحتاج دعم', '$needsSupport', width: pmw4),
       ],
     );
   }
 
-  pw.Widget _metricBox(pw.Font font, String label, String value) {
-    return pw.Expanded(
-      child: pw.Container(
-        padding: const pw.EdgeInsets.all(10),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: _border),
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Column(
-          children: [
-            pw.Text(value,
-                style: pw.TextStyle(
-                    font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 2),
-            pw.Text(label, style: pw.TextStyle(font: font, fontSize: 10)),
-          ],
-        ),
+  pw.Widget _metricBox(pw.Font font, String label, String value,
+      {double width = 150}) {
+    return pw.Container(
+      width: width,
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _border),
+        borderRadius: pw.BorderRadius.circular(8),
+      ),
+      child: pw.Column(
+        children: [
+          pw.Text(value,
+              style: pw.TextStyle(
+                  font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 2),
+          pw.Text(label, style: pw.TextStyle(font: font, fontSize: 10)),
+        ],
       ),
     );
   }

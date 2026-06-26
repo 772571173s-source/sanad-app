@@ -11,17 +11,44 @@ class CoordinatorDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppProvider>();
-    final assignedIds = app.studentSpecialists
-        .where((s) => s.isActive)
-        .map((s) => s.studentId)
-        .toSet();
+    // Correct distribution: a student is fully assigned when each of their
+    // active therapy programs has an active primary assignment.
+    final assignmentsByStudent = <String, Set<String>>{};
+    for (final a in app.studentProgramAssignments) {
+      if (!a.isActive || a.role != 'primary') continue;
+      assignmentsByStudent.putIfAbsent(a.studentId, () => {});
+      assignmentsByStudent[a.studentId]!.add(a.programId);
+    }
+    final programsByStudent = <String, Set<String>>{};
+    for (final p in app.studentTherapyPrograms) {
+      if (!p.isActive) continue;
+      programsByStudent.putIfAbsent(p.studentId, () => {});
+      programsByStudent[p.studentId]!.add(p.programId);
+    }
     final totalStudents = app.students.length;
-    final assigned = assignedIds.length;
-    final unassigned = totalStudents - assigned;
+    int fullyAssigned = 0;
+    int partiallyAssigned = 0;
+    int notReady = 0;
+    for (final student in app.students) {
+      final studentPrograms = programsByStudent[student.id] ?? <String>{};
+      if (studentPrograms.isEmpty) {
+        notReady++;
+        continue;
+      }
+      final assignedPrograms = assignmentsByStudent[student.id] ?? <String>{};
+      if (assignedPrograms.containsAll(studentPrograms)) {
+        fullyAssigned++;
+      } else {
+        partiallyAssigned++;
+      }
+    }
+    final assigned = fullyAssigned;
+    final unassigned = notReady + partiallyAssigned;
     final specialists =
         app.staff.where((u) => u.role == UserRole.specialist).length;
 
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _CoordinatorHero(
@@ -73,7 +100,6 @@ class CoordinatorDashboardScreen extends StatelessWidget {
             final alerts = _Alerts(
               app: app,
               unassigned: unassigned,
-              assignedIds: assignedIds,
             );
             if (!wide) {
               return Column(
@@ -106,6 +132,7 @@ class CoordinatorDashboardScreen extends StatelessWidget {
             ),
           ),
       ],
+      ),
     );
   }
 }
@@ -359,6 +386,7 @@ class _RecentCoordinatorActivity extends StatelessWidget {
         .where((log) =>
             log.action.contains('ربط') ||
             log.action.contains('فك') ||
+            log.action.contains('إسناد') ||
             log.action.contains('أخصائي'))
         .take(6)
         .map((log) => _CoordActivity(
@@ -370,7 +398,9 @@ class _RecentCoordinatorActivity extends StatelessWidget {
         .toList();
     if (logs.isNotEmpty) return logs;
 
-    final assignments = app.studentSpecialists.take(6);
+    final assignments = app.studentProgramAssignments
+        .where((a) => a.isActive)
+        .take(6);
     return assignments.map((a) {
       final student = app.students
           .where((s) => s.id == a.studentId)
@@ -378,11 +408,14 @@ class _RecentCoordinatorActivity extends StatelessWidget {
       final specialist = app.staff
           .where((u) => u.id == a.specialistId)
           .firstOrNull;
+      final program = app.therapyPrograms
+          .where((p) => p.id == a.programId)
+          .firstOrNull;
       return _CoordActivity(
         icon: Icons.link_outlined,
-        title: 'ربط طالب',
+        title: 'إسناد برنامج',
         subtitle:
-            '${student?.name ?? '-'} مع ${specialist?.name ?? '-'}',
+            '${student?.name ?? '-'} ← ${program?.name ?? a.programId} ← ${specialist?.name ?? '-'}',
         time: _shortDate(a.assignedAt),
       );
     }).toList();
@@ -481,12 +514,10 @@ class _Alerts extends StatelessWidget {
   const _Alerts({
     required this.app,
     required this.unassigned,
-    required this.assignedIds,
   });
 
   final AppProvider app;
   final int unassigned;
-  final Set<String> assignedIds;
 
   @override
   Widget build(BuildContext context) {
@@ -504,7 +535,11 @@ class _Alerts extends StatelessWidget {
     final studentIdsWithSession = app.centerSessions
         .map((s) => s.studentId)
         .toSet();
-    final noSession = assignedIds
+    final allAssignedStudentIds = app.studentProgramAssignments
+        .where((a) => a.isActive)
+        .map((a) => a.studentId)
+        .toSet();
+    final noSession = allAssignedStudentIds
         .where((id) => !studentIdsWithSession.contains(id))
         .length;
     if (noSession > 0) {
@@ -516,7 +551,7 @@ class _Alerts extends StatelessWidget {
       ));
     }
 
-    final noAssessment = assignedIds.where((id) {
+    final noAssessment = allAssignedStudentIds.where((id) {
       return !app.clinicalAssessments
           .any((a) => a.studentId == id);
     }).length;

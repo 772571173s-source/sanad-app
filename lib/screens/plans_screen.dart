@@ -85,6 +85,7 @@ class _PlansScreenState extends State<PlansScreen> {
               .split('T')
               .first,
           progress: progress,
+          specialistId: app.user?.id ?? '',
         ),
       );
       goal.clear();

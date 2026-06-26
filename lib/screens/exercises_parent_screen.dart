@@ -356,6 +356,7 @@ class _ExercisesParentScreenState extends State<ExercisesParentScreen> {
       sourceType: exercise.sourceType,
       sessionDate: exercise.sessionDate,
       noteForParent: exercise.noteForParent,
+      specialistId: exercise.specialistId,
       parentCompletedAt:
           parentCompletedAt ?? exercise.parentCompletedAt,
       specialistReviewedAt: exercise.specialistReviewedAt,

@@ -11,7 +11,7 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 31;
+  static const currentVersion = 34;
 
   mobile.Database? _database;
 
@@ -55,6 +55,96 @@ class DatabaseService {
     await database;
     final source = File(await databaseFilePath());
     await source.copy(targetPath);
+  }
+
+  /// Exports all data belonging to a single center as a JSON map.
+  /// Does NOT include full DB copy – only center-scoped records.
+  Future<Map<String, dynamic>> exportCenterBackup(String centerId) async {
+    final db = await database;
+    final backup = <String, dynamic>{};
+    final tables = <String, String>{
+      'centers': "id = '$centerId'",
+      'users': "center_id = '$centerId'",
+      'students': "center_id = '$centerId'",
+      'parents': "center_id = '$centerId'",
+      'student_therapy_programs': "center_id = '$centerId'",
+      'student_program_assignments': "center_id = '$centerId'",
+      'clinical_assessments': "center_id = '$centerId'",
+      'clinical_findings': "center_id = '$centerId'",
+      'evaluations': "center_id = '$centerId'",
+      'training_plans': "center_id = '$centerId'",
+      'goal_skill_steps': "center_id = '$centerId'",
+      'sessions': "center_id = '$centerId'",
+      'session_skill_results':
+          "session_id IN (SELECT id FROM sessions WHERE center_id = '$centerId')",
+      'exercises': "center_id = '$centerId'",
+      'rewards': "center_id = '$centerId'",
+      'reports': "center_id = '$centerId'",
+      'student_followups': "center_id = '$centerId'",
+      'audit_logs': "center_id = '$centerId'",
+      'sign_resources': "center_id = '$centerId'",
+    };
+    for (final entry in tables.entries) {
+      final rows = await db.rawQuery(
+          'SELECT * FROM "${entry.key}" WHERE ${entry.value}');
+      backup[entry.key] = rows;
+    }
+    return backup;
+  }
+
+  /// Writes [backup] (from [exportCenterBackup]) into [targetFile] as JSON.
+  Future<void> saveCenterBackupToFile(
+      Map<String, dynamic> backup, String targetPath) async {
+    final file = File(targetPath);
+    await file.writeAsString(jsonEncode(backup));
+  }
+
+  /// Reads a center backup JSON file and returns the parsed map.
+  Future<Map<String, dynamic>> loadCenterBackupFromFile(
+      String sourcePath) async {
+    final file = File(sourcePath);
+    final content = await file.readAsString();
+    return jsonDecode(content) as Map<String, dynamic>;
+  }
+
+  /// Imports a previously exported center backup into the current database.
+  /// Does NOT import the center itself (assumes it already exists or will be
+  /// created separately). Inserts all child records under the same IDs.
+  Future<void> importCenterBackup(Map<String, dynamic> backup) async {
+    final db = await database;
+    final order = [
+      'students',
+      'parents',
+      'student_therapy_programs',
+      'student_program_assignments',
+      'clinical_assessments',
+      'clinical_findings',
+      'evaluations',
+      'training_plans',
+      'goal_skill_steps',
+      'sessions',
+      'session_skill_results',
+      'exercises',
+      'rewards',
+      'reports',
+      'student_followups',
+      'audit_logs',
+      'sign_resources',
+      'users',
+    ];
+    for (final table in order) {
+      final rows = backup[table];
+      if (rows is! List) continue;
+      for (final row in rows) {
+        if (row is! Map) continue;
+        try {
+          await db.insert(table, row.cast<String, Object?>(),
+              conflictAlgorithm: mobile.ConflictAlgorithm.replace);
+        } catch (_) {
+          // Skip rows that fail (e.g. missing FK references)
+        }
+      }
+    }
   }
 
   Future<void> importBackup(String sourcePath) async {
@@ -176,6 +266,8 @@ class DatabaseService {
         score TEXT NOT NULL,
         severity INTEGER NOT NULL DEFAULT 1,
         recommendation TEXT NOT NULL DEFAULT '',
+        program_id TEXT NOT NULL DEFAULT '',
+        specialist_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         notes TEXT NOT NULL,
@@ -194,6 +286,7 @@ class DatabaseService {
         progress INTEGER NOT NULL,
         program_id TEXT NOT NULL DEFAULT '',
         source_type TEXT NOT NULL DEFAULT 'standard',
+        specialist_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(center_id) REFERENCES centers(id),
@@ -222,6 +315,7 @@ class DatabaseService {
         specialist_reviewed_at TEXT NOT NULL DEFAULT '',
         created_from_session_result TEXT NOT NULL DEFAULT '',
         stars INTEGER NOT NULL DEFAULT 0,
+        specialist_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(center_id) REFERENCES centers(id),
@@ -307,6 +401,7 @@ class DatabaseService {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS student_therapy_programs (
         id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         program_id TEXT NOT NULL,
         assigned_at TEXT NOT NULL,
@@ -321,6 +416,7 @@ class DatabaseService {
       CREATE TABLE IF NOT EXISTS assessment_drafts (
         student_id TEXT NOT NULL,
         program_id TEXT NOT NULL,
+        center_id TEXT NOT NULL DEFAULT '',
         phase TEXT NOT NULL DEFAULT 'sections',
         step_index INTEGER NOT NULL DEFAULT 0,
         current_letter TEXT NOT NULL DEFAULT '',
@@ -344,10 +440,27 @@ class DatabaseService {
         created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT ''
       )
+    '''    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS student_program_assignments (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL,
+        student_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        specialist_id TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'primary',
+        status TEXT NOT NULL DEFAULT 'active',
+        notes TEXT NOT NULL DEFAULT '',
+        assigned_by_user_id TEXT NOT NULL DEFAULT '',
+        assigned_at TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
     ''');
     await db.execute('''
       CREATE TABLE IF NOT EXISTS student_followups (
         id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
         student_id TEXT NOT NULL,
         specialist_id TEXT NOT NULL DEFAULT '',
         program_id TEXT NOT NULL DEFAULT '',
@@ -359,6 +472,18 @@ class DatabaseService {
         created_at TEXT NOT NULL DEFAULT '',
         resolved_at TEXT NOT NULL DEFAULT '',
         last_opened_at TEXT NOT NULL DEFAULT '',
+        updated_at TEXT NOT NULL DEFAULT ''
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS specialist_program_capabilities (
+        id TEXT PRIMARY KEY,
+        center_id TEXT NOT NULL DEFAULT '',
+        specialist_id TEXT NOT NULL,
+        program_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'active',
+        created_by_user_id TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT '',
         updated_at TEXT NOT NULL DEFAULT ''
       )
     ''');
@@ -563,6 +688,7 @@ class DatabaseService {
       await _ensureTable(db, 'student_followups', '''
         CREATE TABLE student_followups (
           id TEXT PRIMARY KEY,
+          center_id TEXT NOT NULL DEFAULT '',
           student_id TEXT NOT NULL,
           specialist_id TEXT NOT NULL DEFAULT '',
           program_id TEXT NOT NULL DEFAULT '',
@@ -649,6 +775,74 @@ class DatabaseService {
       await _addColumns(db, {
         'clinical_findings': {
           'template_id': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 32) {
+      await _ensureTable(db, 'student_program_assignments', '''
+        CREATE TABLE student_program_assignments (
+          id TEXT PRIMARY KEY,
+          center_id TEXT NOT NULL,
+          student_id TEXT NOT NULL,
+          program_id TEXT NOT NULL,
+          specialist_id TEXT NOT NULL,
+          role TEXT NOT NULL DEFAULT 'primary',
+          status TEXT NOT NULL DEFAULT 'active',
+          notes TEXT NOT NULL DEFAULT '',
+          assigned_by_user_id TEXT NOT NULL DEFAULT '',
+          assigned_at TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 34) {
+      await _ensureTable(db, 'specialist_program_capabilities', '''
+        CREATE TABLE specialist_program_capabilities (
+          id TEXT PRIMARY KEY,
+          center_id TEXT NOT NULL DEFAULT '',
+          specialist_id TEXT NOT NULL,
+          program_id TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_by_user_id TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT ''
+        )
+      ''');
+    }
+    if (oldVersion < 33) {
+      await _addColumns(db, {
+        'evaluations': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'clinical_assessments': {
+          'program_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'training_plans': {
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'assessment_drafts': {
+          'center_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'student_therapy_programs': {
+          'center_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'student_followups': {
+          'center_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'exercises': {
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        },
+        'goal_skill_steps': {
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
+        },
+      });
+    }
+    if (oldVersion < 34) {
+      await _addColumns(db, {
+        'clinical_assessments': {
+          'specialist_id': "TEXT NOT NULL DEFAULT ''",
         },
       });
     }
@@ -1015,6 +1209,7 @@ class DatabaseService {
         specialist_id TEXT NOT NULL DEFAULT '',
         specialist_name TEXT NOT NULL DEFAULT '',
         type TEXT NOT NULL DEFAULT 'speech',
+        program_id TEXT NOT NULL DEFAULT '',
         strengths_summary TEXT NOT NULL DEFAULT '',
         weaknesses_summary TEXT NOT NULL DEFAULT '',
         goals_summary TEXT NOT NULL DEFAULT '',
@@ -1241,6 +1436,7 @@ class DatabaseService {
       CREATE TABLE assessment_drafts (
         student_id TEXT NOT NULL,
         program_id TEXT NOT NULL,
+        center_id TEXT NOT NULL DEFAULT '',
         phase TEXT NOT NULL DEFAULT 'sections',
         step_index INTEGER NOT NULL DEFAULT 0,
         current_letter TEXT NOT NULL DEFAULT '',
@@ -1268,6 +1464,7 @@ class DatabaseService {
         specialist_id TEXT NOT NULL DEFAULT '',
         specialist_name TEXT NOT NULL DEFAULT '',
         type TEXT NOT NULL DEFAULT 'speech',
+        program_id TEXT NOT NULL DEFAULT '',
         strengths_summary TEXT NOT NULL DEFAULT '',
         weaknesses_summary TEXT NOT NULL DEFAULT '',
         goals_summary TEXT NOT NULL DEFAULT '',
@@ -1311,6 +1508,7 @@ class DatabaseService {
         last_session_id TEXT NOT NULL DEFAULT '',
         program_id TEXT NOT NULL DEFAULT '',
         source_type TEXT NOT NULL DEFAULT 'standard',
+        specialist_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         FOREIGN KEY(center_id) REFERENCES centers(id),
@@ -1334,6 +1532,7 @@ class DatabaseService {
         last_session_id TEXT NOT NULL DEFAULT '',
         program_id TEXT NOT NULL DEFAULT '',
         source_type TEXT NOT NULL DEFAULT 'standard',
+        specialist_id TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -1455,6 +1654,8 @@ class DatabaseService {
         'created_at': 'TEXT NOT NULL',
         'updated_at': "TEXT NOT NULL DEFAULT ''",
         'notes': 'TEXT NOT NULL',
+        'program_id': "TEXT NOT NULL DEFAULT ''",
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
       },
       'training_plans': {
         'id': 'TEXT PRIMARY KEY',
@@ -1466,6 +1667,7 @@ class DatabaseService {
         'progress': 'INTEGER NOT NULL',
         'program_id': "TEXT NOT NULL DEFAULT ''",
         'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
@@ -1481,6 +1683,7 @@ class DatabaseService {
         'last_session_id': "TEXT NOT NULL DEFAULT ''",
         'program_id': "TEXT NOT NULL DEFAULT ''",
         'source_type': "TEXT NOT NULL DEFAULT 'standard'",
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': 'TEXT NOT NULL',
         'updated_at': 'TEXT NOT NULL',
       },
@@ -1504,6 +1707,7 @@ class DatabaseService {
         'specialist_reviewed_at': "TEXT NOT NULL DEFAULT ''",
         'created_from_session_result': "TEXT NOT NULL DEFAULT ''",
         'stars': 'INTEGER NOT NULL DEFAULT 0',
+        'specialist_id': "TEXT NOT NULL DEFAULT ''",
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
@@ -1522,13 +1726,28 @@ class DatabaseService {
         'id': 'TEXT PRIMARY KEY',
         'center_id': "TEXT NOT NULL DEFAULT ''",
         'student_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT',
+        'specialist_id': 'TEXT',
+        'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
         'type': 'TEXT NOT NULL',
+        'report_title': "TEXT NOT NULL DEFAULT ''",
         'created_at': 'TEXT NOT NULL',
-        'improvement_rate': 'INTEGER NOT NULL',
-        'specialist_signature': 'TEXT NOT NULL',
+        'improvement_rate': 'INTEGER NOT NULL DEFAULT 0',
+        'specialist_signature': "TEXT NOT NULL DEFAULT ''",
         'manager_signature': "TEXT NOT NULL DEFAULT ''",
+        'scope': "TEXT NOT NULL DEFAULT ''",
+        'date_from': "TEXT NOT NULL DEFAULT ''",
+        'date_to': "TEXT NOT NULL DEFAULT ''",
+        'report_status': "TEXT NOT NULL DEFAULT 'exported'",
+        'data_json': "TEXT NOT NULL DEFAULT ''",
         'file_path': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
+        'report_category': "TEXT NOT NULL DEFAULT 'general'",
+        'previous_report_id': 'TEXT',
+        'quarter': 'TEXT',
+        'year': 'TEXT',
+        'snapshot_json': "TEXT NOT NULL DEFAULT ''",
+        'sequence_number': "INTEGER NOT NULL DEFAULT 0",
       },
       'clinical_assessments': {
         'id': 'TEXT PRIMARY KEY',
@@ -1537,6 +1756,7 @@ class DatabaseService {
         'specialist_id': "TEXT NOT NULL DEFAULT ''",
         'specialist_name': "TEXT NOT NULL DEFAULT ''",
         'type': "TEXT NOT NULL DEFAULT 'speech'",
+        'program_id': "TEXT NOT NULL DEFAULT ''",
         'strengths_summary': "TEXT NOT NULL DEFAULT ''",
         'weaknesses_summary': "TEXT NOT NULL DEFAULT ''",
         'goals_summary': "TEXT NOT NULL DEFAULT ''",
@@ -1660,6 +1880,7 @@ class DatabaseService {
       },
       'student_therapy_programs': {
         'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'student_id': 'TEXT NOT NULL',
         'program_id': 'TEXT NOT NULL',
         'assigned_at': 'TEXT NOT NULL',
@@ -1672,6 +1893,7 @@ class DatabaseService {
       'assessment_drafts': {
         'student_id': 'TEXT NOT NULL',
         'program_id': 'TEXT NOT NULL',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'phase': "TEXT NOT NULL DEFAULT 'sections'",
         'step_index': 'INTEGER NOT NULL DEFAULT 0',
         'current_letter': "TEXT NOT NULL DEFAULT ''",
@@ -1692,8 +1914,23 @@ class DatabaseService {
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
+      'student_program_assignments': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': 'TEXT NOT NULL',
+        'student_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'specialist_id': 'TEXT NOT NULL',
+        'role': "TEXT NOT NULL DEFAULT 'primary'",
+        'status': "TEXT NOT NULL DEFAULT 'active'",
+        'notes': "TEXT NOT NULL DEFAULT ''",
+        'assigned_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'assigned_at': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
+      },
       'student_followups': {
         'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
         'student_id': 'TEXT NOT NULL',
         'specialist_id': "TEXT NOT NULL DEFAULT ''",
         'program_id': "TEXT NOT NULL DEFAULT ''",
@@ -1716,6 +1953,16 @@ class DatabaseService {
         'result': "TEXT NOT NULL DEFAULT 'لم يبدأ'",
         'created_at': 'TEXT NOT NULL',
         'updated_at': 'TEXT NOT NULL',
+      },
+      'specialist_program_capabilities': {
+        'id': 'TEXT PRIMARY KEY',
+        'center_id': "TEXT NOT NULL DEFAULT ''",
+        'specialist_id': 'TEXT NOT NULL',
+        'program_id': 'TEXT NOT NULL',
+        'status': "TEXT NOT NULL DEFAULT 'active'",
+        'created_by_user_id': "TEXT NOT NULL DEFAULT ''",
+        'created_at': "TEXT NOT NULL DEFAULT ''",
+        'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
     };
     for (final entry in tables.entries) {
@@ -1840,20 +2087,16 @@ class DatabaseService {
       await db.delete('skill_step_templates', where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('speech_sound_trigger_templates', where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('audit_logs', where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('student_program_assignments',
+          where: 'center_id = ?', whereArgs: [centerId]);
 
-      // Tables without center_id – reference students in this center
+      // Tables that now have center_id – delete directly
       await db.delete('student_followups',
-          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
-          whereArgs: [centerId]);
+          where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('student_therapy_programs',
-          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
-          whereArgs: [centerId]);
-      await db.delete('student_specialists',
-          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
-          whereArgs: [centerId]);
+          where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('assessment_drafts',
-          where: 'student_id IN (SELECT id FROM students WHERE center_id = ?)',
-          whereArgs: [centerId]);
+          where: 'center_id = ?', whereArgs: [centerId]);
 
       // Students (depends on center)
       await db.delete('students', where: 'center_id = ?', whereArgs: [centerId]);
