@@ -9,6 +9,7 @@ import '../models/app_models.dart';
 import '../providers/app_provider.dart';
 import '../services/report_export_service.dart';
 import '../services/smart_pdf_report_service.dart';
+import '../services/word_report_service.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -602,6 +603,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
           controller: manager,
           decoration: const InputDecoration(labelText: 'توقيع المدير'),
         ),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 8),
+        Text('Word DOCX (تجريبي - PoC)',
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        _buildActionButton('تصدير Word تجريبي', Icons.description_outlined,
+            _isSaving ? null : () => _generateWordPoC()),
       ],
     );
   }
@@ -811,6 +823,23 @@ class _ReportsScreenState extends State<ReportsScreen> {
       reportCategory: reportCategory,
       previousReportId: prevReport?.id,
     );
+  }
+
+  Future<void> _generateWordPoC() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final path = await WordReportService.generateTestDocx();
+      if (path == null) {
+        _showSnack('تم إلغاء حفظ الملف.');
+        return;
+      }
+      _showSnack('تم حفظ ملف Word: $path');
+    } catch (e) {
+      _showSnack('خطأ: ${e.toString().replaceFirst('Bad state: ', '')}');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Future<void> _performSave({
