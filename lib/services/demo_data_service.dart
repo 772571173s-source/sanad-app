@@ -449,6 +449,259 @@ class DemoDataService {
         'id = ?', [planId]);
   }
 
+  /// Phase 2: محاكاة رحلة علاجية لهدف واحد
+  /// Creates 5 graduated sessions for a single goal, updates progress,
+  /// and optionally creates a new assessment marking the linked finding as normal.
+  Future<Map<String, dynamic>> simulateSingleGoalTherapyJourney({
+    required String studentId,
+    required String programId,
+    required String specialistId,
+    required String planId,
+    DateTime? baseDate,
+  }) async {
+    // ── Guard: demo center only ────────────────────────────────
+    final center = await _db.first('centers',
+        where: 'id = ?', whereArgs: [demoCenterId]);
+    if (center == null) {
+      return {
+        'success': false,
+        'message': 'المركز التجريبي غير موجود. أنشئ المركز التجريبي أولاً.',
+      };
+    }
+
+    // ── Validate student ──────────────────────────────────────
+    final student = await _db.first('students',
+        where: 'id = ? AND center_id = ?', whereArgs: [studentId, demoCenterId]);
+    if (student == null) {
+      return {
+        'success': false,
+        'message': 'الطالب غير موجود في المركز التجريبي.',
+      };
+    }
+
+    // ── Validate specialist ────────────────────────────────────
+    final specialist = await _db.first('users',
+        where: 'id = ? AND center_id = ? AND role = ?',
+        whereArgs: [specialistId, demoCenterId, 'specialist']);
+    if (specialist == null) {
+      return {
+        'success': false,
+        'message': 'الأخصائي غير موجود في المركز التجريبي.',
+      };
+    }
+
+    // ── Validate assignment ────────────────────────────────────
+    final assignment = await _db.first('student_program_assignments',
+        where: 'student_id = ? AND program_id = ? AND specialist_id = ? AND status = ?',
+        whereArgs: [studentId, programId, specialistId, 'active']);
+    if (assignment == null) {
+      return {
+        'success': false,
+        'message': 'لا يوجد إسناد نشط بين الطالب والبرنامج والأخصائي.',
+      };
+    }
+
+    // ── Validate plan ──────────────────────────────────────────
+    final plan = await _db.first('training_plans',
+        where: 'id = ? AND student_id = ? AND program_id = ? AND specialist_id = ?',
+        whereArgs: [planId, studentId, programId, specialistId]);
+    if (plan == null) {
+      return {
+        'success': false,
+        'message': 'الهدف العلاجي غير موجود أو لا يتبع هذا الطالب والبرنامج.',
+      };
+    }
+    final planGoal = plan['goal'] as String? ?? '';
+    final currentProgress = plan['progress'] as int? ?? 0;
+    if (currentProgress >= 100) {
+      return {
+        'success': false,
+        'message': 'الهدف متقن بالفعل. لا يمكن محاكاة رحلة علاجية عليه.',
+      };
+    }
+
+    // ── Validate a previous assessment exists ──────────────────
+    final assessments = await _db.where('clinical_assessments',
+        where: 'student_id = ? AND program_id = ?',
+        whereArgs: [studentId, programId],
+        orderBy: 'created_at DESC');
+    final prevAssessment = assessments.isEmpty ? null : assessments.first;
+    if (prevAssessment == null) {
+      return {
+        'success': false,
+        'message': 'لا يمكن محاكاة رحلة علاجية قبل وجود تقييم أولي وهدف علاجي.',
+      };
+    }
+
+    // ── Get effective date ─────────────────────────────────────
+    final effectiveDate = baseDate ?? DateTime.now();
+
+    // ── Create 5 graduated sessions ───────────────────────────
+    final sessionResults = [
+      'يحتاج إعادة',
+      'يحتاج إعادة',
+      'بمساعدة',
+      'بمساعدة',
+      'متقن',
+    ];
+    final sessionDates = [
+      effectiveDate.add(const Duration(days: 0)),
+      effectiveDate.add(const Duration(days: 3)),
+      effectiveDate.add(const Duration(days: 7)),
+      effectiveDate.add(const Duration(days: 10)),
+      effectiveDate.add(const Duration(days: 14)),
+    ];
+    final successRates = [25, 35, 50, 65, 95];
+    final noteTexts = [
+      'محاولة أولى - يحتاج تدريبًا مكثفًا',
+      'لا يزال يحتاج إعادة - صعوبة في الأداء',
+      'أدى المهارة بمساعدة بسيطة',
+      'تحسن ملحوظ مع مساعدة بسيطة',
+      'أدى المهارة بشكل متقن - ممتاز',
+    ];
+
+    for (int i = 0; i < 5; i++) {
+      await _db.upsert('sessions', {
+        'id': 'demo_phase2_sess_${studentId}_${planId}_${i + 1}',
+        'center_id': demoCenterId,
+        'student_id': studentId,
+        'specialist_id': specialistId,
+        'plan_id': planId,
+        'program_id': programId,
+        'skill_id': '',
+        'activity_results': '',
+        'session_type': 'نطق وتخاطب',
+        'attempts': 10,
+        'success_rate': successRates[i],
+        'started_at': sessionDates[i].toIso8601String(),
+        'duration_seconds': 1800,
+        'card_title': planGoal,
+        'quick_result': sessionResults[i],
+        'notes': noteTexts[i],
+        'summary': 'محاكاة رحلة علاجية - الجلسة ${i + 1}',
+        'created_at': effectiveDate.toIso8601String(),
+      });
+    }
+
+    // ── Update goal skill steps & progress ────────────────────
+    final steps = await _db.where('goal_skill_steps',
+        where: 'goal_id = ?', whereArgs: [planId]);
+    int finalProgress;
+    if (steps.isNotEmpty) {
+      // Mark all steps as متقن gradually
+      for (int i = 0; i < steps.length; i++) {
+        final step = steps[i];
+        await _db.updateWhere('goal_skill_steps',
+            {'status': 'متقن', 'updated_at': effectiveDate.toIso8601String()},
+            'id = ?', [step['id']]);
+      }
+      // Calculate progress = (mastered / total) * 100
+      final totalSteps = steps.length;
+      final masteredSteps = totalSteps; // all now متقن
+      finalProgress = ((masteredSteps / totalSteps) * 100).round();
+    } else {
+      // No steps: progress inferred from last session (which is متقن)
+      finalProgress = 100;
+    }
+    await _db.updateWhere('training_plans',
+        {'progress': finalProgress, 'updated_at': effectiveDate.toIso8601String()},
+        'id = ?', [planId]);
+
+    // ── Try to link plan to a finding and create new assessment ─
+    bool newAssessmentCreated = false;
+    bool findingImproved = false;
+    String? findingItemTitle;
+    String? assessmentMessage;
+
+    final prevFindings = await _db.where('clinical_findings',
+        where: 'assessment_id = ?', whereArgs: [prevAssessment['id']]);
+
+    // Find a finding whose goal text relates to this plan's goal
+    Map<String, dynamic>? matchedFinding;
+    for (final f in prevFindings) {
+      final fGoal = (f['goal'] as String? ?? '');
+      // Check if finding.goal contains the plan goal or vice versa
+      if (fGoal.replaceAll('/', '').contains(planGoal.replaceAll('/', '').trim()) ||
+          planGoal.replaceAll('/', '').contains(fGoal.replaceAll('/', '').trim())) {
+        matchedFinding = f;
+        break;
+      }
+    }
+
+    if (matchedFinding != null && !((matchedFinding['is_normal'] as int? ?? 0) == 1)) {
+      // Create a new assessment
+      final newAssessmentId = 'demo_phase2_assess_${studentId}_${planId}_${effectiveDate.millisecondsSinceEpoch}';
+      await _db.upsert('clinical_assessments', {
+        'id': newAssessmentId,
+        'center_id': demoCenterId,
+        'student_id': studentId,
+        'specialist_id': specialistId,
+        'specialist_name': specialist['name'] as String? ?? '',
+        'type': 'speech',
+        'program_id': programId,
+        'strengths_summary': 'تحسن ملحوظ في المهارات المستهدفة بعد الجلسات المكثفة',
+        'weaknesses_summary': prevAssessment['weaknesses_summary'],
+        'goals_summary': prevAssessment['goals_summary'],
+        'training_summary': prevAssessment['training_summary'],
+        'created_at': effectiveDate.toIso8601String(),
+      });
+
+      // Copy all findings, but mark the matched one as normal
+      for (final f in prevFindings) {
+        final isTargetFinding = f['id'] == matchedFinding!['id'];
+        final isNormal = isTargetFinding ? 1 : (f['is_normal'] as int? ?? 0);
+        final result = isTargetFinding ? 'جيد' : (f['result'] as String? ?? '');
+        await _db.upsert('clinical_findings', {
+          'id': '${newAssessmentId}_${f['id']}',
+          'assessment_id': newAssessmentId,
+          'center_id': demoCenterId,
+          'student_id': studentId,
+          'domain': f['domain'],
+          'item_title': f['item_title'],
+          'result': result,
+          'is_normal': isNormal,
+          'weakness': isTargetFinding ? '' : (f['weakness'] as String? ?? ''),
+          'goal': isTargetFinding ? '' : (f['goal'] as String? ?? ''),
+          'training': isTargetFinding ? '' : (f['training'] as String? ?? ''),
+          'program_id': programId,
+          'source_type': f['source_type'] as String? ?? 'standard',
+          'template_id': f['template_id'] as String? ?? '',
+          'created_at': effectiveDate.toIso8601String(),
+        });
+        if (isTargetFinding) {
+          findingImproved = true;
+          findingItemTitle = f['item_title'] as String? ?? '';
+        }
+      }
+      newAssessmentCreated = true;
+    } else if (prevFindings.isEmpty) {
+      assessmentMessage = 'لا توجد بنود تقييم سابقة لإنشاء تقييم تحسن جديد.';
+    } else if (matchedFinding == null) {
+      assessmentMessage = 'لم يتم العثور على بند تقييم مرتبط بالهدف. لم يتم إنشاء تقييم تحسن جديد.';
+    } else {
+      assessmentMessage = 'البند المرتبط بالهدف هو بالفعل طبيعي. لم يتم إنشاء تقييم جديد.';
+    }
+
+    // ── Return summary ────────────────────────────────────────
+    final result = <String, dynamic>{
+      'success': true,
+      'planGoal': planGoal,
+      'planId': planId,
+      'sessionsCreated': 5,
+      'sessionSequence': sessionResults,
+      'progressAchieved': finalProgress,
+      'newAssessmentCreated': newAssessmentCreated,
+      'findingImproved': findingImproved,
+    };
+    if (findingItemTitle != null) {
+      result['findingItemTitle'] = findingItemTitle;
+    }
+    if (assessmentMessage != null) {
+      result['assessmentMessage'] = assessmentMessage;
+    }
+    return result;
+  }
+
   /// Helper: get demo students as list of maps.
   Future<List<Map<String, dynamic>>> getDemoStudents() async {
     return _db.where('students', where: 'center_id = ?', whereArgs: [demoCenterId]);
@@ -464,6 +717,14 @@ class DemoDataService {
   Future<List<Map<String, dynamic>>> getDemoUsers() async {
     return _db.where('users',
         where: 'center_id = ?', whereArgs: [demoCenterId]);
+  }
+
+  /// Helper: get training plans (goals) for a demo student in a program.
+  Future<List<Map<String, dynamic>>> getDemoPlans(String studentId, String programId) async {
+    return _db.where('training_plans',
+        where: 'student_id = ? AND program_id = ? AND center_id = ?',
+        whereArgs: [studentId, programId, demoCenterId],
+        orderBy: 'created_at ASC');
   }
 
   /// Helper: get global Sanad library programs.

@@ -30,8 +30,11 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
   List<Map<String, dynamic>> _demoUsers = [];
   List<Map<String, dynamic>> _demoPrograms = [];
   List<Map<String, dynamic>> _demoSpecialists = [];
+  List<Map<String, dynamic>> _demoPlans = [];
   String? _selectedProgramId;
   String? _selectedSpecialistId;
+  String? _selectedPlanId;
+  Map<String, dynamic>? _phase2Result;
 
   @override
   void initState() {
@@ -49,11 +52,13 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
         _demoUsers = await _service.getDemoUsers();
         _demoPrograms = await _service.getDemoPrograms();
         _demoSpecialists = await _service.getDemoSpecialists();
+        await _loadPlans();
       } else {
         _demoStudents = [];
         _demoUsers = [];
         _demoPrograms = [];
         _demoSpecialists = [];
+        _demoPlans = [];
       }
     } catch (e) {
       _status = {'exists': false, 'error': '$e'};
@@ -210,6 +215,54 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
     try {
       await _timeService.reset();
       _showMsg('تم إعادة ضبط الزمن التجريبي إلى 2026-01-01.');
+      await _refreshStatus();
+    } catch (e) {
+      _showMsg('خطأ: $e', error: true);
+    } finally {
+      setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _loadPlans() async {
+    if (_selectedStudentId != null && _selectedProgramId != null) {
+      _demoPlans = await _service.getDemoPlans(_selectedStudentId!, _selectedProgramId!);
+    } else {
+      _demoPlans = [];
+    }
+  }
+
+  Future<void> _onSelectionChanged() async {
+    _selectedPlanId = null;
+    _phase2Result = null;
+    await _loadPlans();
+  }
+
+  Future<void> _runPhase2() async {
+    if (_selectedStudentId == null || _selectedProgramId == null ||
+        _selectedSpecialistId == null || _selectedPlanId == null) {
+      _showMsg('اختر الطالب والبرنامج والأخصائي والهدف أولاً.', error: true);
+      return;
+    }
+    setState(() => _busy = true);
+    _showMsg('جارٍ محاكاة الرحلة العلاجية...');
+    try {
+      DateTime? baseDate;
+      if (_timeState['exists'] == true) {
+        baseDate = DateTime.parse(_timeState['currentDate'] as String);
+      }
+      final result = await _service.simulateSingleGoalTherapyJourney(
+        studentId: _selectedStudentId!,
+        programId: _selectedProgramId!,
+        specialistId: _selectedSpecialistId!,
+        planId: _selectedPlanId!,
+        baseDate: baseDate,
+      );
+      setState(() => _phase2Result = result);
+      if (result['success'] == true) {
+        _showMsg('تمت محاكاة الرحلة العلاجية بنجاح.');
+      } else {
+        _showMsg(result['message'] as String? ?? 'فشلت المحاكاة.', error: true);
+      }
       await _refreshStatus();
     } catch (e) {
       _showMsg('خطأ: $e', error: true);
@@ -477,7 +530,10 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
                                   value: s['id'] as String,
                                   child: Text('${s['name'] ?? ''}', style: const TextStyle(fontSize: 13)),
                                 )).toList(),
-                                onChanged: (v) => setState(() => _selectedStudentId = v),
+                                onChanged: (v) {
+                                  setState(() => _selectedStudentId = v);
+                                  _onSelectionChanged();
+                                },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
@@ -487,7 +543,10 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
                                   value: p['id'] as String,
                                   child: Text('${p['name'] ?? ''}', style: const TextStyle(fontSize: 13)),
                                 )).toList(),
-                                onChanged: (v) => setState(() => _selectedProgramId = v),
+                                onChanged: (v) {
+                                  setState(() => _selectedProgramId = v);
+                                  _onSelectionChanged();
+                                },
                               ),
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
@@ -497,7 +556,10 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
                                   value: s['id'] as String,
                                   child: Text('${s['name'] ?? ''}', style: const TextStyle(fontSize: 13)),
                                 )).toList(),
-                                onChanged: (v) => setState(() => _selectedSpecialistId = v),
+                                onChanged: (v) {
+                                  setState(() => _selectedSpecialistId = v);
+                                  _onSelectionChanged();
+                                },
                               ),
                               const SizedBox(height: 16),
                               _ToolButton(
@@ -632,11 +694,190 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
                           ),
                         ),
                       ),
+                    const SizedBox(height: 24),
+
+                    // ═══════════════════════════════════════════
+                    // SECTION 6: محاكاة رحلة علاجية لهدف واحد
+                    // ═══════════════════════════════════════════
+                    _SectionHeader(title: 'القسم 6: محاكاة رحلة علاجية لهدف واحد', cs: cs),
+                    const SizedBox(height: 8),
+                    if (!exists)
+                      Card(
+                        color: cs.surfaceContainerHighest,
+                        child: const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('أنشئ المركز التجريبي أولاً.'),
+                        ),
+                      )
+                    else if (_selectedStudentId == null || _selectedProgramId == null || _selectedSpecialistId == null)
+                      Card(
+                        color: cs.tertiaryContainer,
+                        child: const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('اختر طالبًا وبرنامجًا وأخصائيًا من القسم 4 أولاً.'),
+                        ),
+                      )
+                    else if (_demoPlans.isEmpty)
+                      Card(
+                        color: cs.tertiaryContainer,
+                        child: const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('لا توجد أهداف علاجية لهذا الطالب. استخدم "تجهيز تقرير أولي" من القسم 4 أولاً.'),
+                        ),
+                      )
+                    else
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(children: [
+                                Icon(Icons.route_outlined, size: 18, color: cs.primary),
+                                const SizedBox(width: 8),
+                                Text('التاريخ التجريبي الحالي:',
+                                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _timeState['currentDate'] != null
+                                      ? (_timeState['currentDate'] as String).substring(0, 10)
+                                      : 'غير محدد',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w900, fontSize: 15, color: cs.primary),
+                                ),
+                              ]),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: _selectedPlanId,
+                                decoration: const InputDecoration(labelText: 'الهدف العلاجي', border: OutlineInputBorder()),
+                                items: _demoPlans.map((p) => DropdownMenuItem(
+                                  value: p['id'] as String,
+                                  child: Text('${p['goal'] ?? ''}', style: const TextStyle(fontSize: 13)),
+                                )).toList(),
+                                onChanged: (v) => setState(() {
+                                  _selectedPlanId = v;
+                                  _phase2Result = null;
+                                }),
+                              ),
+                              const SizedBox(height: 12),
+                              _ToolButton(
+                                icon: Icons.play_circle_outline,
+                                title: 'تنفيذ رحلة علاجية تجريبية',
+                                subtitle: 'ينشئ 5 جلسات متدرجة + يحدّث progress + تقييم تحسن جديد',
+                                busy: _busy,
+                                color: Colors.teal,
+                                onTap: _runPhase2,
+                              ),
+                              if (_phase2Result != null) ...[
+                                const Divider(height: 20),
+                                _buildPhase2Result(cs),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 80),
                   ],
                 ),
               ),
       ),
+    );
+  }
+
+  Widget _buildPhase2Result(ColorScheme cs) {
+    final r = _phase2Result;
+    if (r == null) return const SizedBox.shrink();
+    final success = r['success'] == true;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: success ? cs.primaryContainer.withValues(alpha: 0.3) : cs.errorContainer.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: success ? cs.primary.withValues(alpha: 0.3) : cs.error.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Icon(success ? Icons.check_circle : Icons.error, size: 20, color: success ? Colors.green : cs.error),
+            const SizedBox(width: 8),
+            Text(success ? 'نتيجة المحاكاة' : 'فشلت المحاكاة',
+                style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+          ]),
+          if (!success) ...[
+            const SizedBox(height: 8),
+            Text(r['message'] as String? ?? '', style: TextStyle(fontSize: 13, color: cs.error)),
+          ],
+          if (success) ...[
+            const SizedBox(height: 8),
+            _resultRow('الهدف', r['planGoal'] as String? ?? '', cs),
+            _resultRow('الجلسات المنشأة', '${r['sessionsCreated']}', cs),
+            _resultRow(
+                'تسلسل النتائج', (r['sessionSequence'] as List).join(' ← '), cs),
+            _resultRow('نسبة التقدم بعد المحاكاة', '${r['progressAchieved']}%', cs),
+            const SizedBox(height: 6),
+            if (r['newAssessmentCreated'] == true) ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  Icon(Icons.check_circle, size: 16, color: Colors.green),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      r['findingImproved'] == true
+                          ? 'تم إنشاء تقييم تحسن جديد. البند "${r['findingItemTitle']}" تغير من ضعف إلى طبيعي.'
+                          : 'تم إنشاء تقييم جديد.',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ]),
+              ),
+            ] else ...[
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Row(children: [
+                  Icon(Icons.info_outline, size: 16, color: Colors.amber.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      r['assessmentMessage'] as String? ?? 'لم يتم إنشاء تقييم تحسن جديد.',
+                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
+                    ),
+                  ),
+                ]),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text('اذهب إلى ملف الطالب أو شاشة التقارير لرؤية النتائج.',
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _resultRow(String label, String value, ColorScheme cs) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(children: [
+        Expanded(
+          child: Text('$label:',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w600)),
+        ),
+        const SizedBox(width: 8),
+        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+      ]),
     );
   }
 

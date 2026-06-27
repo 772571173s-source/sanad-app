@@ -1849,6 +1849,308 @@ void main() {
     });
   });
 
+  // ─── Phase 2: simulateSingleGoalTherapyJourney Tests ───────
+  group('simulateSingleGoalTherapyJourney', () {
+    /// Sets up fresh state: demo center, student, specialist, assignment, assessment, plan.
+    /// Progress is always reset to 0 even if prepareInitialReport skips.
+    Future<({
+      DemoDataService srv,
+      DatabaseService db,
+      String studentId,
+      String specialistId,
+      String programId,
+      String planId,
+    })> _setup() async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      await srv.seedFullDemoData();
+      final db = DatabaseService.instance;
+      final library = SanadLibraryService(db);
+      await library.ensureSeeded();
+      final programs = await srv.getDemoPrograms();
+      final progId = programs.first['id'] as String;
+      final studentId = 'demo_phase2_st';
+      final specialistId = 'demo_phase2_spec';
+      await db.upsert('students', {
+        'id': studentId, 'center_id': DemoDataService.demoCenterId,
+        'name': 'طالب المرحلة 2', 'age': 6, 'status': 'نشط',
+        'diagnosis': 'اضطراب نطق', 'parent_name': '', 'parent_phone': '',
+        'portal_email': '', 'portal_password': '', 'photo_path': '', 'notes': '',
+      });
+      await db.upsert('users', {
+        'id': specialistId, 'center_id': DemoDataService.demoCenterId,
+        'name': 'أخصائي المرحلة 2', 'role': 'specialist',
+        'email': 'spec_p2@test.com', 'password_hash': 'hash',
+      });
+      // Create assignment + assessment + plans
+      await srv.prepareInitialReport(studentId, progId, specialistId,
+          baseDate: DateTime(2026, 1, 15));
+      // Reset all plan progress to 0 (prepareInitialReport may skip if assessment exists)
+      await db.updateWhere('training_plans',
+          {'progress': 0}, 'student_id = ? AND program_id = ?', [studentId, progId]);
+      // Delete any prior simulated sessions for this student
+      await db.deleteWhere('sessions',
+          'student_id = ?', [studentId]);
+      // Get the plan
+      final plans = await srv.getDemoPlans(studentId, progId);
+      if (plans.isEmpty) {
+        throw StateError('No plans after prepareInitialReport');
+      }
+      final planId = plans.first['id'] as String;
+      return (
+        srv: srv, db: db,
+        studentId: studentId, specialistId: specialistId,
+        programId: progId, planId: planId,
+      );
+    }
+
+    test('fails outside demo_center_sanad with clear message', () async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: 'real_st', programId: 'real_prog',
+        specialistId: 'real_spec', planId: 'real_plan',
+      );
+      expect(result['success'], isFalse);
+      // Center or student not found (center may exist from other tests)
+      expect(result['message'],
+          anyOf(contains('المركز التجريبي غير موجود'), contains('الطالب غير موجود')));
+    });
+
+    test('fails if student not in demo center', () async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      await srv.seedFullDemoData();
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: 'nonexistent', programId: 'prog',
+        specialistId: 'spec', planId: 'plan',
+      );
+      expect(result['success'], isFalse);
+      expect(result['message'], contains('الطالب غير موجود'));
+    });
+
+    test('fails if no assessment exists', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      // Delete findings first, then assessment (keep assignment & plans)
+      final existingAssessments = await db.where('clinical_assessments',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId]);
+      for (final a in existingAssessments) {
+        await db.deleteWhere('clinical_findings',
+            'assessment_id = ?', [a['id'] as String]);
+        await db.delete('clinical_assessments', a['id'] as String);
+      }
+      // Reset progress (previous test may have set it to 100)
+      await db.updateWhere('training_plans',
+          {'progress': 0}, 'id = ?', [planId]);
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+      );
+      expect(result['success'], isFalse);
+      expect(result['message'], contains('تقييم أولي'));
+    });
+
+    test('creates 5 sessions with only allowed statuses', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      final baseDate = DateTime(2026, 2, 1);
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: baseDate,
+      );
+      expect(result['success'], isTrue);
+      expect(result['sessionsCreated'], equals(5));
+      final sessions = await db.where('sessions',
+          where: 'student_id = ? AND plan_id = ?',
+          whereArgs: [studentId, planId]);
+      expect(sessions.length, equals(5));
+      final allowedStatuses = {'يحتاج إعادة', 'بمساعدة', 'متقن'};
+      for (final s in sessions) {
+        final qr = s['quick_result'] as String? ?? '';
+        expect(allowedStatuses, contains(qr),
+            reason: 'Session has disallowed status: $qr');
+      }
+      // Verify sequence
+      final seq = sessions.map((m) => Map<String, Object?>.from(m)).toList()
+        ..sort((a, b) => (a['started_at'] as String)
+            .compareTo(b['started_at'] as String));
+      expect(seq[0]['quick_result'], equals('يحتاج إعادة'));
+      expect(seq[1]['quick_result'], equals('يحتاج إعادة'));
+      expect(seq[2]['quick_result'], equals('بمساعدة'));
+      expect(seq[3]['quick_result'], equals('بمساعدة'));
+      expect(seq[4]['quick_result'], equals('متقن'));
+    });
+
+    test('sessions use baseDate and not DateTime.now', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      final baseDate = DateTime(2026, 3, 1);
+      await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: baseDate,
+      );
+      final sessions = await db.where('sessions',
+          where: 'student_id = ? AND plan_id = ?',
+          whereArgs: [studentId, planId]);
+      for (final s in sessions) {
+        final startedAt = s['started_at'] as String;
+        expect(startedAt.startsWith('2026'), isTrue,
+            reason: 'Session date should use baseDate year, not real year');
+      }
+    });
+
+    test('updates goal progress to 100 via steps', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      // Verify steps exist (3 steps per plan from prepareInitialReport)
+      var steps = await db.where('goal_skill_steps',
+          where: 'goal_id = ?', whereArgs: [planId]);
+      expect(steps.length, greaterThan(0));
+
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 4, 1),
+      );
+
+      // Steps should all be متقن now
+      steps = await db.where('goal_skill_steps',
+          where: 'goal_id = ?', whereArgs: [planId]);
+      for (final step in steps) {
+        expect(step['status'], equals('متقن'));
+      }
+
+      // Plan progress should be 100
+      final plan = await db.first('training_plans',
+          where: 'id = ?', whereArgs: [planId]);
+      expect(plan, isNotNull);
+      expect(plan!['progress'], equals(100),
+          reason: 'All steps متقن → progress=100');
+      expect(result['progressAchieved'], equals(100));
+    });
+
+    test('updates goal progress for plan without steps', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      // Delete steps for this plan
+      await db.deleteWhere('goal_skill_steps',
+          'goal_id = ?', [planId]);
+      // Set initial progress < 100
+      await db.updateWhere('training_plans',
+          {'progress': 20}, 'id = ?', [planId]);
+
+      await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 5, 1),
+      );
+
+      final plan = await db.first('training_plans',
+          where: 'id = ?', whereArgs: [planId]);
+      expect(plan, isNotNull);
+      // No steps → progress = 100 because last session is متقن
+      expect(plan!['progress'], equals(100));
+    });
+
+    test('creates new assessment with linked finding set to normal', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 6, 1),
+      );
+
+      // Should have created a new assessment
+      final assessments = await db.where('clinical_assessments',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId],
+          orderBy: 'created_at DESC');
+      final newAssess = assessments.isNotEmpty ? assessments.first : null;
+      expect(newAssess, isNotNull);
+      expect(newAssess!['id'], contains('demo_phase2_assess_'));
+
+      // Check findings: the linked one should be is_normal=1
+      final findings = await db.where('clinical_findings',
+          where: 'assessment_id = ?', whereArgs: [newAssess['id']]);
+      expect(findings.length, greaterThan(0));
+      bool foundImproved = false;
+      for (final f in findings) {
+        if ((f['is_normal'] as int? ?? 0) == 1) {
+          foundImproved = true;
+        }
+      }
+      expect(foundImproved, isTrue,
+          reason: 'New assessment should have at least one normal finding');
+    });
+
+    test('no duplicate goals created after new assessment', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      final plansBefore = await db.where('training_plans',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId]);
+
+      await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 7, 1),
+      );
+
+      final plansAfter = await db.where('training_plans',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId]);
+      expect(plansAfter.length, equals(plansBefore.length),
+          reason: 'New assessment should not create duplicate goals');
+    });
+
+    test('does not modify other plans', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      final allPlansBefore = await db.where('training_plans',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId]);
+      final otherPlanProgressBefore = <String, int>{};
+      for (final p in allPlansBefore) {
+        if (p['id'] != planId) {
+          otherPlanProgressBefore[p['id'] as String] = p['progress'] as int? ?? 0;
+        }
+      }
+
+      await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 8, 1),
+      );
+
+      final allPlansAfter = await db.where('training_plans',
+          where: 'student_id = ? AND program_id = ?',
+          whereArgs: [studentId, programId]);
+      for (final p in allPlansAfter) {
+        if (p['id'] != planId) {
+          final before = otherPlanProgressBefore[p['id'] as String] ?? 0;
+          expect(p['progress'], equals(before),
+              reason: 'Other plan ${p['id']} progress should not change');
+        }
+      }
+    });
+
+    test('fails if plan is already mastered', () async {
+      final (:srv, :db, :studentId, :specialistId, :programId, :planId) =
+          await _setup();
+      await db.updateWhere('training_plans',
+          {'progress': 100}, 'id = ?', [planId]);
+      final result = await srv.simulateSingleGoalTherapyJourney(
+        studentId: studentId, programId: programId,
+        specialistId: specialistId, planId: planId,
+        baseDate: DateTime(2026, 9, 1),
+      );
+      expect(result['success'], isFalse);
+      expect(result['message'], contains('متقن بالفعل'));
+    });
+  });
+
   // ─── DemoTimeService Tests ──────────────────────────────────
   group('DemoTimeService', () {
     late DemoTimeService timeService;
