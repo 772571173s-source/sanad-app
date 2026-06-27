@@ -132,7 +132,7 @@ class SmartPdfReportService {
   }
 
   pw.Widget _header(pw.Font font, ReportData data) {
-    final now = DateTime.now().toIso8601String().split('T').first;
+    final now = _formatDate(DateTime.now().toIso8601String());
     return pw.Container(
       padding: const pw.EdgeInsets.all(14),
       decoration: pw.BoxDecoration(
@@ -167,12 +167,13 @@ class SmartPdfReportService {
                       font: font,
                       fontSize: 21,
                       color: _text,
-                      fontWeight: pw.FontWeight.bold)),
+                      fontWeight: pw.FontWeight.bold,
+                      wordSpacing: 2)),
               pw.SizedBox(height: 4),
               pw.Text(data.center?.address ?? '',
-                  style: pw.TextStyle(font: font, color: _text)),
+                  style: pw.TextStyle(font: font, color: _text, wordSpacing: 2)),
               pw.Text('تاريخ التقرير: $now',
-                  style: pw.TextStyle(font: font)),
+                  style: pw.TextStyle(font: font, wordSpacing: 2)),
             ],
           ),
         ],
@@ -183,7 +184,7 @@ class SmartPdfReportService {
   pw.Widget _studentInfoBox(pw.Font font, ReportData data) {
     final student = data.student;
     final period = data.dateFrom.isNotEmpty
-        ? 'من ${data.dateFrom} إلى ${data.dateTo}'
+        ? 'من ${_formatDate(data.dateFrom)} إلى ${_formatDate(data.dateTo)}'
         : 'بدون فترة محددة';
     return pw.Container(
       width: double.infinity,
@@ -222,9 +223,10 @@ class SmartPdfReportService {
               style: pw.TextStyle(
                   font: font,
                   fontSize: 11,
-                  fontWeight: pw.FontWeight.bold)),
+                  fontWeight: pw.FontWeight.bold,
+                  wordSpacing: 2)),
           pw.Text(value,
-              style: pw.TextStyle(font: font, fontSize: 11)),
+              style: pw.TextStyle(font: font, fontSize: 11, wordSpacing: 2)),
         ],
       ),
     );
@@ -266,12 +268,13 @@ class SmartPdfReportService {
         borderRadius: pw.BorderRadius.circular(6),
       ),
       child: pw.Text(
-        'القسم $index: ${section.programName}',
+        'القسم $index - ${section.programName}',
         style: pw.TextStyle(
             font: font,
             fontSize: 15,
             color: PdfColors.white,
-            fontWeight: pw.FontWeight.bold),
+            fontWeight: pw.FontWeight.bold,
+            wordSpacing: 2),
       ),
     );
   }
@@ -331,19 +334,20 @@ class SmartPdfReportService {
     return [
       _subSectionTitle(font, 'التقييمات'),
       pw.SizedBox(height: 6),
-      ...section.assessments.take(3).map((a) => _arBullet(
-            font,
-            '${a.specialistName} - ${a.createdAt.split('T').first}',
-            fontSize: 10.5,
-          )),
       if (section.findings.isNotEmpty) ...[
-        pw.SizedBox(height: 4),
         pw.Text('عدد نقاط التقييم: ${section.findings.length}',
             style: pw.TextStyle(
                 font: font,
-                fontSize: 10,
-                color: _muted)),
+                fontSize: 10.5,
+                color: _muted,
+                wordSpacing: 2)),
+        pw.SizedBox(height: 4),
       ],
+      ...section.assessments.take(3).map((a) => _arBullet(
+            font,
+            '${a.specialistName} - ${_formatDate(a.createdAt)}',
+            fontSize: 10.5,
+          )),
     ];
   }
 
@@ -452,7 +456,7 @@ class SmartPdfReportService {
             ],
           ),
           ...section.sessions.map((session) => pw.TableRow(children: [
-                _cell(font, session.startedAt.split('T').first),
+                _cell(font, _formatDate(session.startedAt)),
                 _cell(font, session.cardTitle),
                 _cell(font, session.quickResult),
                 _cell(font, '${session.successRate}%'),
@@ -540,7 +544,7 @@ class SmartPdfReportService {
       ),
       child: pw.Text(title,
           style: pw.TextStyle(
-              font: font, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              font: font, fontSize: 16, fontWeight: pw.FontWeight.bold, wordSpacing: 2)),
     );
   }
 
@@ -555,7 +559,8 @@ class SmartPdfReportService {
           style: pw.TextStyle(
               font: font,
               fontSize: 12,
-              fontWeight: pw.FontWeight.bold)),
+              fontWeight: pw.FontWeight.bold,
+              wordSpacing: 2)),
     );
   }
 
@@ -584,10 +589,11 @@ class SmartPdfReportService {
                   font: font,
                   fontSize: 16,
                   color: accent,
-                  fontWeight: pw.FontWeight.bold)),
+                  fontWeight: pw.FontWeight.bold,
+                  wordSpacing: 2)),
           pw.SizedBox(height: 2),
           pw.Text(label,
-              style: pw.TextStyle(font: font, fontSize: 9)),
+              style: pw.TextStyle(font: font, fontSize: 9, wordSpacing: 2)),
         ],
       ),
     );
@@ -603,7 +609,7 @@ class SmartPdfReportService {
         '- $text',
         textDirection: pw.TextDirection.rtl,
         textAlign: pw.TextAlign.right,
-        style: pw.TextStyle(font: font, fontSize: fontSize),
+        style: pw.TextStyle(font: font, fontSize: fontSize, wordSpacing: 2),
       ),
     );
   }
@@ -617,6 +623,7 @@ class SmartPdfReportService {
           font: font,
           fontSize: 9.5,
           fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+          wordSpacing: 1,
         ),
       ),
     );
@@ -629,10 +636,10 @@ class SmartPdfReportService {
       children: [
         if (specialistSignature.isNotEmpty)
           pw.Text('توقيع الأخصائي: $specialistSignature',
-              style: pw.TextStyle(font: font, fontSize: 12)),
+              style: pw.TextStyle(font: font, fontSize: 12, wordSpacing: 2)),
         if (managerSignature.isNotEmpty)
           pw.Text('توقيع المدير: $managerSignature',
-              style: pw.TextStyle(font: font, fontSize: 12)),
+              style: pw.TextStyle(font: font, fontSize: 12, wordSpacing: 2)),
       ],
     );
   }
@@ -645,21 +652,17 @@ class SmartPdfReportService {
         border: pw.Border.all(color: const PdfColor.fromInt(0xFFFFC107)),
         borderRadius: pw.BorderRadius.circular(6),
       ),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.center,
-        children: [
-          pw.Text('⚠ ',
-              style: pw.TextStyle(font: font, fontSize: 14, color: const PdfColor.fromInt(0xFF856404))),
-          pw.Text(
-            'تقرير تجريبي - غير مخصص للاستخدام الرسمي',
-            style: pw.TextStyle(
-              font: font,
-              fontSize: 13,
-              color: const PdfColor.fromInt(0xFF856404),
-              fontWeight: pw.FontWeight.bold,
-            ),
-          ),
-        ],
+      child: pw.Text(
+        'تنبيه: تقرير تجريبي - غير مخصص للاستخدام الرسمي',
+        textDirection: pw.TextDirection.rtl,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(
+          font: font,
+          fontSize: 13,
+          color: const PdfColor.fromInt(0xFF856404),
+          fontWeight: pw.FontWeight.bold,
+          wordSpacing: 2,
+        ),
       ),
     );
   }
@@ -670,8 +673,10 @@ class SmartPdfReportService {
       child: pw.Center(
         child: pw.Text(
           'تم إنشاء التقرير بواسطة منصة سند لإدارة الجلسات والبرامج العلاجية',
+          textDirection: pw.TextDirection.rtl,
+          textAlign: pw.TextAlign.center,
           style: pw.TextStyle(
-              font: font, fontSize: 8, color: PdfColors.grey600),
+              font: font, fontSize: 8, color: PdfColors.grey600, wordSpacing: 1),
         ),
       ),
     );
@@ -680,7 +685,7 @@ class SmartPdfReportService {
   pw.Widget _reportTitleSection(pw.Font font, ReportData data,
       String reportCategory, String? quarter, String? year) {
     final title = _categoryTitle(reportCategory);
-    final sub = _categorySubtitle(reportCategory, quarter, year);
+    final sub = _categorySubtitle(reportCategory, quarter, year, data);
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.all(10),
@@ -696,16 +701,37 @@ class SmartPdfReportService {
                   font: font,
                   fontSize: 18,
                   color: PdfColors.white,
-                  fontWeight: pw.FontWeight.bold)),
+                  fontWeight: pw.FontWeight.bold,
+                  wordSpacing: 2)),
           if (sub != null) ...[
             pw.SizedBox(height: 4),
             pw.Text(sub,
                 style: pw.TextStyle(
-                    font: font, fontSize: 11, color: PdfColors.white)),
+                    font: font, fontSize: 11, color: PdfColors.white, wordSpacing: 2)),
           ],
         ],
       ),
     );
+  }
+
+  String _quarterName(String quarter) {
+    switch (quarter) {
+      case 'Q1': return 'الربع الأول';
+      case 'Q2': return 'الربع الثاني';
+      case 'Q3': return 'الربع الثالث';
+      case 'Q4': return 'الربع الرابع';
+      default: return quarter;
+    }
+  }
+
+  /// Convert ISO date string (2026-03-15 or 2026-03-15T00:00:00)
+  /// to dd-MM-yyyy format (15-03-2026).
+  String _formatDate(String isoDate) {
+    if (isoDate.isEmpty) return '';
+    final datePart = isoDate.split('T').first;
+    final parts = datePart.split('-');
+    if (parts.length != 3) return datePart;
+    return '${parts[2]}-${parts[1]}-${parts[0]}';
   }
 
   String _categoryTitle(String reportCategory) {
@@ -717,20 +743,24 @@ class SmartPdfReportService {
       case 'supervisorQuarterly':
         return 'تقرير إشرافي ربع سنوي';
       default:
-        return 'تقرير علاجي';
+        return 'تقرير علاجي شامل';
     }
   }
 
   String? _categorySubtitle(
-      String reportCategory, String? quarter, String? year) {
+      String reportCategory, String? quarter, String? year, ReportData data) {
     switch (reportCategory) {
       case 'specialistInitial':
+        if (data.totalSessions > 0) {
+          return 'هذا التقرير مبني على التقييم الأولي للطالب والجلسات العلاجية المسجلة.';
+        }
         return 'هذا التقرير مبني على التقييم الأولي للطالب.';
       case 'specialistFollowup':
         return 'مقارنة مع التقرير السابق';
       case 'supervisorQuarterly':
         if (quarter != null && year != null) {
-          return 'الربع: $quarter - السنة: $year';
+          final qName = _quarterName(quarter);
+          return '$qName - السنة: $year';
         }
         return 'تقرير إشرافي ربع سنوي';
       default:
@@ -777,7 +807,7 @@ class SmartPdfReportService {
         widgets.add(pw.Padding(
           padding: const pw.EdgeInsets.only(right: 12, bottom: 2),
           child: pw.Text('- ${g.goalTitle}',
-              style: pw.TextStyle(font: font, fontSize: 10)),
+               style: pw.TextStyle(font: font, fontSize: 10, wordSpacing: 2)),
         ));
       }
       widgets.add(pw.SizedBox(height: 4));
