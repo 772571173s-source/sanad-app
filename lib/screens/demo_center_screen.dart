@@ -5,6 +5,7 @@ import '../providers/app_provider.dart';
 import '../repositories/sanad_repository.dart';
 import '../services/database_service.dart';
 import '../services/demo_data_service.dart';
+import '../services/demo_time_service.dart';
 
 const demoPassDisplay = 'Demo@123456';
 
@@ -17,7 +18,9 @@ class DemoCenterScreen extends StatefulWidget {
 
 class _DemoCenterScreenState extends State<DemoCenterScreen> {
   final _service = DemoDataService(SanadRepository(DatabaseService.instance));
+  final _timeService = DemoTimeService.instance;
   Map<String, dynamic> _status = {};
+  Map<String, dynamic> _timeState = {};
   bool _loadingStatus = true;
   bool _busy = false;
   String? _message;
@@ -40,6 +43,7 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
     setState(() => _loadingStatus = true);
     try {
       _status = await _service.getFullStatus();
+      _timeState = await _timeService.getState();
       if (_status['exists'] == true) {
         _demoStudents = await _service.getDemoStudents();
         _demoUsers = await _service.getDemoUsers();
@@ -74,6 +78,7 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
     _showMsg('جارٍ إنشاء المركز التجريبي...');
     try {
       await _service.seedFullDemoData();
+      await _timeService.reset();
       _showMsg('تم إنشاء المركز التجريبي بنجاح.');
       await _refreshStatus();
     } catch (e) {
@@ -140,28 +145,71 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
     try {
       final progId = _selectedProgramId!;
       final specId = _selectedSpecialistId!;
+      DateTime? baseDate;
+      if (_timeState['exists'] == true) {
+        baseDate = DateTime.parse(_timeState['currentDate'] as String);
+      }
       switch (toolName) {
         case 'prepareInitial':
-          await _service.prepareInitialReport(_selectedStudentId!, progId, specId);
+          await _service.prepareInitialReport(_selectedStudentId!, progId, specId, baseDate: baseDate);
           _showMsg('تم تجهيز بيانات التقرير الأولي. ادخل كأخصائي وافتتح التقارير.');
           break;
         case 'addProgressSessions':
-          await _service.addProgressSessions(_selectedStudentId!, progId, specId);
+          await _service.addProgressSessions(_selectedStudentId!, progId, specId, baseDate: baseDate);
           _showMsg('تمت إضافة 5 جلسات تقدم.');
           break;
         case 'prepareFollowupNoChange':
-          await _service.prepareFollowupNoChange(_selectedStudentId!, progId, specId);
+          await _service.prepareFollowupNoChange(_selectedStudentId!, progId, specId, baseDate: baseDate);
           _showMsg('تم تجهيز متابعة بلا تغيير. ادخل كأخصائي وجرب تقرير متابعة.');
           break;
         case 'prepareFollowupWithProgress':
-          await _service.prepareFollowupWithProgress(_selectedStudentId!, progId, specId);
+          await _service.prepareFollowupWithProgress(_selectedStudentId!, progId, specId, baseDate: baseDate);
           _showMsg('تم تجهيز متابعة مع تحسن. ادخل كأخصائي وجرب تقرير متابعة.');
           break;
         case 'prepareQuarterly':
-          await _service.prepareQuarterlyData(_selectedStudentId!, progId, specId);
+          await _service.prepareQuarterlyData(_selectedStudentId!, progId, specId, baseDate: baseDate);
           _showMsg('تم تجهيز بيانات Q1/Q2. ادخل كمشرف فني وجرب التقارير الربعية.');
           break;
       }
+      await _refreshStatus();
+    } catch (e) {
+      _showMsg('خطأ: $e', error: true);
+    } finally {
+      setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _advanceWeek() async {
+    setState(() => _busy = true);
+    try {
+      await _timeService.advanceWeeks(1);
+      _showMsg('تم تقديم الزمن التجريبي أسبوعًا واحدًا.');
+      await _refreshStatus();
+    } catch (e) {
+      _showMsg('خطأ: $e', error: true);
+    } finally {
+      setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _advanceMonth() async {
+    setState(() => _busy = true);
+    try {
+      await _timeService.advanceMonths(1);
+      _showMsg('تم تقديم الزمن التجريبي شهرًا واحدًا.');
+      await _refreshStatus();
+    } catch (e) {
+      _showMsg('خطأ: $e', error: true);
+    } finally {
+      setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _resetTime() async {
+    setState(() => _busy = true);
+    try {
+      await _timeService.reset();
+      _showMsg('تم إعادة ضبط الزمن التجريبي إلى 2026-01-01.');
       await _refreshStatus();
     } catch (e) {
       _showMsg('خطأ: $e', error: true);
@@ -491,6 +539,95 @@ class _DemoCenterScreenState extends State<DemoCenterScreen> {
                                 busy: _busy, color: Colors.purple,
                                 onTap: () => _runTool('prepareQuarterly'),
                               ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+
+                    // ═══════════════════════════════════════════
+                    // SECTION 5: محاكاة الزمن العلاجي
+                    // ═══════════════════════════════════════════
+                    _SectionHeader(title: 'القسم 5: محاكاة الزمن العلاجي', cs: cs),
+                    const SizedBox(height: 8),
+                    if (!exists)
+                      Card(
+                        color: cs.surfaceContainerHighest,
+                        child: const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('أنشئ المركز التجريبي أولاً.'),
+                        ),
+                      )
+                    else
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(children: [
+                                Icon(Icons.calendar_month, size: 18, color: cs.primary),
+                                const SizedBox(width: 8),
+                                Text('التاريخ التجريبي الحالي:',
+                                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _timeState['currentDate'] != null
+                                      ? (_timeState['currentDate'] as String).substring(0, 10)
+                                      : 'غير محدد',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w900, fontSize: 15, color: cs.primary),
+                                ),
+                              ]),
+                              if ((_timeState['lastAction'] as String?)?.isNotEmpty == true) ...[
+                                const SizedBox(height: 4),
+                                Text('آخر إجراء: ${_timeState['lastAction']}',
+                                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                              ],
+                              const SizedBox(height: 16),
+                              Row(children: [
+                                Expanded(
+                                  child: _ToolButton(
+                                    icon: Icons.skip_next,
+                                    title: 'تقديم أسبوع',
+                                    subtitle: 'يزيد التاريخ 7 أيام',
+                                    busy: _busy, color: Colors.blue,
+                                    onTap: _advanceWeek,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _ToolButton(
+                                    icon: Icons.skip_next,
+                                    title: 'تقديم شهر',
+                                    subtitle: 'يزيد التاريخ شهرًا',
+                                    busy: _busy, color: Colors.indigo,
+                                    onTap: _advanceMonth,
+                                  ),
+                                ),
+                              ]),
+                              const SizedBox(height: 8),
+                              Row(children: [
+                                Expanded(
+                                  child: _ToolButton(
+                                    icon: Icons.restart_alt,
+                                    title: 'إعادة ضبط الزمن',
+                                    subtitle: 'يعيد التاريخ إلى 2026-01-01',
+                                    busy: _busy, color: Colors.orange,
+                                    onTap: _resetTime,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _ToolButton(
+                                    icon: Icons.refresh,
+                                    title: 'تحديث',
+                                    subtitle: 'تحديث حالة الزمن',
+                                    busy: _busy, color: Colors.grey,
+                                    onTap: _refreshStatus,
+                                  ),
+                                ),
+                              ]),
                             ],
                           ),
                         ),

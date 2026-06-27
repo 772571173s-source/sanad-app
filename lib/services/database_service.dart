@@ -1964,6 +1964,14 @@ class DatabaseService {
         'created_at': "TEXT NOT NULL DEFAULT ''",
         'updated_at': "TEXT NOT NULL DEFAULT ''",
       },
+      'demo_time_state': {
+        'center_id': 'TEXT PRIMARY KEY',
+        'current_date': 'TEXT NOT NULL',
+        'initial_date': 'TEXT NOT NULL',
+        'last_action': "TEXT NOT NULL DEFAULT ''",
+        'created_at': 'TEXT NOT NULL',
+        'updated_at': 'TEXT NOT NULL',
+      },
     };
     for (final entry in tables.entries) {
       final table = entry.key;
@@ -2057,6 +2065,11 @@ class DatabaseService {
     await db.delete(table, where: 'id = ?', whereArgs: [id]);
   }
 
+  Future<void> ensureTable(String name, String createSql) async {
+    final db = await database;
+    await _ensureTable(db, name, createSql);
+  }
+
   Future<void> deleteWhere(
       String table, String where, List<Object?> whereArgs) async {
     final db = await database;
@@ -2091,6 +2104,8 @@ class DatabaseService {
           where: 'center_id = ?', whereArgs: [centerId]);
 
       // Tables that now have center_id – delete directly
+      await db.delete('demo_time_state',
+          where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('student_followups',
           where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('student_therapy_programs',

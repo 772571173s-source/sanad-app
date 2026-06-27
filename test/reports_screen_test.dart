@@ -16,6 +16,7 @@ import 'package:sanad_app/services/report_data_builder.dart';
 import 'package:sanad_app/services/report_export_service.dart';
 import 'package:sanad_app/services/smart_pdf_report_service.dart';
 import 'package:sanad_app/services/demo_data_service.dart';
+import 'package:sanad_app/services/demo_time_service.dart';
 import 'package:sanad_app/services/sanad_library_service.dart';
 import 'package:sanad_app/screens/demo_center_screen.dart';
 import 'package:sanad_app/screens/reports_screen.dart';
@@ -1741,6 +1742,247 @@ void main() {
       final service = DemoDataService(SanadRepository(db));
       final ready = await service.isLibraryReady();
       expect(ready, isA<bool>());
+    });
+
+    test('prepareInitialReport uses baseDate when provided', () async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      await srv.seedFullDemoData();
+      final db = DatabaseService.instance;
+      await db.upsert('students', {
+        'id': 'demo_base_st',
+        'center_id': DemoDataService.demoCenterId,
+        'name': 'طالب أساس',
+        'age': 6, 'status': 'نشط', 'diagnosis': 'اختبار',
+        'parent_name': '', 'parent_phone': '',
+        'portal_email': '', 'portal_password': '',
+        'photo_path': '', 'notes': '',
+      });
+      await db.upsert('users', {
+        'id': 'demo_base_spec',
+        'center_id': DemoDataService.demoCenterId, 'name': 'أخصائي أساس',
+        'role': 'specialist', 'email': 'spec@test.com', 'password_hash': 'hash',
+      });
+      final programs = await srv.getDemoPrograms();
+      if (programs.isEmpty) return;
+      final progId = programs.first['id'] as String;
+      final baseDate = DateTime(2026, 3, 15);
+      await srv.prepareInitialReport('demo_base_st', progId, 'demo_base_spec',
+          baseDate: baseDate);
+      final plans = await db.where('training_plans',
+          where: 'student_id = ?', whereArgs: ['demo_base_st']);
+      if (plans.isNotEmpty) {
+        final targetDate = plans.first['target_date'] as String;
+        expect(targetDate.startsWith('2026-03-15'), isTrue);
+      }
+    });
+
+    test('addProgressSessions uses baseDate when provided', () async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      await srv.seedFullDemoData();
+      final db = DatabaseService.instance;
+      await db.upsert('students', {
+        'id': 'demo_base_st2',
+        'center_id': DemoDataService.demoCenterId,
+        'name': 'طالب أساس 2',
+        'age': 6, 'status': 'نشط', 'diagnosis': 'اختبار',
+        'parent_name': '', 'parent_phone': '',
+        'portal_email': '', 'portal_password': '',
+        'photo_path': '', 'notes': '',
+      });
+      await db.upsert('users', {
+        'id': 'demo_base_spec2',
+        'center_id': DemoDataService.demoCenterId, 'name': 'أخصائي أساس 2',
+        'role': 'specialist', 'email': 's2@test.com', 'password_hash': 'hash',
+      });
+      final programs = await srv.getDemoPrograms();
+      if (programs.isEmpty) return;
+      final progId = programs.first['id'] as String;
+      final baseDate = DateTime(2026, 2, 1);
+      await srv.prepareInitialReport('demo_base_st2', progId, 'demo_base_spec2',
+          baseDate: baseDate);
+      await srv.addProgressSessions('demo_base_st2', progId, 'demo_base_spec2',
+          baseDate: baseDate);
+      final sessions = await db.where('sessions',
+          where: 'student_id = ?', whereArgs: ['demo_base_st2']);
+      if (sessions.isNotEmpty) {
+        for (final s in sessions) {
+          final startedAt = s['started_at'] as String;
+          expect(startedAt.startsWith('2026'), isTrue,
+              reason: 'Session should use baseDate year, not real year');
+        }
+      }
+    });
+
+    test('prepareQuarterlyData uses baseDate year when provided', () async {
+      final srv = DemoDataService(SanadRepository(DatabaseService.instance));
+      await srv.seedFullDemoData();
+      final db = DatabaseService.instance;
+      await db.upsert('students', {
+        'id': 'demo_base_st3',
+        'center_id': DemoDataService.demoCenterId,
+        'name': 'طالب أساس 3',
+        'age': 6, 'status': 'نشط', 'diagnosis': 'اختبار',
+        'parent_name': '', 'parent_phone': '',
+        'portal_email': '', 'portal_password': '',
+        'photo_path': '', 'notes': '',
+      });
+      await db.upsert('users', {
+        'id': 'demo_base_spec3',
+        'center_id': DemoDataService.demoCenterId, 'name': 'أخصائي أساس 3',
+        'role': 'specialist', 'email': 's3@test.com', 'password_hash': 'hash',
+      });
+      final programs = await srv.getDemoPrograms();
+      if (programs.isEmpty) return;
+      final progId = programs.first['id'] as String;
+      final baseDate = DateTime(2025, 6, 1);
+      await srv.prepareQuarterlyData('demo_base_st3', progId, 'demo_base_spec3',
+          baseDate: baseDate);
+      final sessions = await db.where('sessions',
+          where: 'student_id = ?', whereArgs: ['demo_base_st3']);
+      if (sessions.isNotEmpty) {
+        for (final s in sessions) {
+          final startedAt = s['started_at'] as String;
+          expect(startedAt.startsWith('2025'), isTrue,
+              reason: 'Quarterly sessions should use baseDate year 2025');
+        }
+      }
+    });
+  });
+
+  // ─── DemoTimeService Tests ──────────────────────────────────
+  group('DemoTimeService', () {
+    late DemoTimeService timeService;
+
+    setUp(() async {
+      final db = DatabaseService.instance;
+      await db.deleteCenter(DemoTimeService.demoCenterId);
+      timeService = DemoTimeService.instance;
+      await timeService.reset();
+    });
+
+    test('getState returns exists=false before initialization', () async {
+      final db = DatabaseService.instance;
+      await db.deleteWhere('demo_time_state', 'center_id = ?', [DemoTimeService.demoCenterId]);
+      final state = await timeService.getState();
+      expect(state['exists'], isFalse);
+    });
+
+    test('reset creates default state with 2026-01-01', () async {
+      await timeService.reset();
+      final state = await timeService.getState();
+      expect(state['exists'], isTrue);
+      expect(state['currentDate'], startsWith('2026-01-01'));
+      expect(state['initialDate'], startsWith('2026-01-01'));
+      expect(state['lastAction'], isNotEmpty);
+    });
+
+    test('getCurrentDate returns correct default date', () async {
+      await timeService.reset();
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2026));
+      expect(date.month, equals(1));
+      expect(date.day, equals(1));
+    });
+
+    test('advanceWeeks advances date by 7 days', () async {
+      await timeService.reset();
+      await timeService.advanceWeeks(1);
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2026));
+      expect(date.month, equals(1));
+      expect(date.day, equals(8));
+    });
+
+    test('advanceWeeks multiple weeks', () async {
+      await timeService.reset();
+      await timeService.advanceWeeks(4);
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2026));
+      expect(date.month, equals(1));
+      expect(date.day, equals(29));
+    });
+
+    test('advanceMonths advances date by 1 month', () async {
+      await timeService.reset();
+      await timeService.advanceMonths(1);
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2026));
+      expect(date.month, equals(2));
+      expect(date.day, equals(1));
+    });
+
+    test('advanceMonths multiple months crosses year boundary', () async {
+      await timeService.reset();
+      await timeService.advanceMonths(12);
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2027));
+      expect(date.month, equals(1));
+      expect(date.day, equals(1));
+    });
+
+    test('reset restores date to initial value after advances', () async {
+      await timeService.reset();
+      await timeService.advanceMonths(3);
+      var date = await timeService.getCurrentDate();
+      expect(date.month, equals(4));
+
+      await timeService.reset();
+      date = await timeService.getCurrentDate();
+      expect(date.month, equals(1));
+      expect(date.day, equals(1));
+    });
+
+    test('setCurrentDate sets a specific date', () async {
+      await timeService.reset();
+      await timeService.setCurrentDate(DateTime(2026, 6, 15));
+      final date = await timeService.getCurrentDate();
+      expect(date.year, equals(2026));
+      expect(date.month, equals(6));
+      expect(date.day, equals(15));
+    });
+
+    test('currentWeekRange returns valid range', () async {
+      await timeService.reset();
+      final range = await timeService.currentWeekRange();
+      expect(range['start'], isA<DateTime>());
+      expect(range['end'], isA<DateTime>());
+      expect(range['end']!.difference(range['start']!).inDays, equals(6));
+    });
+
+    test('currentMonthRange returns valid range', () async {
+      await timeService.reset();
+      final range = await timeService.currentMonthRange();
+      expect(range['start'], isA<DateTime>());
+      expect(range['end'], isA<DateTime>());
+      expect(range['start']!.month, equals(1));
+      expect(range['start']!.day, equals(1));
+      expect(range['end']!.month, equals(1));
+      expect(range['end']!.day, equals(31));
+    });
+
+    test('advanceDays works correctly', () async {
+      await timeService.reset();
+      await timeService.advanceDays(15);
+      final date = await timeService.getCurrentDate();
+      expect(date.day, equals(16));
+    });
+
+    test('time state is isolated to demo_center_sanad', () async {
+      // Non-demo center should not have time state
+      final db = DatabaseService.instance;
+      final nonDemoState = await db.first('demo_time_state',
+          where: 'center_id = ?', whereArgs: ['real_center']);
+      expect(nonDemoState, isNull);
+    });
+
+    test('advanceMonths January 31 shifts correctly', () async {
+      await timeService.reset();
+      await timeService.setCurrentDate(DateTime(2026, 1, 31));
+      await timeService.advanceMonths(1);
+      final date = await timeService.getCurrentDate();
+      // Dart's DateTime(2026, 2, 31) overflows to 2026-03-03
+      expect(date.month, equals(3));
+      expect(date.day, equals(3));
     });
   });
 }

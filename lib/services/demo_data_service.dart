@@ -190,11 +190,11 @@ class DemoDataService {
   // ═══════════════════════════════════════════════════════════
 
   /// Ensure a student is assigned to a program + specialist.
-  Future<void> _ensureAssignment(String studentId, String programId, String specialistId) async {
+  Future<void> _ensureAssignment(String studentId, String programId, String specialistId, {DateTime? baseDate}) async {
     final existing = await _db.first('student_program_assignments',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (existing != null) return;
-    final now = DateTime.now().toIso8601String();
+    final now = (baseDate ?? DateTime.now()).toIso8601String();
     await _db.upsert('student_program_assignments', {
       'id': 'spa_accel_${studentId}_$programId', 'center_id': demoCenterId,
       'student_id': studentId, 'program_id': programId,
@@ -211,14 +211,14 @@ class DemoDataService {
 
   /// Tool 1: تجهيز تقرير أولي
   /// Creates: assessment + findings + goals + steps.
-  Future<void> prepareInitialReport(String studentId, String programId, String specialistId) async {
-    await _ensureAssignment(studentId, programId, specialistId);
+  Future<void> prepareInitialReport(String studentId, String programId, String specialistId, {DateTime? baseDate}) async {
+    await _ensureAssignment(studentId, programId, specialistId, baseDate: baseDate);
     // Check if assessment already exists
     final existing = await _db.first('clinical_assessments',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (existing != null) return;
 
-    final now = DateTime.now().toIso8601String();
+    final now = (baseDate ?? DateTime.now()).toIso8601String();
     final assessmentId = 'demo_accel_assess_${studentId}_$programId';
     await _db.upsert('clinical_assessments', {
       'id': assessmentId, 'center_id': demoCenterId, 'student_id': studentId,
@@ -268,13 +268,13 @@ class DemoDataService {
 
   /// Tool 2: إضافة جلسات تقدم
   /// Creates [count] sessions after now with increasing success rates.
-  Future<void> addProgressSessions(String studentId, String programId, String specialistId, {int count = 5}) async {
+  Future<void> addProgressSessions(String studentId, String programId, String specialistId, {int count = 5, DateTime? baseDate}) async {
     final plans = await _db.where('training_plans',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (plans.isEmpty) {
       throw StateError('لا توجد أهداف علاجية لهذا الطالب. استخدم "تجهيز تقرير أولي" أولاً.');
     }
-    final now = DateTime.now();
+    final now = baseDate ?? DateTime.now();
     for (int i = 1; i <= count; i++) {
       final planId = plans[i % plans.length]['id'] as String;
       final targetGoal = plans[i % plans.length]['goal'] as String;
@@ -302,11 +302,11 @@ class DemoDataService {
   /// Tool 3: تجهيز متابعة بلا تغيير
   /// Creates assessment + goals + pre-report sessions + a saved report,
   /// but NO sessions after the report date.
-  Future<void> prepareFollowupNoChange(String studentId, String programId, String specialistId) async {
-    await _ensureAssignment(studentId, programId, specialistId);
-    await prepareInitialReport(studentId, programId, specialistId);
+  Future<void> prepareFollowupNoChange(String studentId, String programId, String specialistId, {DateTime? baseDate}) async {
+    await _ensureAssignment(studentId, programId, specialistId, baseDate: baseDate);
+    await prepareInitialReport(studentId, programId, specialistId, baseDate: baseDate);
     // Add 2 sessions before a past report date
-    final reportDate = DateTime.now().subtract(const Duration(days: 30));
+    final reportDate = (baseDate ?? DateTime.now()).subtract(const Duration(days: 30));
     final plans = await _db.where('training_plans',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (plans.isEmpty) return;
@@ -321,7 +321,7 @@ class DemoDataService {
         'started_at': reportDate.subtract(Duration(days: (3 - i) * 7)).toIso8601String(),
         'duration_seconds': 1800, 'card_title': 'نطق صوت /ر/',
         'quick_result': i == 1 ? 'بمساعدة' : 'متقن',
-        'notes': 'جلسة قبل التقرير', 'summary': 'تم التدريب', 'created_at': DateTime.now().toIso8601String(),
+        'notes': 'جلسة قبل التقرير', 'summary': 'تم التدريب', 'created_at': (baseDate ?? DateTime.now()).toIso8601String(),
       });
     }
     // Save a report with snapshot
@@ -342,17 +342,17 @@ class DemoDataService {
       'program_id': programId, 'specialist_id': specialistId,
       'report_category': 'specialistInitial', 'scope': 'singleProgram',
       'snapshot_json': snapshot, 'report_status': 'exported',
-      'updated_at': DateTime.now().toIso8601String(),
+      'updated_at': (baseDate ?? DateTime.now()).toIso8601String(),
     });
   }
 
   /// Tool 4: تجهيز متابعة مع تحسن
   /// Creates assessment + goals + pre-report sessions + report +
   /// sessions AFTER the report date with progress.
-  Future<void> prepareFollowupWithProgress(String studentId, String programId, String specialistId) async {
-    await prepareFollowupNoChange(studentId, programId, specialistId);
+  Future<void> prepareFollowupWithProgress(String studentId, String programId, String specialistId, {DateTime? baseDate}) async {
+    await prepareFollowupNoChange(studentId, programId, specialistId, baseDate: baseDate);
     // Add 3 sessions after the report with progress
-    final reportDate = DateTime.now().subtract(const Duration(days: 30));
+    final reportDate = (baseDate ?? DateTime.now()).subtract(const Duration(days: 30));
     final plans = await _db.where('training_plans',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (plans.isEmpty) return;
@@ -368,7 +368,7 @@ class DemoDataService {
         'duration_seconds': 1800, 'card_title': 'نطق صوت /ر/',
         'quick_result': i == 1 ? 'بمساعدة' : (i == 2 ? 'بمساعدة' : 'متقن'),
         'notes': 'جلسة بعد التقرير مع تحسن', 'summary': 'تم ملاحظة تحسن في الأداء',
-        'created_at': DateTime.now().toIso8601String(),
+        'created_at': (baseDate ?? DateTime.now()).toIso8601String(),
       });
     }
     final lastPlanId = plans.last['id'] as String;
@@ -379,21 +379,22 @@ class DemoDataService {
 
   /// Tool 5: تجهيز بيانات ربع سنوية Q1/Q2
   /// Creates Q1 sessions + Q1 report + Q2 sessions with progress.
-  Future<void> prepareQuarterlyData(String studentId, String programId, String specialistId) async {
-    await _ensureAssignment(studentId, programId, specialistId);
+  Future<void> prepareQuarterlyData(String studentId, String programId, String specialistId, {DateTime? baseDate}) async {
+    await _ensureAssignment(studentId, programId, specialistId, baseDate: baseDate);
     // Create assessment if not exists
     final existing = await _db.first('clinical_assessments',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (existing == null) {
-      await prepareInitialReport(studentId, programId, specialistId);
+      await prepareInitialReport(studentId, programId, specialistId, baseDate: baseDate);
     }
-    final now = DateTime.now().toIso8601String();
+    final now = (baseDate ?? DateTime.now()).toIso8601String();
+    final year = baseDate?.year ?? 2026;
     final plans = await _db.where('training_plans',
         where: 'student_id = ? AND program_id = ?', whereArgs: [studentId, programId]);
     if (plans.isEmpty) return;
 
-    // Q1 sessions (Jan-Mar 2026)
-    final q1Dates = ['2026-01-15T10:00:00','2026-02-01T10:00:00','2026-02-15T10:00:00','2026-03-01T10:00:00'];
+    // Q1 sessions (Jan-Mar)
+    final q1Dates = ['$year-01-15T10:00:00','$year-02-01T10:00:00','$year-02-15T10:00:00','$year-03-01T10:00:00'];
     for (int i = 0; i < q1Dates.length; i++) {
       final planId = plans[i % plans.length]['id'] as String;
       await _db.upsert('sessions', {
@@ -409,24 +410,24 @@ class DemoDataService {
     }
     // Q1 report
     final q1snapshot = jsonEncode({
-      'studentId': studentId, 'generatedAt': '2026-03-31T23:59:59',
+      'studentId': studentId, 'generatedAt': '${year}-03-31T23:59:59',
       'reportCategory': 'supervisorQuarterly', 'totalSessions': q1Dates.length,
-      'totalPlans': plans.length, 'quarter': 'Q1', 'year': '2026',
+      'totalPlans': plans.length, 'quarter': 'Q1', 'year': '$year',
       'sections': [{'programId': programId, 'programName': _programName(programId), 'overallProgress': 25, 'masteredGoals': 0, 'activeGoals': plans.length}],
     });
     await _db.upsert('reports', {
       'id': 'demo_accel_${studentId}_Q1', 'center_id': demoCenterId,
       'student_id': studentId, 'type': 'تقرير ربع سنوي',
-      'created_at': '2026-03-31T23:59:59', 'improvement_rate': 25,
+      'created_at': '${year}-03-31T23:59:59', 'improvement_rate': 25,
       'specialist_signature': await _specialistName(specialistId), 'manager_signature': '[تجريبي] مدير مركز سند',
       'program_id': programId, 'specialist_id': specialistId,
       'report_category': 'supervisorQuarterly', 'scope': 'singleProgram',
-      'quarter': 'Q1', 'year': '2026', 'snapshot_json': q1snapshot,
+      'quarter': 'Q1', 'year': '$year', 'snapshot_json': q1snapshot,
       'report_status': 'exported', 'updated_at': now,
     });
 
-    // Q2 sessions with progress (Apr-Jun 2026)
-    final q2Dates = ['2026-04-10T10:00:00','2026-04-25T10:00:00','2026-05-10T10:00:00','2026-05-25T10:00:00'];
+    // Q2 sessions with progress (Apr-Jun)
+    final q2Dates = ['$year-04-10T10:00:00','$year-04-25T10:00:00','$year-05-10T10:00:00','$year-05-25T10:00:00'];
     for (int i = 0; i < q2Dates.length; i++) {
       final planId = plans[i % plans.length]['id'] as String;
       await _db.upsert('sessions', {
