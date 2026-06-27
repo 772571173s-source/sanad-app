@@ -1,9 +1,12 @@
 import 'dart:io';
 import 'dart:developer' as developer;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/app_models.dart';
 import '../providers/app_provider.dart';
@@ -11,6 +14,7 @@ import '../services/report_export_service.dart';
 import '../services/smart_pdf_report_service.dart';
 import '../services/word_report_service.dart';
 import '../services/word_report_service_v2.dart';
+import '../services/center_quarterly_data_builder.dart';
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -44,6 +48,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   // Manager/Supervisor: selected year for quarterly reports
   int _selectedYear = DateTime.now().year;
+
+  // Report period (1-4) for the Word real-data export
+  int _reportPeriod = 1;
 
   // Loading state
   bool _isSaving = false;
@@ -595,6 +602,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
           ],
         ),
         const SizedBox(height: 16),
+        // Report period selector for Word data export
+        Text('اختر فترة التقرير لـ Word:',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<int>(
+          initialValue: _reportPeriod,
+          decoration: const InputDecoration(labelText: 'فترة التقرير'),
+          items: const [
+            DropdownMenuItem(value: 1, child: Text('التقرير الأول (الأشهر 1-4)')),
+            DropdownMenuItem(value: 2, child: Text('التقرير الثاني (الأشهر 5-7)')),
+            DropdownMenuItem(value: 3, child: Text('التقرير الثالث (الأشهر 8-10)')),
+            DropdownMenuItem(value: 4, child: Text('التقرير الرابع (الأشهر 11-12)')),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => _reportPeriod = value);
+          },
+        ),
+        const SizedBox(height: 16),
         TextField(
           controller: signature,
           decoration: const InputDecoration(labelText: 'توقيع الأخصائي'),
@@ -616,8 +642,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _buildActionButton('تصدير Word تجريبي', Icons.description_outlined,
             _isSaving ? null : () => _generateWordPoC()),
         const SizedBox(height: 4),
-        _buildActionButton('تصدير Word V2 تجريبي', Icons.description_outlined,
+         _buildActionButton('تصدير Word V2 تجريبي', Icons.description_outlined,
             _isSaving ? null : () => _generateWordV2PoC()),
+        const SizedBox(height: 4),
+        _buildActionButton('تصدير تقرير المركز Word - بيانات حقيقية',
+            Icons.assignment_outlined,
+            _isSaving ? null : () => _generateCenterQuarterlyWord(context)),
       ],
     );
   }
@@ -863,6 +893,80 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }
   }
 
+  Future<void> _generateCenterQuarterlyWord(BuildContext context) async {
+    if (_isSaving) return;
+    final app = context.read<AppProvider>();
+    final student = _selectedStudent;
+    if (student == null) {
+      _showSnack('الرجاء اختيار طالب أولاً.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      final period = _reportPeriod;
+      final y = _selectedYear;
+      final months = CenterQuarterlyDataBuilder.monthsForReportPeriod(period);
+      final firstMonth = months.first;
+      final lastMonth = months.last;
+      final dateFrom = '$y-${_pad(firstMonth)}-01';
+      final dateTo = lastMonth == 12
+          ? '${y + 1}-01-01'
+          : '$y-${_pad(lastMonth + 1)}-01';
+
+      String? programId;
+      if (scope == 'singleProgram') programId = _selectedProgramId;
+
+      final builder = CenterQuarterlyDataBuilder(app: app);
+      final model = await builder.build(
+        studentId: student.id,
+        year: y,
+        periodNumber: period,
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        programId: programId,
+      );
+
+      final bytes = await WordReportServiceV2.generateBytes(model);
+
+      if (kIsWeb) {
+        _showSnack('دعم الويب غير متاح حاليًا.');
+        return;
+      }
+
+      String? outputPath;
+      if (_isMobile) {
+        final dir = await getApplicationDocumentsDirectory();
+        final reportsDir = Directory('${dir.path}/reports');
+        if (!reportsDir.existsSync()) reportsDir.createSync(recursive: true);
+        final filePath = '${reportsDir.path}/center_quarterly_real_data_poc.docx';
+        await File(filePath).writeAsBytes(bytes);
+        await Share.shareXFiles([XFile(filePath)], text: 'تقرير المركز - سند');
+        outputPath = filePath;
+      } else {
+        outputPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'حفظ تقرير المركز Word',
+          fileName: 'center_quarterly_real_data_poc.docx',
+          type: FileType.custom,
+          allowedExtensions: ['docx'],
+        );
+        if (outputPath != null) {
+          await File(outputPath).writeAsBytes(bytes);
+        }
+      }
+
+      if (outputPath == null) {
+        _showSnack('تم إلغاء حفظ الملف.');
+        return;
+      }
+      _showSnack('تم حفظ تقرير المركز Word: $outputPath');
+    } catch (e) {
+      _showSnack('خطأ: ${e.toString().replaceFirst('Bad state: ', '')}');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
   Future<void> _performSave({
     required BuildContext context,
     required AppProvider app,
@@ -994,6 +1098,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       SnackBar(content: Text(message)),
     );
   }
+
+  static String _pad(int n) => n.toString().padLeft(2, '0');
 }
 
 // ---------------------------------------------------------------------------
