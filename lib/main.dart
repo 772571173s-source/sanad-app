@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/app_provider.dart';
@@ -66,8 +68,14 @@ TextTheme _sanadTextTheme(TextTheme base, Color text, Color muted) {
   );
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Use a stable directory for the database on desktop platforms
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    final dir = await getApplicationSupportDirectory();
+    DatabaseService.setDatabaseDirectory(dir.path);
+  }
 
   // Log all Flutter errors to console
   FlutterError.onError = (details) {

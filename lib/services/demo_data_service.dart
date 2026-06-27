@@ -74,6 +74,7 @@ class DemoDataService {
   /// dataEntry). Does NOT create programs, specialists, or students.
   /// The Sanad library must be available system-wide before calling this.
   Future<void> seedFullDemoData() async {
+    print('[DemoDataService] seedFullDemoData() called — center=$demoCenterId');
     // Clean up any old demo-specific programs before seeding
     await _db.deleteWhere('therapy_program_templates',
         'center_id = ?', [demoCenterId]);
@@ -90,6 +91,7 @@ class DemoDataService {
 
   // ─── Reset (keep center + base accounts, delete therapeutic data) ─
   Future<void> resetDemoData() async {
+    print('[DemoDataService] resetDemoData() called — center=$demoCenterId');
     final tablesToClean = [
       'goal_skill_steps',
       'clinical_findings',
@@ -116,6 +118,7 @@ class DemoDataService {
 
   // ─── Delete everything demo ───────────────────────────────
   Future<void> deleteDemoData() async {
+    print('[DemoDataService] deleteDemoData() called — center=$demoCenterId');
     await _db.deleteCenter(demoCenterId);
     // Delete all demo users (base + manually added + any with center_id)
     await _db.deleteWhere('users', 'center_id = ?', [demoCenterId]);

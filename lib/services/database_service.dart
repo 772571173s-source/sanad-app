@@ -11,16 +11,28 @@ class DatabaseService {
   DatabaseService._();
 
   static final DatabaseService instance = DatabaseService._();
-  static const currentVersion = 34;
+  static const currentVersion = 35;
 
   mobile.Database? _database;
+  static String? _customDbDirectory;
+
+  /// Sets a custom database directory (useful for desktop platforms where
+  /// [getDatabasesPath] may not return a stable path between runs).
+  /// Must be called before the [database] getter is accessed for the first time.
+  static void setDatabaseDirectory(String dir) => _customDbDirectory = dir;
+
+  Future<String> _resolveDbDir() async {
+    if (_customDbDirectory != null) return _customDbDirectory!;
+    final factory = _databaseFactory();
+    return factory.getDatabasesPath();
+  }
 
   Future<mobile.Database> get database async {
     if (_database != null) return _database!;
+    final dbDir = await _resolveDbDir();
     final factory = _databaseFactory();
-    final dbPath = await factory.getDatabasesPath();
     _database = await factory.openDatabase(
-      path.join(dbPath, 'sanad_mvp.db'),
+      path.join(dbDir, 'sanad_mvp.db'),
       options: mobile.OpenDatabaseOptions(
         version: currentVersion,
         onConfigure: (db) async => db.execute('PRAGMA foreign_keys = ON'),
@@ -46,9 +58,8 @@ class DatabaseService {
   }
 
   Future<String> databaseFilePath() async {
-    final factory = _databaseFactory();
-    final dbPath = await factory.getDatabasesPath();
-    return path.join(dbPath, 'sanad_mvp.db');
+    final dbDir = await _resolveDbDir();
+    return path.join(dbDir, 'sanad_mvp.db');
   }
 
   Future<void> exportBackup(String targetPath) async {
@@ -155,10 +166,16 @@ class DatabaseService {
   }
 
   Future<void> resetLocalDatabase() async {
+    print('[DB] resetLocalDatabase() called — DELETING entire database file');
     await _database?.close();
     _database = null;
     final file = File(await databaseFilePath());
     if (await file.exists()) await file.delete();
+  }
+
+  Future<void> close() async {
+    await _database?.close();
+    _database = null;
   }
 
   Future<void> _createSchema(mobile.Database db) async {
@@ -845,6 +862,26 @@ class DatabaseService {
           'specialist_id': "TEXT NOT NULL DEFAULT ''",
         },
       });
+    }
+    if (oldVersion < 35) {
+      await _ensureTable(db, 'center_report_settings', '''
+        CREATE TABLE center_report_settings (
+          center_id TEXT PRIMARY KEY,
+          logo_base64 TEXT NULL,
+          logo_file_name TEXT NULL,
+          arabic_header_text TEXT NOT NULL DEFAULT '',
+          english_header_text TEXT NOT NULL DEFAULT '',
+          default_report_title TEXT NOT NULL DEFAULT '',
+          default_technical_supervisor_name TEXT NOT NULL DEFAULT '',
+          footer_notes TEXT NOT NULL DEFAULT '',
+          reports_to_fund INTEGER NOT NULL DEFAULT 0,
+          fund_name TEXT NOT NULL DEFAULT '',
+          show_fund_card_number INTEGER NOT NULL DEFAULT 0,
+          show_referral_date INTEGER NOT NULL DEFAULT 0,
+          show_referral_source INTEGER NOT NULL DEFAULT 0,
+          updated_at TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -1972,6 +2009,22 @@ class DatabaseService {
         'created_at': 'TEXT NOT NULL',
         'updated_at': 'TEXT NOT NULL',
       },
+      'center_report_settings': {
+        'center_id': 'TEXT PRIMARY KEY',
+        'logo_base64': 'TEXT NULL',
+        'logo_file_name': 'TEXT NULL',
+        'arabic_header_text': "TEXT NOT NULL DEFAULT ''",
+        'english_header_text': "TEXT NOT NULL DEFAULT ''",
+        'default_report_title': "TEXT NOT NULL DEFAULT ''",
+        'default_technical_supervisor_name': "TEXT NOT NULL DEFAULT ''",
+        'footer_notes': "TEXT NOT NULL DEFAULT ''",
+        'reports_to_fund': 'INTEGER NOT NULL DEFAULT 0',
+        'fund_name': "TEXT NOT NULL DEFAULT ''",
+        'show_fund_card_number': 'INTEGER NOT NULL DEFAULT 0',
+        'show_referral_date': 'INTEGER NOT NULL DEFAULT 0',
+        'show_referral_source': 'INTEGER NOT NULL DEFAULT 0',
+        'updated_at': 'TEXT NOT NULL',
+      },
     };
     for (final entry in tables.entries) {
       final table = entry.key;
@@ -2077,6 +2130,7 @@ class DatabaseService {
   }
 
   Future<void> deleteCenter(String centerId) async {
+    print('[DB] deleteCenter() called — center=$centerId');
     final db = await database;
     await db.execute('PRAGMA foreign_keys = OFF');
     try {
@@ -2111,6 +2165,8 @@ class DatabaseService {
       await db.delete('student_therapy_programs',
           where: 'center_id = ?', whereArgs: [centerId]);
       await db.delete('assessment_drafts',
+          where: 'center_id = ?', whereArgs: [centerId]);
+      await db.delete('center_report_settings',
           where: 'center_id = ?', whereArgs: [centerId]);
 
       // Students (depends on center)

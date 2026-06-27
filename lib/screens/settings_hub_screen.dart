@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_provider.dart';
 import '../widgets/app_widgets.dart';
 import 'backup_screen.dart';
+import 'center_report_settings_screen.dart';
 import 'center_settings_screen.dart';
 import 'password_screen.dart';
 
@@ -31,6 +32,22 @@ class SettingsHubScreen extends StatelessWidget {
           if (app.isCenterManager) ...[
             const SizedBox(height: 12),
             const CenterSettingsScreen(),
+          ],
+          if (app.isCenterManager || app.isClinicalSupervisor) ...[
+            const SizedBox(height: 12),
+            AppCard(
+              child: ListTile(
+                leading: const Icon(Icons.description_outlined),
+                title: const Text('إعدادات التقارير'),
+                subtitle: const Text('الشعار، الترويسة، خيارات التقرير'),
+                trailing: const Icon(Icons.chevron_left),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const CenterReportSettingsScreen()),
+                ),
+              ),
+            ),
           ],
           if (app.isOwner || app.isCenterManager) ...[
             const SizedBox(height: 12),

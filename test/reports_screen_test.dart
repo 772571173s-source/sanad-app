@@ -7,8 +7,10 @@ import 'package:provider/provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:sanad_app/models/app_models.dart';
+import 'package:sanad_app/models/center_report_settings.dart';
 import 'package:sanad_app/providers/app_provider.dart';
 import 'package:sanad_app/repositories/sanad_repository.dart';
+import 'package:sanad_app/services/center_report_settings_service.dart';
 import 'package:sanad_app/services/database_service.dart';
 import 'package:sanad_app/services/pdf_service.dart';
 import 'package:sanad_app/services/report_comparison_service.dart';
@@ -2285,6 +2287,130 @@ void main() {
       // Dart's DateTime(2026, 2, 31) overflows to 2026-03-03
       expect(date.month, equals(3));
       expect(date.day, equals(3));
+    });
+  });
+
+  // ─── Center Report Settings ───────────────────────────────────
+  group('CenterReportSettings', () {
+    late DatabaseService db;
+    late CenterReportSettingsService svc;
+
+    setUp(() async {
+      db = DatabaseService.instance;
+      svc = CenterReportSettingsService(db);
+    });
+
+    test('defaults() returns center-specific defaults', () {
+      final s = CenterReportSettings.defaults('center_1');
+      expect(s.centerId, equals('center_1'));
+      expect(s.defaultReportTitle, isNotEmpty);
+      expect(s.arabicHeaderText, equals(''));
+      expect(s.reportsToFund, isFalse);
+    });
+
+    test('save then getForCenter returns same data', () async {
+      final now = DateTime.now().toIso8601String();
+      final original = CenterReportSettings(
+        centerId: 'test_report_center',
+        arabicHeaderText: 'مركز اختبار التقارير',
+        englishHeaderText: 'Test Report Center',
+        defaultReportTitle: 'تقرير اختبار',
+        defaultTechnicalSupervisorName: 'مشرف اختبار',
+        footerNotes: 'ملاحظة اختبار',
+        reportsToFund: true,
+        fundName: 'جهة اختبار',
+        showFundCardNumber: true,
+        showReferralDate: true,
+        showReferralSource: false,
+        updatedAt: now,
+      );
+      await svc.save(original);
+
+      final loaded = await svc.getForCenter('test_report_center');
+      expect(loaded.centerId, equals('test_report_center'));
+      expect(loaded.arabicHeaderText, equals('مركز اختبار التقارير'));
+      expect(loaded.englishHeaderText, equals('Test Report Center'));
+      expect(loaded.defaultReportTitle, equals('تقرير اختبار'));
+      expect(loaded.defaultTechnicalSupervisorName, equals('مشرف اختبار'));
+      expect(loaded.footerNotes, equals('ملاحظة اختبار'));
+      expect(loaded.reportsToFund, isTrue);
+      expect(loaded.fundName, equals('جهة اختبار'));
+      expect(loaded.showFundCardNumber, isTrue);
+      expect(loaded.showReferralDate, isTrue);
+      expect(loaded.showReferralSource, isFalse);
+    });
+
+    test('save updates existing row (upsert)', () async {
+      final now = DateTime.now().toIso8601String();
+      await svc.save(CenterReportSettings(
+        centerId: 'upsert_center',
+        arabicHeaderText: 'نص أول',
+        updatedAt: now,
+      ));
+      await svc.save(CenterReportSettings(
+        centerId: 'upsert_center',
+        arabicHeaderText: 'نص محدث',
+        reportsToFund: true,
+        updatedAt: now,
+      ));
+      final loaded = await svc.getForCenter('upsert_center');
+      expect(loaded.arabicHeaderText, equals('نص محدث'));
+      expect(loaded.reportsToFund, isTrue);
+    });
+
+    test('getForCenter returns defaults when no row exists', () async {
+      final s = await svc.getForCenter('nonexistent_center');
+      expect(s.centerId, equals('nonexistent_center'));
+      expect(s.defaultReportTitle, isNotEmpty);
+    });
+
+    test('save/load logo then clearLogo', () async {
+      final bytes = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]); // PNG header
+      await svc.updateLogo('logo_center', bytes, 'test.png');
+
+      var loaded = await svc.getForCenter('logo_center');
+      expect(loaded.logoBase64, isNotNull);
+      expect(loaded.logoFileName, equals('test.png'));
+
+      await svc.clearLogo('logo_center');
+      loaded = await svc.getForCenter('logo_center');
+      expect(loaded.logoBase64, isNull);
+      expect(loaded.logoFileName, isNull);
+    });
+
+    test('delete removes row', () async {
+      final now = DateTime.now().toIso8601String();
+      await svc.save(CenterReportSettings(
+        centerId: 'delete_test_center',
+        arabicHeaderText: 'سيتم حذفي',
+        updatedAt: now,
+      ));
+      await svc.delete('delete_test_center');
+      final s = await svc.getForCenter('delete_test_center');
+      // After delete, getForCenter returns defaults
+      expect(s.arabicHeaderText, equals(''));
+    });
+
+    test('data survives database re-open (persistence)', () async {
+      final now = DateTime.now().toIso8601String();
+      await svc.save(CenterReportSettings(
+        centerId: 'persist_test_center',
+        arabicHeaderText: 'بيانات ثابتة',
+        reportsToFund: true,
+        fundName: 'صندوق اختبار',
+        updatedAt: now,
+      ));
+
+      // Close and re-open the database
+      await db.close();
+      await db.database; // re-opens
+
+      // Verify data still exists
+      final svc2 = CenterReportSettingsService(db);
+      final loaded = await svc2.getForCenter('persist_test_center');
+      expect(loaded.arabicHeaderText, equals('بيانات ثابتة'));
+      expect(loaded.reportsToFund, isTrue);
+      expect(loaded.fundName, equals('صندوق اختبار'));
     });
   });
 }

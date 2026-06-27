@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../models/assessment_improvement_summary.dart';
 import '../repositories/sanad_repository.dart';
+import '../models/center_report_settings.dart';
+import '../services/center_report_settings_service.dart';
+import '../services/database_service.dart';
 import '../services/demo_data_service.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
@@ -74,6 +77,9 @@ class AppProvider extends ChangeNotifier {
   bool _centerPlansLoaded = false;
   List<ClinicalAssessment> centerClinicalAssessments = [];
   bool _centerAssessmentsLoaded = false;
+  CenterReportSettings? centerReportSettings;
+  final CenterReportSettingsService _centerReportSettingsService =
+      CenterReportSettingsService(DatabaseService.instance);
 
   bool get isSanadOwnerAccount => user?.role == UserRole.sanadOwner;
   bool get isSupportMode => isSanadOwnerAccount && supportModeCenter != null;
@@ -815,6 +821,38 @@ class AppProvider extends ChangeNotifier {
           .addAll(await _repository.clinicalAssessments(student.id));
     }
     _centerAssessmentsLoaded = true;
+    notifyListeners();
+  }
+
+  Future<void> loadCenterReportSettings() async {
+    if (activeCenterId.isEmpty) return;
+    centerReportSettings =
+        await _centerReportSettingsService.getForCenter(activeCenterId);
+    notifyListeners();
+  }
+
+  Future<void> saveCenterReportSettings(CenterReportSettings s) async {
+    _ensure(activeCenterId.isNotEmpty, 'لا يوجد مركز محدد.');
+    final finalSettings = s.copyWith(centerId: activeCenterId);
+    await _centerReportSettingsService.save(finalSettings);
+    centerReportSettings = finalSettings;
+    notifyListeners();
+  }
+
+  Future<void> updateCenterReportLogo(List<int> bytes, String fileName) async {
+    _ensure(activeCenterId.isNotEmpty, 'لا يوجد مركز محدد.');
+    await _centerReportSettingsService.updateLogo(
+        activeCenterId, bytes, fileName);
+    centerReportSettings =
+        await _centerReportSettingsService.getForCenter(activeCenterId);
+    notifyListeners();
+  }
+
+  Future<void> clearCenterReportLogo() async {
+    _ensure(activeCenterId.isNotEmpty, 'لا يوجد مركز محدد.');
+    await _centerReportSettingsService.clearLogo(activeCenterId);
+    centerReportSettings =
+        await _centerReportSettingsService.getForCenter(activeCenterId);
     notifyListeners();
   }
 
