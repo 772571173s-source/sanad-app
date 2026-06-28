@@ -98,6 +98,12 @@ class CenterQuarterlyDataBuilder {
       ]));
     }
 
+    final serviceNames = <String>{};
+    for (final plan in plans) {
+      final name = programNames[plan.programId] ?? '';
+      if (name.isNotEmpty) serviceNames.add(name);
+    }
+
     final title = periodNumber != null
         ? 'التقرير ${_periodArabic(periodNumber)} - $year'
         : 'التقرير - $year';
@@ -106,6 +112,13 @@ class CenterQuarterlyDataBuilder {
       centerName: centerName,
       studentName: student.name,
       dateRange: title,
+      programType: student.programType,
+      diagnosis: student.diagnosis,
+      centerSettings: app.centerReportSettings,
+      year: year,
+      studentAge: student.age.toString(),
+      months: months,
+      activeServiceNames: serviceNames.toList()..sort(),
       sections: [
         WordReportSection(
           sectionTitle: 'بيانات الجلسات',
@@ -128,11 +141,11 @@ class CenterQuarterlyDataBuilder {
       planSessionsInRange.sort((a, b) => a.startedAt.compareTo(b.startedAt));
       final last = planSessionsInRange.last;
       if (last.specialistId.isNotEmpty) {
-        return userNames[last.specialistId] ?? last.specialistId;
+        return userNames[last.specialistId] ?? '';
       }
     }
     if (plan.specialistId.isNotEmpty) {
-      return userNames[plan.specialistId] ?? plan.specialistId;
+      return userNames[plan.specialistId] ?? '';
     }
     return '';
   }

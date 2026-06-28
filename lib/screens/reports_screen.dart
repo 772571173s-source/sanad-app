@@ -902,6 +902,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       return;
     }
 
+    if (app.centerReportSettings == null) {
+      await app.loadCenterReportSettings();
+    }
+
     setState(() => _isSaving = true);
     try {
       final period = _reportPeriod;
